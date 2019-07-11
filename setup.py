@@ -22,6 +22,7 @@ setuptools.setup(
     ],
     scripts=[
         'create_j1939db-json.py',
+        'pretty_j1939.py',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
