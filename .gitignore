@@ -1,3 +1,9 @@
 .xls
 tmp/
 venv/
+.idea/
+build/
+dist/
+pretty_j1939.egg-info/
+__pycache__/
+
