@@ -194,7 +194,7 @@ def get_spn_value(message_data, spn, validate=True):
     return value
 
 
-def describe_message_data(message_id, message_data):
+def describe_message_data(message_id, message_data, include_na=False):
     pgn, da, sa = parse_j1939_id(message_id)
 
     description = dict()
@@ -206,7 +206,10 @@ def describe_message_data(message_id, message_data):
             if is_spn_numerical_values(spn):
                 spn_value = get_spn_value(message_data, spn)
                 if spn_value is None:
-                    description[spn_name] = "N/A"
+                    if include_na:
+                        description[spn_name] = "N/A"
+                    else:
+                        continue
                 elif is_spn_bitencoded(spn_units):
                     try:
                         enum_descriptions = j1939db["J1939BitDecodings"]["{}".format(spn)]
