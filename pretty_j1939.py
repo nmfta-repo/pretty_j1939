@@ -37,11 +37,13 @@ bam_processor = pretty_j1939.parse.get_bam_processor(process_bam_found)
 with open(args.candump, 'r') as f:
     for candump_line in f.readlines():
         try:
+            timestamp = float(candump_line.split(' ')[0].replace('(', '').replace(')', ''))
             message_id = bitstring.BitString(hex=candump_line.split(' ')[2].split('#')[0])
             message_data = bitstring.BitString(hex=candump_line.split(' ')[2].split('#')[1])
-            timestamp = float(candump_line.split(' ')[0].replace('(', '').replace(')', ''))
 
         except IndexError:
+            continue
+        except ValueError:
             continue
 
         desc_line = ''

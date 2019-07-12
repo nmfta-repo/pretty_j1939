@@ -139,8 +139,8 @@ def lookup_all_spn_params(callback, spn):
     spn_start = j1939db["J1939SPNdb"]["{}".format(spn)]["StartBit"]
     spn_end = j1939db["J1939SPNdb"]["{}".format(spn)]["EndBit"]
     spn_length = j1939db["J1939SPNdb"]["{}".format(spn)]["SPNLength"]
-    scale = j1939db["J1939SPNdb"]["{}".format(spn)]["Resolution"]
     offset = j1939db["J1939SPNdb"]["{}".format(spn)]["Offset"]
+    scale = j1939db["J1939SPNdb"]["{}".format(spn)]["Resolution"]
     if scale <= 0:
         scale = 1
     return name, offset, scale, spn_end, spn_length, spn_start, units
@@ -156,19 +156,41 @@ def get_spn_bytes(message_data, spn):
     return cut_data
 
 
-def get_spn_value(message_data, spn):
-    scale = j1939db["J1939SPNdb"]["{}".format(spn)]["Resolution"]
-    operational_min = j1939db["J1939SPNdb"]["{}".format(spn)]["OperationalLow"]
-    operational_max = j1939db["J1939SPNdb"]["{}".format(spn)]["OperationalHigh"]
+def is_spn_bitencoded(spn_units):
+    return spn_units.lower() in ("bit", "binary",)
 
+
+def is_spn_numerical_values(spn):
+    spn_units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
+    norm_units = spn_units.lower()
+    return norm_units not in ("manufacturer determined", "byte", "", "request dependent", "ascii")
+
+
+# returns a float in units of the SPN, or None if the value if the SPN value is not available in the message_data
+#   if validate == True, raises a ValueError if the value is present in message_data but is beyond the operational range
+def get_spn_value(message_data, spn, validate=True):
+    units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
+
+    offset = j1939db["J1939SPNdb"]["{}".format(spn)]["Offset"]
+    scale = j1939db["J1939SPNdb"]["{}".format(spn)]["Resolution"]
     if scale <= 0:
         scale = 1
-    offset = j1939db["J1939SPNdb"]["{}".format(spn)]["Offset"]
 
     cut_data = get_spn_bytes(message_data, spn)
-    value = cut_data.uint * scale + offset
-    if value < operational_min or value > operational_max:
-        raise ValueError
+    if cut_data.all(True):  # value unavailable in message_data
+        return None
+
+    if is_spn_bitencoded(units):
+        value = cut_data.uint
+    else:
+        value = cut_data.uint * scale + offset
+
+        if validate:
+            operational_min = j1939db["J1939SPNdb"]["{}".format(spn)]["OperationalLow"]
+            operational_max = j1939db["J1939SPNdb"]["{}".format(spn)]["OperationalHigh"]
+            if value < operational_min or value > operational_max:
+                raise ValueError
+
     return value
 
 
@@ -181,23 +203,27 @@ def describe_message_data(message_id, message_data):
         spn_units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
 
         try:
-            if spn_units.lower() in ("bit", "binary",):
+            if is_spn_numerical_values(spn):
                 spn_value = get_spn_value(message_data, spn)
-                try:
-                    enum_descriptions = j1939db["J1939BitDecodings"]["{}".format(spn)]
-                    spn_value_description = enum_descriptions[str(int(spn_value))].strip()
-                    description[spn_name] = "%d (%s)" % (spn_value, spn_value_description)
-                except KeyError:
-                    description[spn_name] = "%d (Unknown)" % spn_value
-            elif spn_units.lower() in ("manufacturer determined", "byte", ""):
-                description[spn_name] = "%s" % get_spn_bytes(message_data, spn)
-            elif spn_units.lower() in ("request dependent",):
-                description[spn_name] = "%s (%s)" % (get_spn_bytes(message_data, spn), spn_units)
-            elif spn_units.upper() in ("ASCII",):
-                description[spn_name] = "%s" % get_spn_bytes(message_data, spn).tobytes()
+                if spn_value is None:
+                    description[spn_name] = "N/A"
+                elif is_spn_bitencoded(spn_units):
+                    try:
+                        enum_descriptions = j1939db["J1939BitDecodings"]["{}".format(spn)]
+                        spn_value_description = enum_descriptions[str(int(spn_value))].strip()
+                        description[spn_name] = "%d (%s)" % (spn_value, spn_value_description)
+                    except KeyError:
+                        description[spn_name] = "%d (Unknown)" % spn_value
+                else:
+                    description[spn_name] = "%s (%s)" % (spn_value, spn_units)
             else:
-                spn_value = get_spn_value(message_data, spn)
-                description[spn_name] = "%s (%s)" % (spn_value, spn_units)
+                if spn_units.lower() in ("request dependent",):
+                    description[spn_name] = "%s (%s)" % (get_spn_bytes(message_data, spn), spn_units)
+                elif spn_units.lower() in ("ascii",):
+                    description[spn_name] = "%s" % get_spn_bytes(message_data, spn).tobytes()
+                else:
+                    description[spn_name] = "%s" % get_spn_bytes(message_data, spn)
+
         except ValueError:
             description[spn_name] = "%s (%s)" % (get_spn_bytes(message_data, spn), "Out of range")
 
