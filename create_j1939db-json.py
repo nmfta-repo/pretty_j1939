@@ -62,7 +62,7 @@ class J1939daConverter:
 
     @staticmethod
     def just_numerals(contents):
-        contents = re.sub(r'[^0-9\./]', '', contents)  # remove all but number and '.'
+        contents = re.sub(r'[^0-9\.\-/]', '', contents)  # remove all but number and '.'
         contents = re.sub(r'/$', '', contents)  # remove trailing '/' that are sometimes left
         return contents
 
