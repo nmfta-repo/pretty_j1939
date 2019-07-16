@@ -62,7 +62,8 @@ class J1939daConverter:
 
     @staticmethod
     def just_numerals(contents):
-        contents = re.sub(r'[^0-9\.]', '', contents)  # remove all but number and '.'
+        contents = re.sub(r'[^0-9\./]', '', contents)  # remove all but number and '.'
+        contents = re.sub(r'/$', '', contents)  # remove trailing '/' that are sometimes left
         return contents
 
     @staticmethod
@@ -86,7 +87,7 @@ class J1939daConverter:
             left = J1939daConverter.just_numerals(left.split(' ')[0])
             right = J1939daConverter.just_numerals(right.split(' ')[0])
             return asteval.Interpreter()('%s/%s' % (left, right))
-        elif 'microsiemens/mm' in norm_contents:  # special handling
+        elif 'microsiemens/mm' in norm_contents:  # special handling for this weirdness
             return float(contents.split(' ')[0])
         raise ValueError('unknown spn resolution "%s"' % contents)
 
