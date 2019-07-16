@@ -119,7 +119,13 @@ class J1939daConverter:
             left, right = norm_contents.split(' to ')[0:2]
             left = J1939daConverter.just_numerals(left.split(' ')[0])
             right = J1939daConverter.just_numerals(right.split(' ')[0])
-            return float(left), float(right)
+
+            range_units = norm_contents.split(' ')
+            range_units = range_units[len(range_units) - 1]
+            if range_units == 'km' and units == 'm':
+                return float(left)*1000, float(right)*1000
+            else:
+                return float(left), float(right)
         raise ValueError('unknown operational range from "%s","%s"' % (contents, units))
 
     @staticmethod
