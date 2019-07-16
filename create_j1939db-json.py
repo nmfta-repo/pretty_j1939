@@ -162,13 +162,82 @@ class J1939daConverter:
             return start + length - 1
 
     @staticmethod
-    def get_bit_enum(line):
-        line = re.sub(r'[-b]', '', line)
-        line = unidecode.unidecode(line)
-        words = line.split(' ')
-        val = str(int(words[0], 2))
-        desc = ' '.join(words[1:]).strip()
-        return desc, val
+    def get_enum_lines(description_lines):
+        enum_lines = list()
+        for line in description_lines:
+            if line.lower().startswith('bit state'):
+                line = re.sub(r'(Bit States|Bit State)', '', line, flags=re.IGNORECASE)
+                enum_lines.append(line)
+            elif re.match(r'^[ ]*[0-9][0-9bxXA-F\-:]*[ ]+[^ ]+', line):
+                enum_lines.append(line)
+
+        return enum_lines
+
+    @staticmethod
+    def is_enum_lines_binary(description_lines):
+        all_ones_and_zeroes = True
+        for line in description_lines:
+            first = re.match(r'[ ]*([0-9bxXA-F]+)', line).groups()[0]
+            if re.sub(r'[^10b]', '', first) != first:
+                all_ones_and_zeroes = False
+                break
+
+        return all_ones_and_zeroes
+
+    @staticmethod
+    # returns a pair of inclusive, inclusive range boundaries or None if this line is not a range
+    def get_enum_line_range(line):
+        match = re.match(r'[ ]*([0-9bxXA-F]+)[ ]*(\-|to|thru)[ ]*([0-9bxXA-F]+)[ -=]', line)
+        if match:
+            groups = match.groups()
+            if re.match(r'[01b]', groups[0]) and not re.match(r'[01b]', groups[2]):
+                return None
+            return groups[0], groups[2]
+        else:
+            return None
+
+    @staticmethod
+    def create_bit_object_from_description(spn_description, bit_object):
+        description_lines = spn_description.splitlines()
+        enum_lines = J1939daConverter.get_enum_lines(description_lines)
+        is_binary = J1939daConverter.is_enum_lines_binary(enum_lines)
+
+        for line in enum_lines:
+            line = unidecode.unidecode(line)
+            enum_description = re.sub(r'[ ]+', ' ', line)
+
+            range_boundaries = J1939daConverter.get_enum_line_range(line)
+            if range_boundaries is not None:
+                if is_binary:
+                    first = re.sub(r'b', '', range_boundaries[0])
+                    first_val = int(first, base=2)
+                    second = re.sub(r'b', '', range_boundaries[1])
+                    second_val = int(second, base=2)
+                elif 'x' in range_boundaries[0].lower():
+                    first_val = int(range_boundaries[0], base=16)
+                    second_val = int(range_boundaries[1], base=16)
+                else:
+                    first_val = int(range_boundaries[0], base=10)
+                    second_val = int(range_boundaries[1], base=10)
+
+                for i in range(first_val, second_val+1):
+                    bit_object.update(({str(i): enum_description}))
+            else:
+                first = re.match(r'[ ]*([0-9bxXA-F]+)', line).groups()[0]
+
+                if is_binary:
+                    first = re.sub(r'b', '', first)
+                    val = str(int(first, base=2))
+                elif 'x' in first.lower():
+                    val = str(int(first, base=16))
+                else:
+                    val = str(int(first, base=10))
+
+                bit_object.update(({val: enum_description}))
+
+    @staticmethod
+    def is_spn_likely_bitmapped(spn_description):
+        return len(J1939daConverter.get_enum_lines(spn_description.splitlines())) > 2
 
     def process_spns_and_pgns_tab(self, sheet):
         self.j1939db.update({'J1939PGNdb': OrderedDict()})
@@ -248,16 +317,12 @@ class J1939daConverter:
 
                 j1939_spn_db.update({spn_label: spn_object})
 
-                if row[units_col] == 'bit':
+                spn_description = row[spn_description_col]
+                if row[units_col] == 'bit' or self.is_spn_likely_bitmapped(spn_description):
                     bit_object = OrderedDict()
-
-                    for line in row[spn_description_col].splitlines():
-                        if re.match(r'^[0-1]+ ', line):
-                            desc, val = self.get_bit_enum(line)
-
-                            bit_object.update(({val: desc}))
-
-                    j1939_bit_decodings.update({spn_label: bit_object})
+                    self.create_bit_object_from_description(spn_description, bit_object)
+                    if len(bit_object) > 0:
+                        j1939_bit_decodings.update({spn_label: bit_object})
 
         return
 
