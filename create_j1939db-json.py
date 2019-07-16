@@ -149,7 +149,7 @@ class J1939daConverter:
         if '.' in first:
             byte_index, bit_index = list(map(int, first.split('.')))
         else:
-            bit_index = 0
+            bit_index = 1
             byte_index = int(first)
 
         return (byte_index - 1)*8 + (bit_index - 1)
