@@ -276,13 +276,14 @@ class J1939daConverter:
             pgn = row[pgn_col]
             if pgn == '':
                 continue
+
             pgn_label = str(int(pgn))
 
             spn = row[spn_col]
+
             if not j1939_pgn_db.get(pgn_label) is None:
                 # TODO assert that PGN values haven't changed across multiple SPN rows
-                if not spn == '':
-                    j1939_pgn_db.get(pgn_label).get('SPNs').append(int(spn))
+                pass
             else:
                 pgn_object = OrderedDict()
 
@@ -294,10 +295,13 @@ class J1939daConverter:
                 pgn_object.update({'Rate':      row[transmission_rate_col]})
                 pgn_object.update({'SPNs':      list()})
 
-                if not spn == '':
-                    pgn_object.get('SPNs').append(int(spn))
-
                 j1939_pgn_db.update({pgn_label: pgn_object})
+
+            if pgn == 60416 or pgn == 59392:  # skip all SPNs for transport PGNs
+                continue
+
+            if not spn == '':
+                j1939_pgn_db.get(pgn_label).get('SPNs').append(int(spn))
 
             if not spn == '' and j1939_spn_db.get(str(int(spn))) is None:
                 spn_label = str(int(spn))
