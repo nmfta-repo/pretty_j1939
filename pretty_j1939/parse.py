@@ -223,7 +223,7 @@ def describe_message_data(message_id, message_data, include_na=False):
                     except KeyError:
                         description[spn_name] = "%d (Unknown)" % spn_value
                 else:
-                    description[spn_name] = "%s (%s)" % (spn_value, spn_units)
+                    description[spn_name] = "%s [%s]" % (spn_value, spn_units)
             else:
                 spn_bytes = get_spn_bytes(message_data, spn, pgn)
                 if spn_units.lower() in ("request dependent",):
