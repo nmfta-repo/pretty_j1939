@@ -210,7 +210,6 @@ class J1939daConverter:
         is_binary = J1939daConverter.is_enum_lines_binary(enum_lines)
 
         for line in enum_lines:
-            line = unidecode.unidecode(line)
             enum_description = re.sub(r'[ ]+', ' ', line)
 
             range_boundaries = J1939daConverter.get_enum_line_range(line)
@@ -289,8 +288,8 @@ class J1939daConverter:
 
                 pgn_data_len = self.get_pgn_data_len(row[pgn_data_length_col])
 
-                pgn_object.update({'Label':     row[acronym_col]})
-                pgn_object.update({'Name':      row[pgn_label_col]})
+                pgn_object.update({'Label':     unidecode.unidecode(row[acronym_col])})
+                pgn_object.update({'Name':      unidecode.unidecode(row[pgn_label_col])})
                 pgn_object.update({'PGNLength': pgn_data_len})
                 pgn_object.update({'Rate':      row[transmission_rate_col]})
                 pgn_object.update({'SPNs':      list()})
@@ -310,21 +309,21 @@ class J1939daConverter:
                 spn_units = row[units_col]
                 low, high = self.get_operational_hilo(row[data_range_col], spn_units, spn_length)
 
-                spn_object.update({'DataRange':        row[data_range_col]})
+                spn_object.update({'DataRange':        unidecode.unidecode(row[data_range_col])})
                 spn_object.update({'EndBit':           spn_end_bit})
-                spn_object.update({'Name':             row[spn_name_col]})
+                spn_object.update({'Name':             unidecode.unidecode(row[spn_name_col])})
                 spn_object.update({'Offset':           self.get_spn_offset(row[offset_col])})
                 spn_object.update({'OperationalHigh':  high})
                 spn_object.update({'OperationalLow':   low})
-                spn_object.update({'OperationalRange': row[operational_range_col]})
-                spn_object.update({'Resolution':       self.get_spn_resolution(row[resolution_col])})
+                spn_object.update({'OperationalRange': unidecode.unidecode(row[operational_range_col])})
+                spn_object.update({'Resolution':       self.get_spn_resolution(unidecode.unidecode(row[resolution_col]))})
                 spn_object.update({'SPNLength':        spn_length})
                 spn_object.update({'StartBit':         spn_start_bit})
                 spn_object.update({'Units':            spn_units})
 
                 j1939_spn_db.update({spn_label: spn_object})
 
-                spn_description = row[spn_description_col]
+                spn_description = unidecode.unidecode(row[spn_description_col])
                 if row[units_col] == 'bit' or self.is_spn_likely_bitmapped(spn_description):
                     bit_object = OrderedDict()
                     self.create_bit_object_from_description(spn_description, bit_object)
