@@ -146,13 +146,18 @@ def lookup_all_spn_params(callback, spn):
     return name, offset, scale, spn_end, spn_length, spn_start, units
 
 
-def get_spn_bytes(message_data, spn):
+def get_spn_bytes(message_data, spn, pgn):
     spn_start = j1939db["J1939SPNdb"]["{}".format(spn)]["StartBit"]
     spn_end = j1939db["J1939SPNdb"]["{}".format(spn)]["EndBit"]
+    spn_length = j1939db["J1939SPNdb"]["{}".format(spn)]["SPNLength"]
+
+    # TODO: support extracting bits from multi-spn variable-length PGN (delimited and non-delimited)
+    if spn_length == "Variable" and len(get_spn_list(pgn)) == 1:
+        spn_end = len(message_data) * 8 - 1
 
     cut_data = bitstring.BitString(message_data)[spn_start:spn_end + 1]
-    cut_data.byteswap()
 
+    cut_data.byteswap()
     return cut_data
 
 
@@ -168,7 +173,7 @@ def is_spn_numerical_values(spn):
 
 # returns a float in units of the SPN, or None if the value if the SPN value is not available in the message_data
 #   if validate == True, raises a ValueError if the value is present in message_data but is beyond the operational range
-def get_spn_value(message_data, spn, validate=True):
+def get_spn_value(message_data, spn, pgn, validate=True):
     units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
 
     offset = j1939db["J1939SPNdb"]["{}".format(spn)]["Offset"]
@@ -176,7 +181,7 @@ def get_spn_value(message_data, spn, validate=True):
     if scale <= 0:
         scale = 1
 
-    cut_data = get_spn_bytes(message_data, spn)
+    cut_data = get_spn_bytes(message_data, spn, pgn)
     if cut_data.all(True):  # value unavailable in message_data
         return None
 
@@ -204,7 +209,7 @@ def describe_message_data(message_id, message_data, include_na=False):
 
         try:
             if is_spn_numerical_values(spn):
-                spn_value = get_spn_value(message_data, spn)
+                spn_value = get_spn_value(message_data, spn, pgn)
                 if spn_value is None:
                     if include_na:
                         description[spn_name] = "N/A"
@@ -220,15 +225,16 @@ def describe_message_data(message_id, message_data, include_na=False):
                 else:
                     description[spn_name] = "%s (%s)" % (spn_value, spn_units)
             else:
+                spn_bytes = get_spn_bytes(message_data, spn, pgn)
                 if spn_units.lower() in ("request dependent",):
-                    description[spn_name] = "%s (%s)" % (get_spn_bytes(message_data, spn), spn_units)
+                    description[spn_name] = "%s (%s)" % (spn_bytes, spn_units)
                 elif spn_units.lower() in ("ascii",):
-                    description[spn_name] = "%s" % get_spn_bytes(message_data, spn).tobytes()
+                    description[spn_name] = "%s" % spn_bytes.tobytes()
                 else:
-                    description[spn_name] = "%s" % get_spn_bytes(message_data, spn)
+                    description[spn_name] = "%s" % spn_bytes
 
         except ValueError:
-            description[spn_name] = "%s (%s)" % (get_spn_bytes(message_data, spn), "Out of range")
+            description[spn_name] = "%s (%s)" % (get_spn_bytes(message_data, spn, pgn), "Out of range")
 
     return description
 
