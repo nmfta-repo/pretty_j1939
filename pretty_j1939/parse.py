@@ -156,8 +156,6 @@ def get_spn_bytes(message_data, spn, pgn):
         spn_end = len(message_data) * 8 - 1
 
     cut_data = bitstring.BitString(message_data)[spn_start:spn_end + 1]
-
-    cut_data.byteswap()
     return cut_data
 
 
@@ -185,6 +183,7 @@ def get_spn_value(message_data, spn, pgn, validate=True):
     if cut_data.all(True):  # value unavailable in message_data
         return None
 
+    cut_data.byteswap()
     if is_spn_bitencoded(units):
         value = cut_data.uint
     else:
