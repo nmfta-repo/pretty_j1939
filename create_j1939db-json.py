@@ -320,12 +320,18 @@ class J1939daConverter:
                 spn_label = str(int(spn))
                 spn_object = OrderedDict()
 
+                spn_start_bit = self.get_spn_start_bit(row[spn_position_in_pgn_col])
                 spn_length = self.get_spn_len(row[spn_length_col])
                 if type(spn_length) == str and spn_length.startswith("Variable"):
                     spn_delimiter = self.get_spn_delimiter(row[spn_length_col])
+                    if spn_start_bit == -1:
+                        spn_order = row[spn_position_in_pgn_col].strip()
+                    else:
+                        spn_order = None
                 else:
                     spn_delimiter = None
-                spn_start_bit = self.get_spn_start_bit(row[spn_position_in_pgn_col])
+                    spn_order = None
+
                 spn_end_bit = self.get_spn_end_bit(spn_start_bit, spn_length)
                 spn_units = row[units_col]
                 low, high = self.get_operational_hilo(row[data_range_col], spn_units, spn_length)
@@ -340,7 +346,9 @@ class J1939daConverter:
                 spn_object.update({'Resolution':       self.get_spn_resolution(unidecode.unidecode(row[resolution_col]))})
                 spn_object.update({'SPNLength':        spn_length})
                 if spn_delimiter is not None:
-                    spn_object.update({'Delimiter':        '0x%s' % spn_delimiter.hex()})
+                    spn_object.update({'Delimiter':    '0x%s' % spn_delimiter.hex()})
+                if spn_order is not None:
+                    spn_object.update({'Order':        spn_order})
                 spn_object.update({'StartBit':         spn_start_bit})
                 spn_object.update({'Units':            spn_units})
 
