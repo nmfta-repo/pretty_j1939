@@ -20,16 +20,40 @@ parser.add_argument('--pgn',     type=str2bool, const=True, default=True, nargs=
                     help='print source/destination/type description')
 parser.add_argument('--spn',     type=str2bool, const=True, default=True, nargs='?',
                     help='print signals description')
+parser.add_argument('--transport', type=str2bool, const=True, default=True, nargs='?',
+                    help='print details of transport-layer streams found')
+parser.add_argument('--link', type=str2bool, const=True, default=True, nargs='?',
+                    help='print details of link-layer frames found')
 parser.add_argument('--format',  type=str2bool, const=True, default=False, nargs='?',
                     help='format each structure (otherwise single-line)')
 
 args = parser.parse_args()
 
-bam_descriptions = list()
+transport_messages = list()
 
 
-def process_bam_found(data_bytes, sa, pgn, timestamp):
-    bam_descriptions.append(pretty_j1939.parse.describe_data_transfer_complete(data_bytes, sa, pgn, timestamp))
+def process_bam_found(data_bytes, sa, pgn):
+    transport_found = dict()
+    transport_found['PGN'] = pgn
+    transport_found['data'] = data_bytes
+    transport_messages.append(transport_found)
+
+
+def add_separator(desc_line):
+    if args.format:
+        desc_line = desc_line + '\n'
+    else:
+        desc_line = desc_line + " // "
+    return desc_line
+
+
+def add_description(desc_line, json_object):
+    if args.format:
+        json_description = str(json.dumps(json_object, indent=4))
+    else:
+        json_description = str(json_object)
+    desc_line = desc_line + json_description
+    return desc_line
 
 
 bam_processor = pretty_j1939.parse.get_bam_processor(process_bam_found)
@@ -46,47 +70,49 @@ with open(args.candump, 'r') as f:
         except ValueError:
             continue
 
+        any_described = False
+        transport_messages.clear()
+        bam_processor(message_data.bytes, message_id.uint)
         desc_line = ''
 
-        if args.pgn:
-            pgn_desc = pretty_j1939.parse.describe_message_id(message_id.uint)
-            if args.format:
-                pgn_desc = str(json.dumps(pgn_desc, indent=4))
-            else:
-                pgn_desc = str(pgn_desc)
+        if args.link:
+            if args.pgn:
+                pgn_desc = pretty_j1939.parse.describe_message_id(message_id.uint)
+                desc_line = add_description(desc_line, pgn_desc)
+                any_described = True
 
-            desc_line = desc_line + pgn_desc
+            if args.spn:
+                pgn, _, _ = pretty_j1939.parse.parse_j1939_id(message_id.uint)
+                spn_desc = pretty_j1939.parse.describe_message_data(pgn, message_data.bytes)
+                if any_described:
+                    desc_line = add_separator(desc_line)
+                desc_line = add_description(desc_line, spn_desc)
+                any_described = True
 
-        if args.pgn and args.spn:
-            if args.format:
-                desc_line = desc_line + '\n'
-            else:
-                desc_line = desc_line + " // "
+        if args.transport and len(transport_messages) > 0:
+            if args.pgn:
+                transport_pgn_description = dict()
+                transport_pgn_description['Transport PGN'] = transport_messages[0]['PGN']
+                if any_described:
+                    desc_line = add_separator(desc_line)
+                desc_line = add_description(desc_line, transport_pgn_description)
+                any_described = True
 
-        if args.spn:
-            spn_desc = pretty_j1939.parse.describe_message_data(message_id.uint, message_data.bytes)
-            if args.format:
-                spn_desc = str(json.dumps(spn_desc, indent=4))
-            else:
-                spn_desc = str(spn_desc)
+            if args.candata:
+                transport_data_description = dict()
+                transport_data_description['Transport Data'] = str(bitstring.BitString(transport_messages[0]['data']))
+                if any_described:
+                    desc_line = add_separator(desc_line)
+                desc_line = add_description(desc_line, transport_data_description)
+                any_described = True
 
-            desc_line = desc_line + spn_desc
-
-            pgn, da, sa = pretty_j1939.parse.parse_j1939_id(message_id.uint)
-            bam_processor(message_data, message_id.uint, sa, timestamp)
-            if len(bam_descriptions) > 0:
-                bam_description = bam_descriptions.pop()
-                if args.format:
-                    bam_description = str(json.dumps(bam_description, indent=4))
-                else:
-                    bam_description = str(bam_description)
-
-                if args.format:
-                    desc_line = desc_line + '\n'
-                else:
-                    desc_line = desc_line + " // "
-
-                desc_line = desc_line + bam_description
+            if args.spn:
+                pgn = transport_messages[0]['PGN']
+                spn_desc = pretty_j1939.parse.describe_message_data(pgn, transport_messages[0]['data'])
+                if any_described:
+                    desc_line = add_separator(desc_line)
+                desc_line = add_description(desc_line, spn_desc)
+                any_described = True
 
         if args.candata:
             can_line = candump_line.rstrip() + " ; "
@@ -94,11 +120,15 @@ with open(args.candump, 'r') as f:
                 desc_line = can_line + desc_line
             else:
                 formatted_lines = desc_line.splitlines()
-                first_line = formatted_lines[0]
-                desc_line = can_line + first_line + '\n'
-                formatted_lines.remove(first_line)
+                if len(formatted_lines) == 0:
+                    desc_line = can_line
+                else:
+                    first_line = formatted_lines[0]
+                    desc_line = can_line + first_line + '\n'
+                    formatted_lines.remove(first_line)
 
                 for line in formatted_lines:
                     desc_line = desc_line + ' '*len(candump_line) + "; " + line + '\n'
 
-        print(desc_line)
+        if len(desc_line) > 0:
+            print(desc_line)
