@@ -251,7 +251,7 @@ def describe_message_data(pgn, message_data, include_na=False):
                 if spn_units.lower() in ("request dependent",):
                     description[spn_name] = "%s (%s)" % (spn_bytes, spn_units)
                 elif spn_units.lower() in ("ascii",):
-                    description[spn_name] = "%s" % spn_bytes.tobytes()
+                    description[spn_name] = "%s" % spn_bytes.bytes.decode(encoding="utf-8")
                 else:
                     description[spn_name] = "%s" % spn_bytes
 
