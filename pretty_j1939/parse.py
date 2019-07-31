@@ -19,8 +19,12 @@ def init_j1939db():
         j1939db = json.load(j1939_file)
 
 
+def get_sa(can_id):
+    return SA_MASK & can_id
+
+
 def parse_j1939_id(can_id):
-    sa = (SA_MASK & can_id)
+    sa = get_sa(can_id)
     pf = (PF_MASK & can_id) >> 16
     da = (DA_MASK & can_id) >> 8
 
@@ -238,22 +242,14 @@ def describe_message_data(message_id, message_data, include_na=False):
     return description
 
 
-def describe_data_transfer_complete(message_data, sa, pgn, timestamp):
-    description = dict()
-
-    description['PGN'] = pgn
-    description['data'] = str(bitstring.BitString(message_data))
-
-    return description
-
-
 def get_bam_processor(process_bam_found):
     new_pgn = {}
     new_data = {}
     new_packets = {}
     new_length = {}
 
-    def process_for_bams(message_bytes, message_id, sa, timestamp):
+    def process_for_bams(message_bytes, message_id):
+        sa = get_sa(message_id)
         if is_connection_management_message(message_id):
             if is_bam_cts_message(message_bytes):  # BAM,CTS
                 new_pgn[sa] = (message_bytes[7] << 16) + (message_bytes[6] << 8) + message_bytes[5]
@@ -262,7 +258,6 @@ def get_bam_processor(process_bam_found):
                 new_data[sa] = [0xFF for i in range(7 * new_packets[sa])]
 
         elif is_data_transfer_message(message_id):
-            # print("{:08X}".format(message_id) + "".join(" {:02X}".format(d) for d in message))
             if sa in new_data.keys():
                 for b, i in zip(message_bytes[1:], range(7)):
                     try:
@@ -271,6 +266,6 @@ def get_bam_processor(process_bam_found):
                         print(e)
                 if message_bytes[0] == new_packets[sa]:
                     data_bytes = bytes(new_data[sa][0:new_length[sa]])
-                    process_bam_found(data_bytes, sa, new_pgn[sa], timestamp)
+                    process_bam_found(data_bytes, sa, new_pgn[sa])
 
     return process_for_bams
