@@ -13,6 +13,7 @@ import unidecode
 import asteval
 import json
 import argparse
+import pretty_j1939.parse
 
 parser = argparse. ArgumentParser()
 parser.add_argument('-f', '--digital_annex_xls', type=str,
@@ -310,7 +311,7 @@ class J1939daConverter:
 
                 j1939_pgn_db.update({pgn_label: pgn_object})
 
-            if pgn == 60416 or pgn == 59392:  # skip all SPNs for transport PGNs
+            if pretty_j1939.parse.is_transport_pgn(int(pgn)):  # skip all SPNs for transport PGNs
                 continue
 
             if not spn == '':
