@@ -267,6 +267,9 @@ class J1939daConverter:
         self.j1939db.update({'J1939BitDecodings': OrderedDict()})
         j1939_bit_decodings = self.j1939db.get('J1939BitDecodings')
 
+        # check for SPNs in multiple PNGs
+        spn_map = dict()
+
         header_row_num = 3
         header_row = sheet.row_values(header_row_num)
         pgn_col = header_row.index('PGN')
@@ -318,6 +321,11 @@ class J1939daConverter:
                 j1939_pgn_db.get(pgn_label).get('SPNs').append(int(spn))
 
             if not spn == '' and j1939_spn_db.get(str(int(spn))) is None:
+                if spn_map.get(spn, None) is None:
+                    spn_map.update({spn: pgn})
+                else:
+                    raise ValueError("SPN %d already found in PGN %d, new PGN %d" % (spn, pgn, spn_map.get(spn)))
+
                 spn_label = str(int(spn))
                 spn_object = OrderedDict()
 
