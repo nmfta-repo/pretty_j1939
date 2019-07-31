@@ -174,7 +174,9 @@ def get_spn_bytes(message_data, spn, pgn):
     spn_length = j1939db["J1939SPNdb"]["{}".format(spn)]["SPNLength"]
 
     # TODO: support extracting bits from multi-spn variable-length PGN (delimited and non-delimited)
-    if spn_length == "Variable" and len(get_spn_list(pgn)) == 1:
+    # TODO: special-special support for PGN 64958 'Transit Route' that uses variable length fields encoded in
+    #  dedicated SPNs
+    if type(spn_length) is str and spn_length.startswith("Variable") and len(get_spn_list(pgn)) == 1:
         spn_end = len(message_data) * 8 - 1
 
     cut_data = bitstring.BitString(message_data)[spn_start:spn_end + 1]
