@@ -61,6 +61,19 @@ class J1939daConverter:
         raise ValueError('unknown SPN Length "%s"' % contents)
 
     @staticmethod
+    # returns a single-byte delimiter or None
+    def get_spn_delimiter(contents):
+        if 'delimiter' in contents.lower():
+            if '*' in contents:
+                return b'*'
+            elif 'NULL' in contents:
+                return b'\x00'
+            else:
+                raise ValueError('unknown SPN delimiter "%s"' % contents)
+        else:
+            return None
+
+    @staticmethod
     def just_numerals(contents):
         contents = re.sub(r'[^0-9\.\-/]', '', contents)  # remove all but number and '.'
         contents = re.sub(r'/$', '', contents)  # remove trailing '/' that are sometimes left
@@ -308,6 +321,10 @@ class J1939daConverter:
                 spn_object = OrderedDict()
 
                 spn_length = self.get_spn_len(row[spn_length_col])
+                if type(spn_length) == str and spn_length.startswith("Variable"):
+                    spn_delimiter = self.get_spn_delimiter(row[spn_length_col])
+                else:
+                    spn_delimiter = None
                 spn_start_bit = self.get_spn_start_bit(row[spn_position_in_pgn_col])
                 spn_end_bit = self.get_spn_end_bit(spn_start_bit, spn_length)
                 spn_units = row[units_col]
@@ -322,6 +339,8 @@ class J1939daConverter:
                 spn_object.update({'OperationalRange': unidecode.unidecode(row[operational_range_col])})
                 spn_object.update({'Resolution':       self.get_spn_resolution(unidecode.unidecode(row[resolution_col]))})
                 spn_object.update({'SPNLength':        spn_length})
+                if spn_delimiter is not None:
+                    spn_object.update({'Delimiter':        '0x%s' % spn_delimiter.hex()})
                 spn_object.update({'StartBit':         spn_start_bit})
                 spn_object.update({'Units':            spn_units})
 
