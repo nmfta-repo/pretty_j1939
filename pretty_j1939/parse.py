@@ -9,6 +9,8 @@ import bitstring
 DA_MASK = 0x0000FF00
 SA_MASK = 0x000000FF
 PF_MASK = 0x00FF0000
+TM_MASK = 0x00EB0000
+CM_MASK = 0x00EC0000
 
 j1939db = {}
 
@@ -37,15 +39,31 @@ def parse_j1939_id(can_id):
 
 
 def is_connection_management_message(message_id):
-    return (message_id & PF_MASK) == 0x00EC0000
+    return (message_id & PF_MASK) == CM_MASK
+
+
+def is_connection_management_pgn(pgn):
+    pgn_mask, _, _ = parse_j1939_id(PF_MASK)
+    pgn_expect, _, _, = parse_j1939_id(CM_MASK)
+    return pgn & pgn_mask == pgn_expect
 
 
 def is_data_transfer_message(message_id):
-    return (message_id & PF_MASK) == 0x00EB0000
+    return (message_id & PF_MASK) == TM_MASK
+
+
+def is_data_transfer_pgn(pgn):
+    pgn_mask, _, _ = parse_j1939_id(PF_MASK)
+    pgn_expect, _, _, = parse_j1939_id(TM_MASK)
+    return pgn & pgn_mask == pgn_expect
 
 
 def is_transport_message(message_id):
     return is_data_transfer_message(message_id) or is_connection_management_message(message_id)
+
+
+def is_transport_pgn(pgn):
+    return is_data_transfer_pgn(pgn) or is_data_transfer_pgn(pgn)
 
 
 def is_bam_cts_message(message_bytes):
@@ -202,10 +220,11 @@ def get_spn_value(message_data, spn, pgn, validate=True):
     return value
 
 
-def describe_message_data(message_id, message_data, include_na=False):
-    pgn, da, sa = parse_j1939_id(message_id)
-
+def describe_message_data(pgn, message_data, include_na=False):
     description = dict()
+    if is_transport_pgn(pgn):  # transport messages can't be accurately parsed by the DA description
+        return description
+
     for spn in get_spn_list(pgn):
         spn_name = get_spn_name(spn)
         spn_units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
