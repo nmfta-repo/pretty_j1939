@@ -11,6 +11,7 @@ SA_MASK = 0x000000FF
 PF_MASK = 0x00FF0000
 TM_MASK = 0x00EB0000
 CM_MASK = 0x00EC0000
+ACK_MASK = 0x0E80000
 
 j1939db = {}
 
@@ -43,9 +44,7 @@ def is_connection_management_message(message_id):
 
 
 def is_connection_management_pgn(pgn):
-    pgn_mask, _, _ = parse_j1939_id(PF_MASK)
-    pgn_expect, _, _, = parse_j1939_id(CM_MASK)
-    return pgn & pgn_mask == pgn_expect
+    return pgn == CM_MASK >> 8
 
 
 def is_data_transfer_message(message_id):
@@ -53,17 +52,23 @@ def is_data_transfer_message(message_id):
 
 
 def is_data_transfer_pgn(pgn):
-    pgn_mask, _, _ = parse_j1939_id(PF_MASK)
-    pgn_expect, _, _, = parse_j1939_id(TM_MASK)
-    return pgn & pgn_mask == pgn_expect
+    return pgn == TM_MASK >> 8
+
+
+def is_ack_message(message_id):
+    return (message_id & PF_MASK) == ACK_MASK
+
+
+def is_ack_pgn(pgn):
+    return pgn == ACK_MASK >> 8
 
 
 def is_transport_message(message_id):
-    return is_data_transfer_message(message_id) or is_connection_management_message(message_id)
+    return is_data_transfer_message(message_id) or is_connection_management_message(message_id) or is_ack_message(message_id)
 
 
 def is_transport_pgn(pgn):
-    return is_data_transfer_pgn(pgn) or is_data_transfer_pgn(pgn)
+    return is_data_transfer_pgn(pgn) or is_connection_management_pgn(pgn) or is_ack_pgn(pgn)
 
 
 def is_bam_cts_message(message_bytes):
