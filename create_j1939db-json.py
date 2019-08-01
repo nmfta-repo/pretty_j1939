@@ -161,6 +161,9 @@ class J1939daConverter:
         else:
             first = norm_contents
 
+        if re.match(r'^[a-z]\+[0-9]', first):
+            return -1
+
         first = J1939daConverter.just_numerals(first)
         if first.strip() == '':
             return -1
