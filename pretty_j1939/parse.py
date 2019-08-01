@@ -164,18 +164,20 @@ def lookup_all_spn_params(callback, spn):
     name = get_spn_name(spn)
     units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
     spn_start = j1939db["J1939SPNdb"]["{}".format(spn)]["StartBit"]
-    spn_end = j1939db["J1939SPNdb"]["{}".format(spn)]["EndBit"]
     spn_length = j1939db["J1939SPNdb"]["{}".format(spn)]["SPNLength"]
     offset = j1939db["J1939SPNdb"]["{}".format(spn)]["Offset"]
+
     scale = j1939db["J1939SPNdb"]["{}".format(spn)]["Resolution"]
     if scale <= 0:
         scale = 1
+
+    spn_end = spn_start + spn_length - 1
+
     return name, offset, scale, spn_end, spn_length, spn_start, units
 
 
 def get_spn_bytes(message_data, spn, pgn):
     spn_start = j1939db["J1939SPNdb"]["{}".format(spn)]["StartBit"]
-    spn_end = j1939db["J1939SPNdb"]["{}".format(spn)]["EndBit"]
     spn_length = j1939db["J1939SPNdb"]["{}".format(spn)]["SPNLength"]
 
     # TODO: support extracting bits from multi-spn variable-length PGN (delimited and non-delimited)
@@ -183,6 +185,8 @@ def get_spn_bytes(message_data, spn, pgn):
     #  dedicated SPNs
     if type(spn_length) is str and spn_length.startswith("Variable") and len(get_spn_list(pgn)) == 1:
         spn_end = len(message_data) * 8 - 1
+    else:
+        spn_end = spn_start + spn_length - 1
 
     cut_data = bitstring.BitString(message_data)[spn_start:spn_end + 1]
     return cut_data
