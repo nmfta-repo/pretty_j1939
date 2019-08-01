@@ -13,6 +13,8 @@ import unidecode
 import asteval
 import json
 import argparse
+import functools
+import operator
 import pretty_j1939.parse
 
 parser = argparse. ArgumentParser()
@@ -144,7 +146,6 @@ class J1939daConverter:
 
     @staticmethod
     # return an int of the start bit of the SPN; or -1 (if unknown or variable)
-    # TODO: encode SPN ordering when all SPNs in a PGN are all -1 -- otherwise there's no way to parse by '*' delimiters
     def get_spn_start_bit(contents):
         norm_contents = contents.lower()
 
@@ -262,7 +263,7 @@ class J1939daConverter:
         j1939_bit_decodings = self.j1939db.get('J1939BitDecodings')
 
         # check for SPNs in multiple PNGs
-        spn_map = dict()
+        spn_factcheck_map = dict()
 
         header_row_num = 3
         header_row = sheet.row_values(header_row_num)
@@ -300,11 +301,13 @@ class J1939daConverter:
 
                 pgn_data_len = self.get_pgn_data_len(row[pgn_data_length_col])
 
-                pgn_object.update({'Label':     unidecode.unidecode(row[acronym_col])})
-                pgn_object.update({'Name':      unidecode.unidecode(row[pgn_label_col])})
-                pgn_object.update({'PGNLength': pgn_data_len})
-                pgn_object.update({'Rate':      row[transmission_rate_col]})
-                pgn_object.update({'SPNs':      list()})
+                pgn_object.update({'Label':              unidecode.unidecode(row[acronym_col])})
+                pgn_object.update({'Name':               unidecode.unidecode(row[pgn_label_col])})
+                pgn_object.update({'PGNLength':          pgn_data_len})
+                pgn_object.update({'Rate':               row[transmission_rate_col]})
+                pgn_object.update({'SPNs':               list()})
+                pgn_object.update({'SPNStartBits':       list()})
+                pgn_object.update({'Temp_SPN_Order':     list()})
 
                 j1939_pgn_db.update({pgn_label: pgn_object})
 
@@ -312,30 +315,22 @@ class J1939daConverter:
                 continue
 
             if not spn == '':
-                j1939_pgn_db.get(pgn_label).get('SPNs').append(int(spn))
-
-            if not spn == '' and j1939_spn_db.get(str(int(spn))) is None:
-                if spn_map.get(spn, None) is None:
-                    spn_map.update({spn: pgn})
+                if spn_factcheck_map.get(spn, None) is None:
+                    spn_factcheck_map.update({spn: [pgn,]})
                 else:
-                    raise ValueError("SPN %d already found in PGN %d, new PGN %d" % (spn, pgn, spn_map.get(spn)))
+                    spn_list = spn_factcheck_map.get(spn)
+                    spn_list.append(spn)
+                    spn_factcheck_map.update({spn: spn_list})
 
                 spn_label = str(int(spn))
                 spn_object = OrderedDict()
 
-                spn_start_bit = self.get_spn_start_bit(row[spn_position_in_pgn_col])
                 spn_length = self.get_spn_len(row[spn_length_col])
                 if type(spn_length) == str and spn_length.startswith("Variable"):
                     spn_delimiter = self.get_spn_delimiter(row[spn_length_col])
-                    if spn_start_bit == -1:
-                        spn_order = row[spn_position_in_pgn_col].strip()
-                    else:
-                        spn_order = None
                 else:
                     spn_delimiter = None
-                    spn_order = None
 
-                spn_end_bit = self.get_spn_end_bit(spn_start_bit, spn_length)
                 spn_units = row[units_col]
                 low, high = self.get_operational_hilo(row[data_range_col], spn_units, spn_length)
 
@@ -349,13 +344,45 @@ class J1939daConverter:
                 spn_object.update({'SPNLength':        spn_length})
                 if spn_delimiter is not None:
                     spn_object.update({'Delimiter':    '0x%s' % spn_delimiter.hex()})
-                if spn_order is not None:
-                    spn_object.update({'Order':        spn_order})
-                spn_object.update({'StartBit':         spn_start_bit})
                 spn_object.update({'Units':            spn_units})
 
-                j1939_spn_db.update({spn_label: spn_object})
+                existing_spn = j1939_spn_db.get(str(int(spn)))
+                if existing_spn is not None and not existing_spn == spn_object:
+                    print("Warning: changed details of SPN %d:\n %s vs previous:\n %s" %
+                          (spn, existing_spn, spn_object), file=sys.stderr)
+                else:
+                    j1939_spn_db.update({spn_label: spn_object})
 
+                # record SPN position-in-PGN ('StartBit') in the PGN structure along with the list of SPNs -- or skip
+                # this SPN
+                try:
+                    spn_position_contents = row[spn_position_in_pgn_col]
+                    spn_startbit_inpgn = self.get_spn_start_bit(spn_position_contents)
+                    if spn_label == '5998' and spn_position_contents.strip() == '4.4':  # bug in 201311 DA
+                        spn_startbit_inpgn = self.get_spn_start_bit('4.5')
+                    elif spn_label == '3036' and spn_position_contents.strip() == '6-8.6':  # bug in 201311 DA
+                        spn_startbit_inpgn = self.get_spn_start_bit('6-7,8.6')
+                    elif spn_label == '6062' and spn_position_contents.strip() == '4.4':  # bug in 201311 DA
+                        spn_startbit_inpgn = self.get_spn_start_bit('4.5')
+                    elif spn_label == '6030' and spn_position_contents.strip() == '4.4':  # bug in 201311 DA
+                        spn_startbit_inpgn = self.get_spn_start_bit('4.5')
+
+                    if spn_startbit_inpgn == -1:
+                        spn_order_inpgn = spn_position_contents.strip()
+                    else:
+                        spn_order_inpgn = spn_startbit_inpgn
+                except ValueError:
+                    continue
+
+                if spn_label == '6610' or spn_label == '6815':  # bug in PGN map in 201311 DA
+                    continue
+
+                j1939_pgn_db.get(pgn_label).get('SPNs').append(int(spn))
+                j1939_pgn_db.get(pgn_label).get('SPNStartBits').append(int(spn_startbit_inpgn))
+                # the Temp_SPN_Order list will be deleted later
+                j1939_pgn_db.get(pgn_label).get('Temp_SPN_Order').append(spn_order_inpgn)
+
+                # If there is a bitfield/enum described in this row, then create a separate object describing the states
                 spn_description = unidecode.unidecode(row[spn_description_col])
                 if row[units_col] == 'bit' or self.is_spn_likely_bitmapped(spn_description):
                     bit_object = OrderedDict()
@@ -363,7 +390,56 @@ class J1939daConverter:
                     if len(bit_object) > 0:
                         j1939_bit_decodings.update({spn_label: bit_object})
 
+        # second-pass of all PGNs and SPNs to fix missing SPNLength in some and
+        # re-sort PGNs with some variable length SPNS
+        modified_spns = dict()
+        for pgn, pgn_object in j1939_pgn_db.items():
+            pgn_label = str(int(pgn))
+            spn_list = j1939_pgn_db.get(pgn_label).get('SPNs')
+            spn_startbit_list = j1939_pgn_db.get(pgn_label).get('SPNStartBits')
+            spn_order_list = j1939_pgn_db.get(pgn_label).get('Temp_SPN_Order')
+
+            spn_in_pgn_list = zip(spn_list, spn_startbit_list, spn_order_list)
+            if self.all_spns_positioned(spn_startbit_list):
+                spn_in_pgn_list = sorted(spn_in_pgn_list, key=lambda obj: obj[1])
+
+                spn_objects = list(map(lambda obj: j1939_spn_db.get(str(obj[0])), spn_in_pgn_list))
+
+                for i in range(0, len(spn_objects)-1):
+                    here_startbit = int(spn_in_pgn_list[ i ][1])
+                    next_startbit = int(spn_in_pgn_list[i+1][1])
+                    calced_spn_length = next_startbit - here_startbit
+                    here_spn = spn_in_pgn_list[i][0]
+                    if calced_spn_length == 0:
+                        print("Warning: calculated zero-length SPN %s in PGN %s" % (here_spn, pgn), file=sys.stderr)
+                        continue
+                    else:
+                        current_spn_length = spn_objects[i].get('SPNLength')
+                        if type(current_spn_length) is str and current_spn_length.startswith('Variable'):
+                            spn_objects[i].update({'SPNLength': calced_spn_length})
+                            modified_spns.update({here_spn: True})
+                        elif calced_spn_length < current_spn_length and modified_spns.get(spn) is None:
+                            print("Warning: calculated length for SPN %s (%d) in PGN %s differs from existing SPN "
+                                  "length %s" % (here_spn, calced_spn_length, pgn, current_spn_length), file=sys.stderr)
+            else:
+                spn_in_pgn_list = sorted(spn_in_pgn_list, key=lambda obj: (isinstance(obj[2], str), obj[2]))
+
+            j1939_pgn_db.get(pgn_label).pop('Temp_SPN_Order')
+            j1939_pgn_db.get(pgn_label).update({'SPNs': list(map(operator.itemgetter(0), spn_in_pgn_list))})
+            if len(spn_in_pgn_list) > 0:
+                j1939_pgn_db.get(pgn_label).update({'SPNStartBits': list(map(operator.itemgetter(1), spn_in_pgn_list))})
+            else:
+                j1939_pgn_db.get(pgn_label).pop('SPNStartBits')
+
         return
+
+    @staticmethod
+    def all_spns_positioned(spn_startbit_list):
+        if len(spn_startbit_list) == 0:
+            return True
+        else:
+            is_positioned = map(lambda spn_startbit: int(spn_startbit) != -1, spn_startbit_list)
+            return functools.reduce(lambda a, b: a and b, is_positioned)
 
     def process_any_source_addresses_sheet(self, sheet):
         if self.j1939db.get('J1939SATabledb') is None:
