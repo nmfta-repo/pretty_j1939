@@ -177,14 +177,6 @@ class J1939daConverter:
         return (byte_index - 1)*8 + (bit_index - 1)
 
     @staticmethod
-    # return an int of SPN length or; -1 (if unknown or variable)
-    def get_spn_end_bit(start, length):
-        if start == -1 or length == 'Variable':
-            return -1
-        else:
-            return start + length - 1
-
-    @staticmethod
     def get_enum_lines(description_lines):
         enum_lines = list()
         for line in description_lines:
@@ -348,7 +340,6 @@ class J1939daConverter:
                 low, high = self.get_operational_hilo(row[data_range_col], spn_units, spn_length)
 
                 spn_object.update({'DataRange':        unidecode.unidecode(row[data_range_col])})
-                spn_object.update({'EndBit':           spn_end_bit})
                 spn_object.update({'Name':             unidecode.unidecode(row[spn_name_col])})
                 spn_object.update({'Offset':           self.get_spn_offset(row[offset_col])})
                 spn_object.update({'OperationalHigh':  high})
