@@ -152,8 +152,7 @@ class J1939daConverter:
             return -1
 
         if ',' in norm_contents:
-            contents = contents.split(',')[0]  # TODO handle multi-startbit SPNs
-            norm_contents = contents.lower()
+            raise ValueError("this SPN not in one contiguous bitfield")  # TODO handle multi-startbit SPNs ex '3-4, 5.6'
 
         if '-' in norm_contents:
             first = norm_contents.split('-')[0]
