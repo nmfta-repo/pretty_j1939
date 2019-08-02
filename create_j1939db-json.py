@@ -18,10 +18,10 @@ import operator
 import pretty_j1939.parse
 
 parser = argparse. ArgumentParser()
-parser.add_argument('-f', '--digital_annex_xls', type=str,
+parser.add_argument('-f', '--digital_annex_xls', type=str, required=True,
                     default='J1939DA_201311.xls',
                     help="the J1939 Digital Annex excel sheet used as input")
-parser.add_argument('-w', '--write-json', type=str,
+parser.add_argument('-w', '--write-json', type=str, required=True,
                     default='-', help="where to write the output. defaults to stdout")
 args = parser.parse_args()
 
