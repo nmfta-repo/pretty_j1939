@@ -102,7 +102,15 @@ def get_pgn_name(pgn):
 def get_spn_list(pgn):
     global j1939db
     try:
-        return sorted(j1939db["J1939PGNdb"]["{}".format(pgn)]["SPNs"])
+        return j1939db["J1939PGNdb"]["{}".format(pgn)]["SPNs"]
+    except KeyError:
+        return []
+
+
+def get_startbits_list(pgn):
+    global j1939db
+    try:
+        return j1939db["J1939PGNdb"]["{}".format(pgn)]["SPNStartBits"]
     except KeyError:
         return []
 
@@ -170,9 +178,10 @@ def lookup_all_spn_params(callback, spn, pgn):
     # look up items in the database
     name = get_spn_name(spn)
     units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
-    spn_start = j1939db["J1939SPNdb"]["{}".format(spn)]["StartBit"]
     spn_length = j1939db["J1939SPNdb"]["{}".format(spn)]["SPNLength"]
     offset = j1939db["J1939SPNdb"]["{}".format(spn)]["Offset"]
+
+    spn_start = lookup_spn_startbit(spn, pgn)
 
     scale = j1939db["J1939SPNdb"]["{}".format(spn)]["Resolution"]
     if scale <= 0:
@@ -183,20 +192,63 @@ def lookup_all_spn_params(callback, spn, pgn):
     return name, offset, scale, spn_end, spn_length, spn_start, units
 
 
-def get_spn_bytes(message_data, spn, pgn):
-    spn_start = j1939db["J1939SPNdb"]["{}".format(spn)]["StartBit"]
-    spn_length = j1939db["J1939SPNdb"]["{}".format(spn)]["SPNLength"]
+def lookup_spn_startbit(spn, pgn):
+    global j1939db
 
-    # TODO: support extracting bits from multi-spn variable-length PGN (delimited and non-delimited)
-    # TODO: special-special support for PGN 64958 'Transit Route' that uses variable length fields encoded in
-    #  dedicated SPNs
-    if type(spn_length) is str and spn_length.startswith("Variable") and len(get_spn_list(pgn)) == 1:
-        spn_end = len(message_data) * 8 - 1
+    # support earlier versions of J1939db.json which did not include PGN-to-SPN mappings at the PGN
+    spn_start = j1939db["J1939SPNdb"]["{}".format(spn)].get("StartBit")
+    if spn_start is None: # otherwise, use the SPN bit position information at the PGN
+        spns_in_pgn = get_spn_list(pgn)
+        startbits_in_pgn = get_startbits_list(pgn)
+        spn_start = startbits_in_pgn[spns_in_pgn.index(spn)]
+
+    return spn_start
+
+
+def get_spn_bytes(message_data, spn, pgn):
+    spn_length = j1939db["J1939SPNdb"]["{}".format(spn)]["SPNLength"]
+    spn_start = lookup_spn_startbit(spn, pgn)
+
+    if type(spn_length) is str and spn_length.startswith("Variable"):
+        delimiter = j1939db["J1939SPNdb"]["{}".format(spn)].get("Delimiter")
+        spn_list = get_spn_list(pgn)
+        if delimiter is None:
+            if len(spn_list) == 1:
+                spn_end = len(message_data) * 8 - 1
+                cut_data = bitstring.BitString(message_data)[spn_start:spn_end + 1]
+                return cut_data
+            else:
+                print("Warning: skipping SPN %d in non-delimited and multi-spn and variable-length PGN %d"
+                      " (this is most-likely a problem in the JSONdb or source DA)" % (spn, pgn), file=sys.stderr)
+                return bitstring.BitString(b'')  # no way to handle multi-spn messages without a delimiter
+        else:
+            startbits_list = get_startbits_list(pgn)
+            spn_ordinal = spn_list.index(spn)
+
+            delimiter = delimiter.replace('0x', '')
+            delimiter = bytes.fromhex(delimiter)
+            spn_fields = message_data.split(delimiter)
+
+            if spn_start != -1:  # variable-len field with defined start; must be first variable-len field
+                spn_end = len(spn_fields[0]) * 8 - 1
+                cut_data = bitstring.BitString(spn_fields[0])[spn_start:spn_end + 1]
+                return cut_data
+            else:  # variable-len field with unspecified start; requires field counting
+                num_fixedlen_spn_fields = sum(1 for s in startbits_list if s != -1)
+                variable_spn_ordinal = spn_ordinal - num_fixedlen_spn_fields
+                if num_fixedlen_spn_fields > 0:
+                    variable_spn_fields = spn_fields[1:]
+                else:
+                    variable_spn_fields = spn_fields
+                try:
+                    cut_data = bitstring.BitString(variable_spn_fields[variable_spn_ordinal])
+                except IndexError:
+                    cut_data = bitstring.BitString(b'')
+                return cut_data
     else:
         spn_end = spn_start + spn_length - 1
-
-    cut_data = bitstring.BitString(message_data)[spn_start:spn_end + 1]
-    return cut_data
+        cut_data = bitstring.BitString(message_data)[spn_start:spn_end + 1]
+        return cut_data
 
 
 def is_spn_bitencoded(spn_units):
