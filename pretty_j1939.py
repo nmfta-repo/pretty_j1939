@@ -124,11 +124,11 @@ with open(args.candump, 'r') as f:
                     desc_line = can_line
                 else:
                     first_line = formatted_lines[0]
-                    desc_line = can_line + first_line + '\n'
+                    desc_line = can_line + first_line
                     formatted_lines.remove(first_line)
 
                 for line in formatted_lines:
-                    desc_line = desc_line + ' '*len(candump_line) + "; " + line + '\n'
+                    desc_line = desc_line + '\n' + ' '*len(candump_line) + "; " + line
 
         if len(desc_line) > 0:
             print(desc_line)
