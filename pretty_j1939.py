@@ -92,7 +92,7 @@ with open(args.candump, 'r') as f:
         if args.transport and len(transport_messages) > 0:
             if args.pgn:
                 transport_pgn_description = dict()
-                transport_pgn_description['Transport PGN'] = transport_messages[0]['PGN']
+                transport_pgn_description['Transport PGN'] = pretty_j1939.parse.get_pgn_description(transport_messages[0]['PGN'])
                 if any_described:
                     desc_line = add_separator(desc_line)
                 desc_line = add_description(desc_line, transport_pgn_description)

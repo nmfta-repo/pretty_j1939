@@ -147,17 +147,22 @@ def describe_message_id(message_id):
     description = {}
 
     pgn, da, sa = parse_j1939_id(message_id)
-    pgn_acronym = get_pgn_acronym(pgn)
     da_formatted_address, da_address_name = get_formatted_address_and_name(da)
     sa_formatted_address, sa_address_name = get_formatted_address_and_name(sa)
 
-    description['PGN'] = "%s(%s)" % (pgn_acronym, pgn)
+    description['PGN'] = get_pgn_description(pgn)
     description['DA'] = "%s%s" % (da_address_name, da_formatted_address)
     description['SA'] = "%s%s" % (sa_address_name, sa_formatted_address)
     return description
 
 
-def lookup_all_spn_params(callback, spn):
+def get_pgn_description(pgn):
+    pgn_acronym = get_pgn_acronym(pgn)
+    pgn_description = "%s(%s)" % (pgn_acronym, pgn)
+    return pgn_description
+
+
+def lookup_all_spn_params(callback, spn, pgn):
     global j1939db
 
     # look up items in the database
