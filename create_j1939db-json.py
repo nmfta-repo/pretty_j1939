@@ -396,48 +396,151 @@ class J1939daConverter:
                     if len(bit_object) > 0:
                         j1939_bit_decodings.update({spn_label: bit_object})
 
-        # second-pass of all PGNs and SPNs to fix missing SPNLength in some and
-        # re-sort PGNs with some variable length SPNS
+        # Clean-ups are needed:
+        # * sort SPN lists in PGNs by the Temp_SPN_Order
+        # * fix the starting sequence of -1 startbits in PGNs with fixed-len SPNs mapped
+        # * fix incorrectly variable-len SPNs in a sequence known startbits
+        # * remove any SPN maps that have variable-len, no-delimiter SPNs in a PGN with >1 SPN mapped
+        # * remove Temp_SPN_Order
+        # * remove zero-len startbits arrays
+
+        # * sort SPN lists in PGNs by the Temp_SPN_Order
+        self.sort_spns_by_order(j1939_pgn_db)
+
+        # * fix the starting sequence of -1 startbits in PGNs with fixed-len SPNs mapped
+        self.remove_startbitsunknown_spns(j1939_pgn_db, j1939_spn_db)
+
+        # * fix incorrectly variable-len SPNs in a sequence known startbits
+        self.fix_omittedlen_spns(j1939_pgn_db, j1939_spn_db)
+
+        # * remove any SPN maps that have variable-len, no-delimiter SPNs in a PGN with >1 SPN mapped
+        self.remove_underspecd_spns(j1939_pgn_db, j1939_spn_db)
+
+        # * remove Temp_SPN_Order
+        for pgn, pgn_object in j1939_pgn_db.items():
+            pgn_object.pop('Temp_SPN_Order')
+
+        # * remove zero-len startbits arrays
+        for pgn, pgn_object in j1939_pgn_db.items():
+            spn_list = pgn_object.get('SPNs')
+            if len(spn_list) == 0:
+                pgn_object.pop('SPNStartBits')
+
+        return
+
+    @staticmethod
+    def fix_omittedlen_spns(j1939_pgn_db, j1939_spn_db):
         modified_spns = dict()
         for pgn, pgn_object in j1939_pgn_db.items():
-            pgn_label = str(int(pgn))
-            spn_list = j1939_pgn_db.get(pgn_label).get('SPNs')
-            spn_startbit_list = j1939_pgn_db.get(pgn_label).get('SPNStartBits')
-            spn_order_list = j1939_pgn_db.get(pgn_label).get('Temp_SPN_Order')
+            spn_list = pgn_object.get('SPNs')
+            spn_startbit_list = pgn_object.get('SPNStartBits')
+            spn_order_list = pgn_object.get('Temp_SPN_Order')
 
-            spn_in_pgn_list = zip(spn_list, spn_startbit_list, spn_order_list)
-            if self.all_spns_positioned(spn_startbit_list):
-                spn_in_pgn_list = sorted(spn_in_pgn_list, key=lambda obj: obj[1])
-
-                spn_objects = list(map(lambda obj: j1939_spn_db.get(str(obj[0])), spn_in_pgn_list))
-
-                for i in range(0, len(spn_objects)-1):
-                    here_startbit = int(spn_in_pgn_list[ i ][1])
-                    next_startbit = int(spn_in_pgn_list[i+1][1])
+            spn_in_pgn_list = list(zip(spn_list, spn_startbit_list, spn_order_list))
+            if J1939daConverter.all_spns_positioned(spn_startbit_list):
+                for i in range(0, len(spn_in_pgn_list) - 1):
+                    here_startbit = int(spn_in_pgn_list[i][1])
+                    next_startbit = int(spn_in_pgn_list[i + 1][1])
                     calced_spn_length = next_startbit - here_startbit
                     here_spn = spn_in_pgn_list[i][0]
+
                     if calced_spn_length == 0:
                         print("Warning: calculated zero-length SPN %s in PGN %s" % (here_spn, pgn), file=sys.stderr)
                         continue
                     else:
-                        current_spn_length = spn_objects[i].get('SPNLength')
-                        if type(current_spn_length) is str and current_spn_length.startswith('Variable'):
-                            spn_objects[i].update({'SPNLength': calced_spn_length})
+                        spn_obj = j1939_spn_db.get(str(here_spn))
+                        current_spn_length = spn_obj.get('SPNLength')
+                        if J1939daConverter.is_length_variable(current_spn_length):
+                            spn_obj.update({'SPNLength': calced_spn_length})
                             modified_spns.update({here_spn: True})
-                        elif calced_spn_length < current_spn_length and modified_spns.get(spn) is None:
+                        elif calced_spn_length < current_spn_length and modified_spns.get(here_spn) is None:
                             print("Warning: calculated length for SPN %s (%d) in PGN %s differs from existing SPN "
                                   "length %s" % (here_spn, calced_spn_length, pgn, current_spn_length), file=sys.stderr)
-            else:
-                spn_in_pgn_list = sorted(spn_in_pgn_list, key=lambda obj: (isinstance(obj[2], str), obj[2]))
 
-            j1939_pgn_db.get(pgn_label).pop('Temp_SPN_Order')
-            j1939_pgn_db.get(pgn_label).update({'SPNs': list(map(operator.itemgetter(0), spn_in_pgn_list))})
-            if len(spn_in_pgn_list) > 0:
-                j1939_pgn_db.get(pgn_label).update({'SPNStartBits': list(map(operator.itemgetter(1), spn_in_pgn_list))})
-            else:
-                j1939_pgn_db.get(pgn_label).pop('SPNStartBits')
+    @staticmethod
+    def is_length_variable(spn_length):
+        return type(spn_length) is str and spn_length.startswith('Variable')
 
-        return
+    @staticmethod
+    def remove_startbitsunknown_spns(j1939_pgn_db, j1939_spn_db):
+        for pgn, pgn_object in j1939_pgn_db.items():
+            spn_list = pgn_object.get('SPNs')
+            if len(spn_list) > 1:
+                spn_list = pgn_object.get('SPNs')
+                spn_startbit_list = pgn_object.get('SPNStartBits')
+                spn_order_list = pgn_object.get('Temp_SPN_Order')
+
+                spn_in_pgn_list = list(zip(spn_list, spn_startbit_list, spn_order_list))
+                for i in range(0, len(spn_in_pgn_list)):
+                    here_startbit = int(spn_in_pgn_list[i][1])
+                    prev_spn = spn_in_pgn_list[i - 1][0]
+                    prev_spn_obj = j1939_spn_db.get(str(prev_spn))
+                    prev_spn_len = prev_spn_obj.get('SPNLength')
+                    if here_startbit == -1 and not J1939daConverter.is_length_variable(prev_spn_len):
+                        if (i - 1) == 0:  # special case for the first field
+                            prev_startbit = 0
+                            here_startbit = prev_spn_len
+                            prev_tuple = list(spn_in_pgn_list[i - 1])
+                            prev_tuple[1] = prev_startbit
+                            spn_in_pgn_list[i - 1] = tuple(prev_tuple)
+                        else:
+                            prev_startbit = int(spn_in_pgn_list[i - 1][1])
+                            here_startbit = prev_startbit + prev_spn_len
+                        here_tuple = list(spn_in_pgn_list[i])
+                        here_tuple[1] = here_startbit
+                        spn_in_pgn_list[i] = tuple(here_tuple)
+
+                # update the maps
+                pgn_object.update({'SPNs': list(map(operator.itemgetter(0), spn_in_pgn_list))})
+                pgn_object.update({'SPNStartBits': list(map(operator.itemgetter(1), spn_in_pgn_list))})
+                pgn_object.update({'Temp_SPN_Order': list(map(operator.itemgetter(2), spn_in_pgn_list))})
+
+    @staticmethod
+    def remove_underspecd_spns(j1939_pgn_db, j1939_spn_db):
+        for pgn, pgn_object in j1939_pgn_db.items():
+            spn_list = pgn_object.get('SPNs')
+            if len(spn_list) > 1:
+                spn_list = pgn_object.get('SPNs')
+                spn_startbit_list = pgn_object.get('SPNStartBits')
+                spn_order_list = pgn_object.get('Temp_SPN_Order')
+
+                spn_in_pgn_list = zip(spn_list, spn_startbit_list, spn_order_list)
+
+                def should_remove(tup):
+                    spn = tup[0]
+                    spn_obj = j1939_spn_db.get(str(spn))
+                    current_spn_length = spn_obj.get('SPNLength')
+                    current_spn_delimiter = spn_obj.get('Delimiter')
+                    if J1939daConverter.is_length_variable(current_spn_length) and \
+                            current_spn_delimiter is None:
+                        print("Warning: removing SPN %s from PGN %s because it "
+                              "is variable-length with no delimiter in a multi-SPN PGN. "
+                              "This likely an under-specification in the DA." % (spn, pgn), file=sys.stderr)
+                        return True
+                    return False
+
+                spn_in_pgn_list = [tup for tup in spn_in_pgn_list if not should_remove(tup)]
+
+                # update the maps
+                pgn_object.update({'SPNs': list(map(operator.itemgetter(0), spn_in_pgn_list))})
+                pgn_object.update({'SPNStartBits': list(map(operator.itemgetter(1), spn_in_pgn_list))})
+                pgn_object.update({'Temp_SPN_Order': list(map(operator.itemgetter(2), spn_in_pgn_list))})
+
+    @staticmethod
+    def sort_spns_by_order(j1939_pgn_db):
+        for pgn, pgn_object in j1939_pgn_db.items():
+            spn_list = pgn_object.get('SPNs')
+            spn_startbit_list = pgn_object.get('SPNStartBits')
+            spn_order_list = pgn_object.get('Temp_SPN_Order')
+
+            spn_in_pgn_list = zip(spn_list, spn_startbit_list, spn_order_list)
+            # sort numbers then letters
+            spn_in_pgn_list = sorted(spn_in_pgn_list, key=lambda obj: (isinstance(obj[2], str), obj[2]))
+
+            # update the maps (now sorted by 'Temp_SPN_Order')
+            pgn_object.update({'SPNs': list(map(operator.itemgetter(0), spn_in_pgn_list))})
+            pgn_object.update({'SPNStartBits': list(map(operator.itemgetter(1), spn_in_pgn_list))})
+            pgn_object.update({'Temp_SPN_Order': list(map(operator.itemgetter(2), spn_in_pgn_list))})
 
     @staticmethod
     def all_spns_positioned(spn_startbit_list):
