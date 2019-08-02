@@ -25,6 +25,7 @@ parser.add_argument('-w', '--write-json', type=str,
                     default='-', help="where to write the output. defaults to stdout")
 args = parser.parse_args()
 
+
 class J1939daConverter:
     def __init__(self):
         defusedxml.defuse_stdlib()
@@ -304,7 +305,7 @@ class J1939daConverter:
                 pgn_object.update({'Label':              unidecode.unidecode(row[acronym_col])})
                 pgn_object.update({'Name':               unidecode.unidecode(row[pgn_label_col])})
                 pgn_object.update({'PGNLength':          pgn_data_len})
-                pgn_object.update({'Rate':               row[transmission_rate_col]})
+                pgn_object.update({'Rate':               unidecode.unidecode(row[transmission_rate_col])})
                 pgn_object.update({'SPNs':               list()})
                 pgn_object.update({'SPNStartBits':       list()})
                 pgn_object.update({'Temp_SPN_Order':     list()})
@@ -316,7 +317,7 @@ class J1939daConverter:
 
             if not spn == '':
                 if spn_factcheck_map.get(spn, None) is None:
-                    spn_factcheck_map.update({spn: [pgn,]})
+                    spn_factcheck_map.update({spn: [pgn, ]})
                 else:
                     spn_list = spn_factcheck_map.get(spn)
                     spn_list.append(spn)
@@ -331,16 +332,21 @@ class J1939daConverter:
                 else:
                     spn_delimiter = None
 
-                spn_units = row[units_col]
-                low, high = self.get_operational_hilo(row[data_range_col], spn_units, spn_length)
+                spn_units = unidecode.unidecode(row[units_col])
+                data_range = unidecode.unidecode(row[data_range_col])
+                low, high = self.get_operational_hilo(data_range, spn_units, spn_length)
 
-                spn_object.update({'DataRange':        unidecode.unidecode(row[data_range_col])})
-                spn_object.update({'Name':             unidecode.unidecode(row[spn_name_col])})
+                spn_name = unidecode.unidecode(row[spn_name_col])
+                operational_range = unidecode.unidecode(row[operational_range_col])
+                spn_resoluion = unidecode.unidecode(row[resolution_col])
+
+                spn_object.update({'DataRange':        data_range})
+                spn_object.update({'Name':             spn_name})
                 spn_object.update({'Offset':           self.get_spn_offset(row[offset_col])})
                 spn_object.update({'OperationalHigh':  high})
                 spn_object.update({'OperationalLow':   low})
-                spn_object.update({'OperationalRange': unidecode.unidecode(row[operational_range_col])})
-                spn_object.update({'Resolution':       self.get_spn_resolution(unidecode.unidecode(row[resolution_col]))})
+                spn_object.update({'OperationalRange': operational_range})
+                spn_object.update({'Resolution':       self.get_spn_resolution(spn_resoluion)})
                 spn_object.update({'SPNLength':        spn_length})
                 if spn_delimiter is not None:
                     spn_object.update({'Delimiter':    '0x%s' % spn_delimiter.hex()})
