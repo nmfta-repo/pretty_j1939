@@ -5,6 +5,8 @@
 
 import json
 import bitstring
+import sys
+from collections import OrderedDict
 
 DA_MASK = 0x0000FF00
 SA_MASK = 0x000000FF
@@ -237,7 +239,7 @@ def get_spn_value(message_data, spn, pgn, validate=True):
 
 
 def describe_message_data(pgn, message_data, include_na=False):
-    description = dict()
+    description = OrderedDict()
     if is_transport_pgn(pgn):  # transport messages can't be accurately parsed by the DA description
         return description
 
