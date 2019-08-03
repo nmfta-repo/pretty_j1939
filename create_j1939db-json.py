@@ -15,11 +15,12 @@ import json
 import argparse
 import functools
 import operator
+import itertools
 import pretty_j1939.parse
 
 parser = argparse. ArgumentParser()
-parser.add_argument('-f', '--digital_annex_xls', type=str, required=True,
-                    default='J1939DA_201311.xls',
+parser.add_argument('-f', '--digital_annex_xls', type=str, required=True, action='append',
+                    default=[], nargs='+',
                     help="the J1939 Digital Annex excel sheet used as input")
 parser.add_argument('-w', '--write-json', type=str, required=True,
                     default='-', help="where to write the output. defaults to stdout")
@@ -27,9 +28,11 @@ args = parser.parse_args()
 
 
 class J1939daConverter:
-    def __init__(self):
+    def __init__(self, digital_annex_xls_list):
         defusedxml.defuse_stdlib()
         self.j1939db = OrderedDict()
+        self.digital_annex_xls_list = list(map(lambda da: self.secure_open_workbook(filename=da, on_demand=True),
+                                               digital_annex_xls_list))
 
     @staticmethod
     def secure_open_workbook(**kwargs):
@@ -56,12 +59,18 @@ class J1939daConverter:
     @staticmethod
     # returns an int number of bits, or 'Variable'
     def get_spn_len(contents):
-        if 'to' in contents.lower() or contents.strip() == '' or 'variable' in contents.lower():
+        if 'to' in contents.lower() or \
+           contents.strip() == '' or \
+           'variable' in contents.lower():
+            return 'Variable'
+        elif re.match(r'max [0-9]+ bytes', contents):
             return 'Variable'
         elif 'byte' in contents.lower():
             return int(contents.split(' ')[0]) * 8
         elif 'bit' in contents.lower():
             return int(contents.split(' ')[0])
+        elif re.match(r'^[0-9]+$', contents):
+            return int(contents)
         raise ValueError('unknown SPN Length "%s"' % contents)
 
     @staticmethod
@@ -92,7 +101,10 @@ class J1939daConverter:
         elif 'bit-mapped' in norm_contents or \
              'binary' in norm_contents or \
              'ascii' in norm_contents or \
-             'not defined' in norm_contents or contents.strip() == '':
+             'not defined' in norm_contents or \
+             'variant determined' in norm_contents or \
+             '7 bit iso latin 1 characters' in norm_contents or \
+             contents.strip() == '':
             return int(0)
         elif 'per bit' in norm_contents or '/bit' in norm_contents:
             first = contents.split(' ')[0]
@@ -104,7 +116,7 @@ class J1939daConverter:
             left = J1939daConverter.just_numerals(left.split(' ')[0])
             right = J1939daConverter.just_numerals(right.split(' ')[0])
             return asteval.Interpreter()('%s/%s' % (left, right))
-        elif 'microsiemens/mm' in norm_contents or 'uSiemens/mm':  # special handling for this weirdness
+        elif 'microsiemens/mm' in norm_contents or 'uSiemens/mm' in norm_contents:  # special handling for this weirdness
             return float(contents.split(' ')[0])
         raise ValueError('unknown spn resolution "%s"' % contents)
 
@@ -130,7 +142,9 @@ class J1939daConverter:
                 return -1, -1
         elif 'manufacturer defined' in norm_contents or\
              'bit-mapped' in norm_contents or\
-             'not defined' in norm_contents or contents.strip() == '':
+             'not defined' in norm_contents or\
+             'variant determined' in norm_contents or\
+             contents.strip() == '':
             return -1, -1
         elif ' to ' in norm_contents:
             left, right = norm_contents.split(' to ')[0:2]
@@ -266,23 +280,23 @@ class J1939daConverter:
         # check for SPNs in multiple PNGs
         spn_factcheck_map = dict()
 
-        header_row_num = 3
-        header_row = sheet.row_values(header_row_num)
+        header_row, header_row_num = self.get_header_row(sheet)
+
         pgn_col = header_row.index('PGN')
         spn_col = header_row.index('SPN')
-        acronym_col = header_row.index('Acronym')
-        pgn_label_col = header_row.index('Parameter Group Label')
-        pgn_data_length_col = header_row.index('PGN Data Length')
-        transmission_rate_col = header_row.index('Transmission Rate')
-        spn_position_in_pgn_col = header_row.index('SPN Position in PGN')
-        spn_name_col = header_row.index('SPN Name')
-        offset_col = header_row.index('Offset')
-        data_range_col = header_row.index('Data Range')
-        resolution_col = header_row.index('Resolution')
-        spn_length_col = header_row.index('SPN Length')
-        units_col = header_row.index('Units')
-        operational_range_col = header_row.index('Operational Range')
-        spn_description_col = header_row.index('SPN Description')
+        acronym_col = header_row.index('ACRONYM')
+        pgn_label_col = header_row.index('PARAMETER_GROUP_LABEL')
+        pgn_data_length_col = header_row.index('PGN_DATA_LENGTH')
+        transmission_rate_col = header_row.index('TRANSMISSION_RATE')
+        spn_position_in_pgn_col = header_row.index('SPN_POSITION_IN_PGN')
+        spn_name_col = header_row.index('SPN_NAME')
+        offset_col = header_row.index('OFFSET')
+        data_range_col = header_row.index('DATA_RANGE')
+        resolution_col = header_row.index('RESOLUTION')
+        spn_length_col = header_row.index('SPN_LENGTH')
+        units_col = header_row.index('UNITS')
+        operational_range_col = header_row.index('OPERATIONAL_RANGE')
+        spn_description_col = header_row.index('SPN_DESCRIPTION')
 
         for i in range(header_row_num+1, sheet.nrows):
             row = sheet.row_values(i)
@@ -354,7 +368,7 @@ class J1939daConverter:
 
                 existing_spn = j1939_spn_db.get(str(int(spn)))
                 if existing_spn is not None and not existing_spn == spn_object:
-                    print("Warning: changed details of SPN %d:\n %s vs previous:\n %s" %
+                    print("Warning: changed details of SPN %s:\n %s vs previous:\n %s" %
                           (spn, existing_spn, spn_object), file=sys.stderr)
                 else:
                     j1939_spn_db.update({spn_label: spn_object})
@@ -427,6 +441,26 @@ class J1939daConverter:
                 pgn_object.pop('SPNStartBits')
 
         return
+
+    def get_header_row(self, sheet):
+        header_row_num = self.lookup_header_row(sheet)
+
+        header_row = sheet.row_values(header_row_num)
+        header_row = list(map(lambda x: x.upper(), header_row))
+        header_row = list(map(lambda x: x.replace(' ', '_'), header_row))
+        return header_row, header_row_num
+
+    def lookup_header_row(self, sheet):
+        if sheet.row_values(0)[3].strip() == '':
+            return 3
+        else:
+            return 0
+
+        if sheet.row_values(0)[0] == 'pgn': # support for isobus.net J1939 XLS exports
+            header_row_num = 0
+        else:
+            header_row_num = 3  # default SAE J1939 DA row
+        return header_row_num
 
     @staticmethod
     def fix_omittedlen_spns(j1939_pgn_db, j1939_spn_db):
@@ -555,10 +589,10 @@ class J1939daConverter:
             self.j1939db.update({'J1939SATabledb': OrderedDict()})
         j1939_sa_tabledb = self.j1939db.get('J1939SATabledb')
 
-        header_row_num = 3
-        header_row = sheet.row_values(header_row_num)
-        source_address_id_col = header_row.index('Source Address ID')
-        name_col = header_row.index('Name')
+        header_row, header_row_num = self.get_header_row(sheet)
+
+        source_address_id_col = header_row.index('SOURCE_ADDRESS_ID')
+        name_col = header_row.index('NAME')
 
         for i in range(header_row_num+1, sheet.nrows):
             row = sheet.row_values(i)
@@ -573,15 +607,16 @@ class J1939daConverter:
             j1939_sa_tabledb.update({val: name})
         return
 
-    def convert(self, input_file, output_file):
-        self.j1939db = OrderedDict()
-
-        with self.secure_open_workbook(filename=input_file, on_demand=True) as j1939_da:
-            self.process_spns_and_pgns_tab(j1939_da.sheet_by_name('SPNs & PGNs'))
-            self.process_any_source_addresses_sheet(j1939_da.sheet_by_name('Global Source Addresses (B2)'))
-            self.process_any_source_addresses_sheet(j1939_da.sheet_by_name('IG1 Source Addresses (B3)'))
+    def convert(self, output_file):
+        sheet_name = 'SPNs & PGNs'
+        self.process_spns_and_pgns_tab(self.find_first_sheet_by_name(sheet_name))
+        sheet_name = 'Global Source Addresses (B2)'
+        self.process_any_source_addresses_sheet(self.find_first_sheet_by_name(sheet_name))
+        sheet_name = 'IG1 Source Addresses (B3)'
+        self.process_any_source_addresses_sheet(self.find_first_sheet_by_name(sheet_name))
 
         out = open(output_file, 'w') if output_file != '-' else sys.stdout
+        self.j1939db = OrderedDict()
 
         try:
             out.write(json.dumps(self.j1939db, indent=2, sort_keys=False))
@@ -593,5 +628,13 @@ class J1939daConverter:
 
         return
 
+    def find_first_sheet_by_name(self, sheet_name):
+        for book in self.digital_annex_xls_list:
+            if sheet_name in book.sheet_names():
+                sheet = book.sheet_by_name(sheet_name)
+                return sheet
+        return None
 
-J1939daConverter().convert(args.digital_annex_xls, args.write_json)
+
+all_inputs = itertools.chain(*args.digital_annex_xls)
+J1939daConverter(all_inputs).convert(args.write_json)
