@@ -13,7 +13,7 @@ def str2bool(v):
     return v.lower() in ("yes", "true", "t", "1")
 
 
-parser = argparse.ArgumentParser(description='Process some integers.')
+parser = argparse.ArgumentParser(description='pretty-printing J1939 candump logs')
 parser.add_argument('candump', help='candump log')
 parser.add_argument('--candata', type=str2bool, const=True, default=False, nargs='?',
                     help='print input can data')
