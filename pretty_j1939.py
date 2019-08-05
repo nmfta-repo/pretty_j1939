@@ -2,6 +2,7 @@
 
 import bitstring
 import argparse
+import sys
 import json
 import pretty_j1939.parse
 
@@ -24,96 +25,42 @@ parser.add_argument('--transport', type=str2bool, const=True, default=True, narg
                     help='print details of transport-layer streams found')
 parser.add_argument('--link', type=str2bool, const=True, default=True, nargs='?',
                     help='print details of link-layer frames found')
+parser.add_argument('--include-na', type=str2bool, const=True, default=False, nargs='?',
+                    help='inlude not-available (0xff) SPN values')
 parser.add_argument('--format',  type=str2bool, const=True, default=False, nargs='?',
                     help='format each structure (otherwise single-line)')
 
 args = parser.parse_args()
 
-transport_messages = list()
-
-
-def process_bam_found(data_bytes, sa, pgn):
-    transport_found = dict()
-    transport_found['PGN'] = pgn
-    transport_found['data'] = data_bytes
-    transport_messages.append(transport_found)
-
-
-def add_separator(desc_line):
-    if args.format:
-        desc_line = desc_line + '\n'
-    else:
-        desc_line = desc_line + " // "
-    return desc_line
-
-
-def add_description(desc_line, json_object):
-    if args.format:
-        json_description = str(json.dumps(json_object, indent=4))
-    else:
-        json_description = str(json_object)
-    desc_line = desc_line + json_description
-    return desc_line
-
-
-bam_processor = pretty_j1939.parse.get_bam_processor(process_bam_found)
+describer = pretty_j1939.parse.get_describer(describe_pgns=args.pgn, describe_spns=args.spn,
+                                             describe_link_layer=args.link, describe_transport_layer=args.transport,
+                                             include_transport_rawdata=args.candata,
+                                             include_na=args.include_na)
 
 with open(args.candump, 'r') as f:
     for candump_line in f.readlines():
+        if candump_line == '\n':
+            continue
         try:
             timestamp = float(candump_line.split(' ')[0].replace('(', '').replace(')', ''))
             message_id = bitstring.BitString(hex=candump_line.split(' ')[2].split('#')[0])
             message_data = bitstring.BitString(hex=candump_line.split(' ')[2].split('#')[1])
 
         except IndexError:
+            print("Warning: error in line '%s'" % candump_line, file=sys.stderr)
             continue
         except ValueError:
+            print("Warning: error in line '%s'" % candump_line, file=sys.stderr)
             continue
 
-        any_described = False
-        transport_messages.clear()
-        bam_processor(message_data.bytes, message_id.uint)
         desc_line = ''
 
-        if args.link:
-            if args.pgn:
-                pgn_desc = pretty_j1939.parse.describe_message_id(message_id.uint)
-                desc_line = add_description(desc_line, pgn_desc)
-                any_described = True
-
-            if args.spn:
-                pgn, _, _ = pretty_j1939.parse.parse_j1939_id(message_id.uint)
-                spn_desc = pretty_j1939.parse.describe_message_data(pgn, message_data.bytes)
-                if any_described:
-                    desc_line = add_separator(desc_line)
-                desc_line = add_description(desc_line, spn_desc)
-                any_described = True
-
-        if args.transport and len(transport_messages) > 0:
-            if args.pgn:
-                transport_pgn_description = dict()
-                transport_pgn_description['Transport PGN'] = pretty_j1939.parse.get_pgn_description(transport_messages[0]['PGN'])
-                if any_described:
-                    desc_line = add_separator(desc_line)
-                desc_line = add_description(desc_line, transport_pgn_description)
-                any_described = True
-
-            if args.candata:
-                transport_data_description = dict()
-                transport_data_description['Transport Data'] = str(bitstring.BitString(transport_messages[0]['data']))
-                if any_described:
-                    desc_line = add_separator(desc_line)
-                desc_line = add_description(desc_line, transport_data_description)
-                any_described = True
-
-            if args.spn:
-                pgn = transport_messages[0]['PGN']
-                spn_desc = pretty_j1939.parse.describe_message_data(pgn, transport_messages[0]['data'])
-                if any_described:
-                    desc_line = add_separator(desc_line)
-                desc_line = add_description(desc_line, spn_desc)
-                any_described = True
-
+        description = describer(message_data.bytes, message_id.uint)
+        if args.format:
+            json_description = str(json.dumps(description, indent=4))
+        else:
+            json_description = str(json.dumps(description, separators=(',', ':')))
+        desc_line = desc_line + json_description
         if args.candata:
             can_line = candump_line.rstrip() + " ; "
             if not args.format:

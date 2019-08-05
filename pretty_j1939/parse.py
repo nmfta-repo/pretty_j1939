@@ -358,3 +358,48 @@ def get_bam_processor(process_bam_found):
                     process_bam_found(data_bytes, sa, new_pgn[sa])
 
     return process_for_bams
+
+
+def get_describer(describe_pgns=True, describe_spns=True,
+                              describe_link_layer=True, describe_transport_layer=True,
+                              include_transport_rawdata=True, include_na=False):
+
+    transport_messages = list()
+
+    def process_bam_found(data_bytes, sa, pgn):
+        transport_found = dict()
+        transport_found['PGN'] = pgn
+        transport_found['SA'] = sa
+        transport_found['data'] = data_bytes
+        transport_messages.append(transport_found)
+
+    bam_processor = get_bam_processor(process_bam_found)
+
+    def describer(message_data_bytes, message_id_uint):
+        transport_messages.clear()
+        bam_processor(message_data_bytes, message_id_uint)
+
+        description = OrderedDict()
+
+        if describe_link_layer:
+            if describe_pgns:
+                description.update(describe_message_id(message_id_uint))
+
+            if describe_spns:
+                pgn, _, _ = parse_j1939_id(message_id_uint)
+                description.update(describe_message_data(pgn, message_data_bytes, include_na=include_na))
+
+        if describe_transport_layer and len(transport_messages) > 0:
+            if describe_pgns:
+                description.update({'Transport PGN': get_pgn_description(transport_messages[0]['PGN'])})
+
+            if include_transport_rawdata:
+                description.update({'Transport Data': str(bitstring.BitString(transport_messages[0]['data']))})
+
+            if describe_spns:
+                pgn = transport_messages[0]['PGN']
+                description.update(describe_message_data(pgn, transport_messages[0]['data']))
+
+        return description
+
+    return describer
