@@ -95,7 +95,9 @@ def is_ack_pgn(pgn):
 
 
 def is_transport_message(message_id):
-    return is_data_transfer_message(message_id) or is_connection_management_message(message_id) or is_ack_message(message_id)
+    return is_data_transfer_message(message_id) or \
+           is_connection_management_message(message_id) or \
+           is_ack_message(message_id)
 
 
 def is_transport_pgn(pgn):
@@ -114,16 +116,6 @@ def get_pgn_acronym(pgn):
     if acronym == '':
         acronym = "Unknown"
     return acronym
-
-# TODO delete this unused method
-def get_pgn_name(pgn):
-    pgn_object = get_pgn_object(pgn)
-    if pgn_object is None:
-        return get_pgn_acronym(pgn)
-    name = pgn_object["Name"]
-    if name == '':
-        name = get_pgn_acronym(pgn)
-    return name
 
 
 def get_spn_list(pgn):
@@ -145,13 +137,6 @@ def get_spn_name(spn):
     if spn_object is None:
         return "Unknown"
     return spn_object["Name"]
-
-# TODO remove this unused method
-def get_spn_acronym(spn):
-    spn_object = get_spn_object(spn)
-    if spn_object is None:
-        return "Unknown"
-    return spn_object["Acronym"]
 
 
 def get_formatted_address_and_name(address):
@@ -207,7 +192,7 @@ def lookup_all_spn_params(callback, spn, pgn):
 def lookup_spn_startbit(spn, pgn):
     # support earlier versions of J1939db.json which did not include PGN-to-SPN mappings at the PGN
     spn_start = get_spn_object(spn).get("StartBit")
-    if spn_start is None: # otherwise, use the SPN bit position information at the PGN
+    if spn_start is None:  # otherwise, use the SPN bit position information at the PGN
         spns_in_pgn = get_spn_list(pgn)
         startbits_in_pgn = get_startbits_list(pgn)
         spn_start = startbits_in_pgn[spns_in_pgn.index(spn)]
@@ -344,6 +329,7 @@ def describe_message_data(pgn, message_data, include_na=False):
             description[spn_name] = "%s (%s)" % (get_spn_bytes(message_data, spn, pgn), "Out of range")
 
     return description
+
 
 def get_bam_processor(process_bam_found):
     new_pgn = {}
