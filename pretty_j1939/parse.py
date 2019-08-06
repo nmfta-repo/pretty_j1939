@@ -15,13 +15,42 @@ TM_MASK = 0x00EB0000
 CM_MASK = 0x00EC0000
 ACK_MASK = 0x0E80000
 
-j1939db = {}
+pgn_objects = dict()
+spn_objects = dict()
+address_names = dict()
+bit_encodings = dict()
 
 
 def init_j1939db():
-    global j1939db
     with open("J1939db.json", 'r') as j1939_file:
         j1939db = json.load(j1939_file)
+        for pgn_label, pgn_object in j1939db['J1939PGNdb'].items():
+            pgn_objects.update({int(pgn_label): pgn_object})  # TODO check for all expected fields on each object
+
+        for spn_label, spn_object in j1939db['J1939SPNdb'].items():
+            spn_objects.update({int(spn_label): spn_object})  # TODO check for all expected fields on each object
+
+        for address, address_name in j1939db['J1939SATabledb'].items():
+            address_names.update({int(address): address_name})  # TODO check for all expected fields on each object
+
+        for spn_label, bit_encoding in j1939db['J1939BitDecodings'].items():
+            bit_encodings.update({int(spn_label): bit_encoding})  # TODO check for all expected fields on each object
+
+
+def get_pgn_object(pgn):
+    return pgn_objects.get(pgn)
+
+
+def get_spn_object(spn):
+    return spn_objects.get(spn)
+
+
+def get_address_name(address):
+    return address_names.get(address)
+
+
+def get_bitencodings_object(spn):
+    return bit_encodings.get(spn)
 
 
 def get_sa(can_id):
@@ -78,66 +107,51 @@ def is_bam_cts_message(message_bytes):
 
 
 def get_pgn_acronym(pgn):
-    global j1939db
-    try:
-        acronym = j1939db["J1939PGNdb"]["{}".format(pgn)]["Label"]
-        if acronym == '':
-            acronym = "Unknown"
-        return acronym
-    except KeyError:
+    pgn_object = get_pgn_object(pgn)
+    if pgn_object is None:
         return "Unknown"
+    acronym = pgn_object["Label"]
+    if acronym == '':
+        acronym = "Unknown"
+    return acronym
 
-
+# TODO delete this unused method
 def get_pgn_name(pgn):
-    global j1939db
-    try:
-        name = j1939db["J1939PGNdb"]["{}".format(pgn)]["Name"]
-        if name == '':
-            name = get_pgn_acronym(pgn)
-        return name
-    except KeyError:
+    pgn_object = get_pgn_object(pgn)
+    if pgn_object is None:
         return get_pgn_acronym(pgn)
+    name = pgn_object["Name"]
+    if name == '':
+        name = get_pgn_acronym(pgn)
+    return name
 
 
 def get_spn_list(pgn):
-    global j1939db
-    try:
-        return j1939db["J1939PGNdb"]["{}".format(pgn)]["SPNs"]
-    except KeyError:
+    pgn_object = get_pgn_object(pgn)
+    if pgn_object is None:
         return []
+    return pgn_object["SPNs"]
 
 
 def get_startbits_list(pgn):
-    global j1939db
-    try:
-        return j1939db["J1939PGNdb"]["{}".format(pgn)]["SPNStartBits"]
-    except KeyError:
+    pgn_object = get_pgn_object(pgn)
+    if pgn_object is None:
         return []
+    return pgn_object["SPNStartBits"]
 
 
 def get_spn_name(spn):
-    global j1939db
-    try:
-        return j1939db["J1939SPNdb"]["{}".format(spn)]["Name"]
-    except KeyError:
+    spn_object = get_spn_object(spn)
+    if spn_object is None:
         return "Unknown"
+    return spn_object["Name"]
 
-
+# TODO remove this unused method
 def get_spn_acronym(spn):
-    global j1939db
-    try:
-        return j1939db["J1939SPNdb"]["{}".format(spn)]["Acronym"]
-    except KeyError:
+    spn_object = get_spn_object(spn)
+    if spn_object is None:
         return "Unknown"
-
-
-def get_address_name(address):
-    global j1939db
-    try:
-        address = "{:3d}".format(address)
-        return j1939db["J1939SATabledb"][address.strip()]
-    except KeyError:
-        return "Unknown"
+    return spn_object["Acronym"]
 
 
 def get_formatted_address_and_name(address):
@@ -146,9 +160,8 @@ def get_formatted_address_and_name(address):
         address_name = "All"
     else:
         formatted_address = "({:3d})".format(address)
-        try:
-            address_name = get_address_name(address)
-        except KeyError:
+        address_name = get_address_name(address)
+        if address_name is None:
             address_name = "Unknown"
     return formatted_address, address_name
 
@@ -173,17 +186,16 @@ def get_pgn_description(pgn):
 
 
 def lookup_all_spn_params(callback, spn, pgn):
-    global j1939db
-
     # look up items in the database
     name = get_spn_name(spn)
-    units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
-    spn_length = j1939db["J1939SPNdb"]["{}".format(spn)]["SPNLength"]
-    offset = j1939db["J1939SPNdb"]["{}".format(spn)]["Offset"]
+    spn_object = get_spn_object(spn)
+    units = spn_object["Units"]
+    spn_length = spn_object["SPNLength"]
+    offset = spn_object["Offset"]
 
     spn_start = lookup_spn_startbit(spn, pgn)
 
-    scale = j1939db["J1939SPNdb"]["{}".format(spn)]["Resolution"]
+    scale = spn_object["Resolution"]
     if scale <= 0:
         scale = 1
 
@@ -193,10 +205,8 @@ def lookup_all_spn_params(callback, spn, pgn):
 
 
 def lookup_spn_startbit(spn, pgn):
-    global j1939db
-
     # support earlier versions of J1939db.json which did not include PGN-to-SPN mappings at the PGN
-    spn_start = j1939db["J1939SPNdb"]["{}".format(spn)].get("StartBit")
+    spn_start = get_spn_object(spn).get("StartBit")
     if spn_start is None: # otherwise, use the SPN bit position information at the PGN
         spns_in_pgn = get_spn_list(pgn)
         startbits_in_pgn = get_startbits_list(pgn)
@@ -206,21 +216,22 @@ def lookup_spn_startbit(spn, pgn):
 
 
 def get_spn_bytes(message_data, spn, pgn):
-    spn_length = j1939db["J1939SPNdb"]["{}".format(spn)]["SPNLength"]
+    spn_object = get_spn_object(spn)
+    spn_length = spn_object["SPNLength"]
     spn_start = lookup_spn_startbit(spn, pgn)
 
     if type(spn_length) is str and spn_length.startswith("Variable"):
-        delimiter = j1939db["J1939SPNdb"]["{}".format(spn)].get("Delimiter")
+        delimiter = spn_object.get("Delimiter")
         spn_list = get_spn_list(pgn)
         if delimiter is None:
             if len(spn_list) == 1:
                 spn_end = len(message_data) * 8 - 1
-                cut_data = bitstring.BitString(message_data)[spn_start:spn_end + 1]
+                cut_data = bitstring.ConstBitArray(message_data)[spn_start:spn_end + 1]
                 return cut_data
             else:
                 print("Warning: skipping SPN %d in non-delimited and multi-spn and variable-length PGN %d"
                       " (this is most-likely a problem in the JSONdb or source DA)" % (spn, pgn), file=sys.stderr)
-                return bitstring.BitString(b'')  # no way to handle multi-spn messages without a delimiter
+                return bitstring.ConstBitArray(b'')  # no way to handle multi-spn messages without a delimiter
         else:
             startbits_list = get_startbits_list(pgn)
             spn_ordinal = spn_list.index(spn)
@@ -231,7 +242,7 @@ def get_spn_bytes(message_data, spn, pgn):
 
             if spn_start != -1:  # variable-len field with defined start; must be first variable-len field
                 spn_end = len(spn_fields[0]) * 8 - 1
-                cut_data = bitstring.BitString(spn_fields[0])[spn_start:spn_end + 1]
+                cut_data = bitstring.ConstBitArray(spn_fields[0])[spn_start:spn_end + 1]
                 return cut_data
             else:  # variable-len field with unspecified start; requires field counting
                 num_fixedlen_spn_fields = sum(1 for s in startbits_list if s != -1)
@@ -241,13 +252,13 @@ def get_spn_bytes(message_data, spn, pgn):
                 else:
                     variable_spn_fields = spn_fields
                 try:
-                    cut_data = bitstring.BitString(variable_spn_fields[variable_spn_ordinal])
+                    cut_data = bitstring.ConstBitArray(variable_spn_fields[variable_spn_ordinal])
                 except IndexError:
-                    cut_data = bitstring.BitString(b'')
+                    cut_data = bitstring.ConstBitArray(b'')
                 return cut_data
     else:
         spn_end = spn_start + spn_length - 1
-        cut_data = bitstring.BitString(message_data)[spn_start:spn_end + 1]
+        cut_data = bitstring.ConstBitArray(message_data)[spn_start:spn_end + 1]
         return cut_data
 
 
@@ -256,7 +267,7 @@ def is_spn_bitencoded(spn_units):
 
 
 def is_spn_numerical_values(spn):
-    spn_units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
+    spn_units = get_spn_object(spn)["Units"]
     norm_units = spn_units.lower()
     return norm_units not in ("manufacturer determined", "byte", "", "request dependent", "ascii")
 
@@ -264,14 +275,15 @@ def is_spn_numerical_values(spn):
 # returns a float in units of the SPN, or None if the value if the SPN value is not available in the message_data
 #   if validate == True, raises a ValueError if the value is present in message_data but is beyond the operational range
 def get_spn_value(message_data, spn, pgn, validate=True):
-    units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
+    spn_object = get_spn_object(spn)
+    units = spn_object["Units"]
 
-    offset = j1939db["J1939SPNdb"]["{}".format(spn)]["Offset"]
-    scale = j1939db["J1939SPNdb"]["{}".format(spn)]["Resolution"]
+    offset = spn_object["Offset"]
+    scale = spn_object["Resolution"]
     if scale <= 0:
         scale = 1
 
-    cut_data = get_spn_bytes(message_data, spn, pgn)
+    cut_data = bitstring.BitArray(get_spn_bytes(message_data, spn, pgn))
     if cut_data.all(True):  # value unavailable in message_data
         return None
 
@@ -282,8 +294,8 @@ def get_spn_value(message_data, spn, pgn, validate=True):
         value = cut_data.uint * scale + offset
 
         if validate:
-            operational_min = j1939db["J1939SPNdb"]["{}".format(spn)]["OperationalLow"]
-            operational_max = j1939db["J1939SPNdb"]["{}".format(spn)]["OperationalHigh"]
+            operational_min = spn_object["OperationalLow"]
+            operational_max = spn_object["OperationalHigh"]
             if value < operational_min or value > operational_max:
                 raise ValueError
 
@@ -297,7 +309,7 @@ def describe_message_data(pgn, message_data, include_na=False):
 
     for spn in get_spn_list(pgn):
         spn_name = get_spn_name(spn)
-        spn_units = j1939db["J1939SPNdb"]["{}".format(spn)]["Units"]
+        spn_units = get_spn_object(spn)["Units"]
 
         try:
             if is_spn_numerical_values(spn):
@@ -309,7 +321,10 @@ def describe_message_data(pgn, message_data, include_na=False):
                         continue
                 elif is_spn_bitencoded(spn_units):
                     try:
-                        enum_descriptions = j1939db["J1939BitDecodings"]["{}".format(spn)]
+                        enum_descriptions = get_bitencodings_object(spn)
+                        if enum_descriptions is None:
+                            description[spn_name] = "%d (Unknown)" % spn_value
+                            continue
                         spn_value_description = enum_descriptions[str(int(spn_value))].strip()
                         description[spn_name] = "%d (%s)" % (spn_value, spn_value_description)
                     except KeyError:
@@ -329,7 +344,6 @@ def describe_message_data(pgn, message_data, include_na=False):
             description[spn_name] = "%s (%s)" % (get_spn_bytes(message_data, spn, pgn), "Out of range")
 
     return description
-
 
 def get_bam_processor(process_bam_found):
     new_pgn = {}
@@ -361,8 +375,8 @@ def get_bam_processor(process_bam_found):
 
 
 def get_describer(describe_pgns=True, describe_spns=True,
-                              describe_link_layer=True, describe_transport_layer=True,
-                              include_transport_rawdata=True, include_na=False):
+                  describe_link_layer=True, describe_transport_layer=True,
+                  include_transport_rawdata=True, include_na=False):
 
     transport_messages = list()
 
@@ -394,7 +408,7 @@ def get_describer(describe_pgns=True, describe_spns=True,
                 description.update({'Transport PGN': get_pgn_description(transport_messages[0]['PGN'])})
 
             if include_transport_rawdata:
-                description.update({'Transport Data': str(bitstring.BitString(transport_messages[0]['data']))})
+                description.update({'Transport Data': str(bitstring.ConstBitArray(transport_messages[0]['data']))})
 
             if describe_spns:
                 pgn = transport_messages[0]['PGN']
