@@ -60,7 +60,11 @@ if __name__ == '__main__':
                 json_description = str(json.dumps(description, indent=4))
             else:
                 json_description = str(json.dumps(description, separators=(',', ':')))
-            desc_line = desc_line + json_description
+            if len(description) > 0:
+                desc_line = desc_line + json_description
+            else:
+                desc_line = ''
+
             if args.candata:
                 can_line = candump_line.rstrip() + " ; "
                 if not args.format:
