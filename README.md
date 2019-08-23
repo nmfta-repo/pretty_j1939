@@ -58,7 +58,7 @@ $ pretty_j1939.py --candata=false --format=true --link=false --transport=true ex
 
 ## HOWTO
 
-First, obtain a copy of the digital annex, see http://subs.sae.org/j1939_dl/ for details.
+First, obtain a copy of the digital annex, see https://www.sae.org/standards/content/j1939da_201907/ for details.
 
 Then, use the `create_j1939db-json.py` script to convert that Digital Annex into a JSON file e.g.
 
@@ -108,7 +108,7 @@ pip3 install pretty_j1939
 ## Notes on Digital Annex Sources
 
 You need to obtain a J1939 Digital Annex from the SAE to create a JSON file that can be used by `pretty_j1939.py` see
-http://subs.sae.org/j1939_dl/ for details.
+https://www.sae.org/standards/content/j1939da_201907/ for details.
 
 There are multiple releases; here are a couple notes to consider when purchasing your copy of the Digital Annex.
 * the 201611 Digital Annex has fewer defined SPNs in it than the 201311 Digital Annex; at some point the owners of the
