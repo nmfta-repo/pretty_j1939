@@ -6,8 +6,8 @@ with open("README.md", "r") as readme:
 setuptools.setup(
     name="pretty_j1939",
     version="0.0.1",
-    author=['Ben Gardiner', 'Jeremy Daily'],
-    author_email=['ben.gardiner@nmfta.org', 'jeremy-daily@utulsa.edu'],
+    author='"Ben Gardiner <ben.gardiner@nmfta.org>", "Jeremy Daily <jeremy.daily@colostate.edu>"',
+    author_email='ben.gardiner@nmfta.org',
     description="python libs and scripts for pretty-printing J1939 logs",
     long_description=long_description,
     long_description_content_type="text/markdown",
