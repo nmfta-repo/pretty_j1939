@@ -1,9 +1,10 @@
-.xls
+*.xls
+*.xlsx
 tmp/
 venv/
 .idea/
 build/
 dist/
-pretty_j1939.egg-info/
+*.egg-info/
 __pycache__/
 
