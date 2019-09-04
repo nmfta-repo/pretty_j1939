@@ -29,15 +29,12 @@ if __name__ == '__main__':
         for candump_line in f.readlines():
             if candump_line == '\n':
                 continue
+
             try:
                 timestamp = float(candump_line.split(' ')[0].replace('(', '').replace(')', ''))
                 message_id = bitstring.ConstBitArray(hex=candump_line.split(' ')[2].split('#')[0])
                 message_data = bitstring.ConstBitArray(hex=candump_line.split(' ')[2].split('#')[1])
-
-            except IndexError:
-                print("Warning: error in line '%s'" % candump_line, file=sys.stderr)
-                continue
-            except ValueError:
+            except (IndexError, ValueError):
                 print("Warning: error in line '%s'" % candump_line, file=sys.stderr)
                 continue
 
