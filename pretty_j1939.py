@@ -9,27 +9,15 @@ import pretty_j1939.parse
 pretty_j1939.parse.init_j1939db()
 
 
-def str2bool(v):
-    return v.lower() in ("yes", "true", "t", "1")
-
-
 parser = argparse.ArgumentParser(description='pretty-printing J1939 candump logs')
 parser.add_argument('candump', help='candump log')
-parser.add_argument('--candata', type=str2bool, const=True, default=False, nargs='?',
-                    help='print input can data')
-parser.add_argument('--pgn',     type=str2bool, const=True, default=True, nargs='?',
-                    help='print source/destination/type description')
-parser.add_argument('--spn',     type=str2bool, const=True, default=True, nargs='?',
-                    help='print signals description')
-parser.add_argument('--transport', type=str2bool, const=True, default=True, nargs='?',
-                    help='print details of transport-layer streams found')
-parser.add_argument('--link', type=str2bool, const=True, default=True, nargs='?',
-                    help='print details of link-layer frames found')
-parser.add_argument('--include-na', type=str2bool, const=True, default=False, nargs='?',
-                    help='inlude not-available (0xff) SPN values')
-parser.add_argument('--format',  type=str2bool, const=True, default=False, nargs='?',
-                    help='format each structure (otherwise single-line)')
-
+parser.add_argument('--candata', action='store_true', help='print input can data')
+parser.add_argument('--pgn', action='store_true', default=True, help='print source/destination/type description')
+parser.add_argument('--spn', action='store_true', default=True, help='print signals description')
+parser.add_argument('--transport', action='store_true', help='print details of transport-layer streams found')
+parser.add_argument('--link', action='store_true', default=True, help='print details of link-layer frames found')
+parser.add_argument('--include-na', action='store_true', help='inlude not-available (0xff) SPN values')
+parser.add_argument('--format', action='store_true', help='format each structure (otherwise single-line)')
 args = parser.parse_args()
 
 describer = pretty_j1939.parse.get_describer(describe_pgns=args.pgn, describe_spns=args.spn,
