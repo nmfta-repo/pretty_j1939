@@ -16,7 +16,7 @@ parser.add_argument('--pgn', action='store_true', default=True, help='print sour
 parser.add_argument('--spn', action='store_true', default=True, help='print signals description')
 parser.add_argument('--transport', action='store_true', help='print details of transport-layer streams found')
 parser.add_argument('--link', action='store_true', default=True, help='print details of link-layer frames found')
-parser.add_argument('--include-na', action='store_true', help='inlude not-available (0xff) SPN values')
+parser.add_argument('--include-na', action='store_true', help='include not-available (0xff) SPN values')
 parser.add_argument('--format', action='store_true', help='format each structure (otherwise single-line)')
 args = parser.parse_args()
 
