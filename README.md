@@ -101,7 +101,12 @@ optional arguments:
   --no-include_na  (default)
   --format         format each structure (otherwise single-line)
   --no-format      (default)
+  --da-json [DA_JSON]   absolute path to the input JSON DA is required
+  --real-time [REAL_TIME]
+                        prettify SPNs as they are seen in transport sessions
 ```
+
+To use as a library one can import the Prettyfier class as `from pretty_j1939.prettify import Prettyfier`, instantiate it as `prettyfier = Prettyfier("J1939DA2015.json",describe_pgns=False....)` and call the describer property as `prettyfier.describer(message_data.bytes, message_id.uint)` where `message_data` and `message_id` are both of type `bitstring.Bits` created from the hex id and data strings (lsb on left). Note that the interpretation is done per message. In case of multipacket messages, transport messages are buffered unless `real-time=True` is specified as an argument to the `Prettyfier` constructor.
 
 ## Installing
 

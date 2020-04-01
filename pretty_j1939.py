@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
+import argparse
+import json
+import sys
 
 import bitstring
-import argparse
-import sys
-import json
-import pretty_j1939.parse
 
-pretty_j1939.parse.init_j1939db()
+from pretty_j1939.prettify import Prettyfier
 
 
 parser = argparse.ArgumentParser(description='pretty-printing J1939 candump logs')
@@ -45,30 +43,35 @@ parser.add_argument('--format',    dest='format', action='store_true',  help='fo
 parser.add_argument('--no-format', dest='format', action='store_false', help='(default)')
 parser.set_defaults(format=False)
 
+parser.add_argument('--da-json', type=str, const=True, required=True, nargs='?',
+                    help='absolute path to the input JSON DA is required')  # Changed added new argument to take DA-JSON
+parser.add_argument('--real-time', type=str2bool, const=False, required=False, nargs='?',
+                    help='prettify SPNs as they are seen in transport sessions')  # Changed to transport interpretation per TP.DT
+
 args = parser.parse_args()
 
-describer = pretty_j1939.parse.get_describer(describe_pgns=args.pgn, describe_spns=args.spn,
-                                             describe_link_layer=args.link, describe_transport_layer=args.transport,
-                                             include_transport_rawdata=args.candata,
-                                             include_na=args.include_na)
 if __name__ == '__main__':
+    prettyfier = Prettyfier(args.da_json, real_time=args.real_time, describe_pgns=args.pgn, describe_spns=args.spn,
+                            describe_link_layer=args.link, describe_transport_layer=args.transport,
+                            include_transport_rawdata=args.candata,
+                            include_na=args.include_na)
     with open(args.candump, 'r') as f:
         for candump_line in f.readlines():
             if candump_line == '\n':
                 continue
-
             try:
                 timestamp = float(candump_line.split()[0].lstrip('(').rstrip(')'))
                 message = candump_line.split()[2]
-                message_id = bitstring.ConstBitArray(hex=message.split('#')[0])
-                message_data = bitstring.ConstBitArray(hex=message.split('#')[1])
+                message_id = bitstring.Bits(hex=message.split('#')[0])
+                message_data = bitstring.Bits(hex=message.split('#')[1])
             except (IndexError, ValueError):
                 print("Warning: error in line '%s'" % candump_line, file=sys.stderr)
                 continue
 
             desc_line = ''
 
-            description = describer(message_data.bytes, message_id.uint)
+            description = prettyfier.describer(message_data.bytes, message_id.uint)
+            print('RAW: ', json.loads(json.dumps(description)))
             if args.format:
                 json_description = str(json.dumps(description, indent=4))
             else:
@@ -90,7 +93,7 @@ if __name__ == '__main__':
                         formatted_lines.remove(first_line)
 
                     for line in formatted_lines:
-                        desc_line = desc_line + '\n' + ' '*len(candump_line) + "; " + line
+                        desc_line = desc_line + '\n' + ' ' * len(candump_line) + "; " + line
 
             if len(desc_line) > 0:
                 print(desc_line)
