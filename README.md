@@ -11,7 +11,7 @@ This package can:
 *Formatted* content (one per line) next to candump data:
 
 ```bash
-$ pretty_j1939.py --candata --format --link --transport example.candump.txt | head
+$ pretty_j1939.py --candata --format --transport example.candump.txt | head
 (1543509533.000838) can0 10FDA300#FFFF07FFFFFFFFFF ; {
                                                    ;     "DA": "All(255)",
                                                    ;     "PGN": "EEC6(64931)",
@@ -27,7 +27,7 @@ $ pretty_j1939.py --candata --format --link --transport example.candump.txt | he
 Single-line contents next to candump data:
 
 ```bash
-$ pretty_j1939.py --candata --link --transport example.candump.txt | head
+$ pretty_j1939.py --candata --transport example.candump.txt | head
 (1543509533.000838) can0 10FDA300#FFFF07FFFFFFFFFF ; {"SA":"Engine #1(  0)","DA":"All(255)","PGN":"EEC6(64931)","Engine Variable Geometry Turbocharger Actuator #1":"2.8000000000000003 [%]"}
 (1543509533.000915) can0 18FEE000#FFFFFFFFB05C6800 ; {"SA":"Engine #1(  0)","DA":"All(255)","PGN":"VD(65248)","Total Vehicle Distance":"854934.0 [m]"}
 (1543509533.000991) can0 08FE6E0B#0000000000000000 ; {"SA":"Brakes - System Controller( 11)","DA":"All(255)","PGN":"HRW(65134)","Front Axle, Left Wheel Speed":"0.0 [kph]","Front axle, right wheel speed":"0.0 [kph]","Rear axle, left wheel speed":"0.0 [kph]","Rear axle, right wheel speed":"0.0 [kph]"}
@@ -43,7 +43,7 @@ $ pretty_j1939.py --candata --link --transport example.candump.txt | head
 *Formatted* contents of the transport SPNs only.
 
 ```bash
-$ pretty_j1939.py --format --transport example.candump.txt | head
+$ pretty_j1939.py --format --no-link --transport example.candump.txt | head
 {
     "Transport PGN": "AT1HI1(64920)",
     "Aftertreatment 1 Total Fuel Used": "227.5 [liters]",
@@ -76,24 +76,31 @@ The `pretty_j1939.py` script (and the `describer` in `pretty_j1939/parse.py` tha
 verbosity available when describing J1939 traffic in candump logs:
 
 ```bash
-usage: pretty_j1939.py [-h] [--candata] [--pgn] [--spn] [--transport] [--link]
-                       [--include-na] [--format]
+usage: pretty_j1939.py [-h] [--candata] [--no-candata] [--pgn] [--no-pgn] [--spn] [--no-spn] [--transport] [--no-transport] [--link] [--no-link] [--include_na] [--no-include_na]
+                       [--format] [--no-format]
                        candump
 
 pretty-printing J1939 candump logs
 
 positional arguments:
-  candump       candump log
+  candump          candump log
 
 optional arguments:
-  -h, --help    show this help message and exit
-  --candata     print input can data
-  --pgn         print source/destination/type description
-  --spn         print signals description
-  --transport   print details of transport-layer streams found
-  --link        print details of link-layer frames found
-  --include-na  include not-available (0xff) SPN values
-  --format      format each structure (otherwise single-line)
+  -h, --help       show this help message and exit
+  --candata        print input can data
+  --no-candata     (default)
+  --pgn            (default) print source/destination/type description
+  --no-pgn
+  --spn            (default) print signals description
+  --no-spn
+  --transport      print details of transport-layer streams found
+  --no-transport   (default)
+  --link           (default) print details of link-layer frames found
+  --no-link
+  --include_na     include not-available (0xff) SPN values
+  --no-include_na  (default)
+  --format         format each structure (otherwise single-line)
+  --no-format      (default)
 ```
 
 ## Installing
