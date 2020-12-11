@@ -11,13 +11,40 @@ pretty_j1939.parse.init_j1939db()
 
 parser = argparse.ArgumentParser(description='pretty-printing J1939 candump logs')
 parser.add_argument('candump', help='candump log')
-parser.add_argument('--candata', action='store_true', help='print input can data')
-parser.add_argument('--pgn', action='store_true', default=True, help='print source/destination/type description')
-parser.add_argument('--spn', action='store_true', default=True, help='print signals description')
-parser.add_argument('--transport', action='store_true', help='print details of transport-layer streams found')
-parser.add_argument('--link', action='store_true', default=True, help='print details of link-layer frames found')
-parser.add_argument('--include-na', action='store_true', help='include not-available (0xff) SPN values')
-parser.add_argument('--format', action='store_true', help='format each structure (otherwise single-line)')
+
+parser.add_argument('--candata',    dest='candata', action='store_true',  help='print input can data')
+parser.add_argument('--no-candata', dest='candata', action='store_false', help='(default)')
+parser.set_defaults(candata=False)
+
+parser.add_argument('--pgn',    dest='pgn', action='store_true', help='(default) print source/destination/type '
+                                                                      'description')
+parser.add_argument('--no-pgn', dest='pgn', action='store_false')
+parser.set_defaults(pgn=True)
+
+parser.add_argument('--spn',    dest='spn', action='store_true', help='(default) print signals description')
+parser.add_argument('--no-spn', dest='spn', action='store_false')
+parser.set_defaults(spn=True)
+
+parser.add_argument('--transport',    dest='transport', action='store_true',  help='print details of transport-layer '
+                                                                                   'streams found')
+parser.add_argument('--no-transport', dest='transport', action='store_false', help='(default)')
+parser.set_defaults(transport=False)
+
+parser.add_argument('--link',    dest='link', action='store_true', help='(default) print details of link-layer frames '
+                                                                        'found')
+parser.add_argument('--no-link', dest='link', action='store_false')
+parser.set_defaults(link=True)
+
+parser.add_argument('--include_na',    dest='include_na', action='store_true',  help='include not-available (0xff) SPN '
+                                                                                     'values')
+parser.add_argument('--no-include_na', dest='include_na', action='store_false', help='(default)')
+parser.set_defaults(include_na=False)
+
+parser.add_argument('--format',    dest='format', action='store_true',  help='format each structure (otherwise '
+                                                                             'single-line)')
+parser.add_argument('--no-format', dest='format', action='store_false', help='(default)')
+parser.set_defaults(format=False)
+
 args = parser.parse_args()
 
 describer = pretty_j1939.parse.get_describer(describe_pgns=args.pgn, describe_spns=args.spn,
