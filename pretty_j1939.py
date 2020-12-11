@@ -9,26 +9,41 @@ import pretty_j1939.parse
 pretty_j1939.parse.init_j1939db()
 
 
-def str2bool(v):
-    return v.lower() in ("yes", "true", "t", "1")
-
-
 parser = argparse.ArgumentParser(description='pretty-printing J1939 candump logs')
 parser.add_argument('candump', help='candump log')
-parser.add_argument('--candata', type=str2bool, const=True, default=False, nargs='?',
-                    help='print input can data')
-parser.add_argument('--pgn',     type=str2bool, const=True, default=True, nargs='?',
-                    help='print source/destination/type description')
-parser.add_argument('--spn',     type=str2bool, const=True, default=True, nargs='?',
-                    help='print signals description')
-parser.add_argument('--transport', type=str2bool, const=True, default=True, nargs='?',
-                    help='print details of transport-layer streams found')
-parser.add_argument('--link', type=str2bool, const=True, default=True, nargs='?',
-                    help='print details of link-layer frames found')
-parser.add_argument('--include-na', type=str2bool, const=True, default=False, nargs='?',
-                    help='inlude not-available (0xff) SPN values')
-parser.add_argument('--format',  type=str2bool, const=True, default=False, nargs='?',
-                    help='format each structure (otherwise single-line)')
+
+parser.add_argument('--candata',    dest='candata', action='store_true',  help='print input can data')
+parser.add_argument('--no-candata', dest='candata', action='store_false', help='(default)')
+parser.set_defaults(candata=False)
+
+parser.add_argument('--pgn',    dest='pgn', action='store_true', help='(default) print source/destination/type '
+                                                                      'description')
+parser.add_argument('--no-pgn', dest='pgn', action='store_false')
+parser.set_defaults(pgn=True)
+
+parser.add_argument('--spn',    dest='spn', action='store_true', help='(default) print signals description')
+parser.add_argument('--no-spn', dest='spn', action='store_false')
+parser.set_defaults(spn=True)
+
+parser.add_argument('--transport',    dest='transport', action='store_true',  help='print details of transport-layer '
+                                                                                   'streams found')
+parser.add_argument('--no-transport', dest='transport', action='store_false', help='(default)')
+parser.set_defaults(transport=False)
+
+parser.add_argument('--link',    dest='link', action='store_true', help='(default) print details of link-layer frames '
+                                                                        'found')
+parser.add_argument('--no-link', dest='link', action='store_false')
+parser.set_defaults(link=True)
+
+parser.add_argument('--include_na',    dest='include_na', action='store_true',  help='include not-available (0xff) SPN '
+                                                                                     'values')
+parser.add_argument('--no-include_na', dest='include_na', action='store_false', help='(default)')
+parser.set_defaults(include_na=False)
+
+parser.add_argument('--format',    dest='format', action='store_true',  help='format each structure (otherwise '
+                                                                             'single-line)')
+parser.add_argument('--no-format', dest='format', action='store_false', help='(default)')
+parser.set_defaults(format=False)
 
 args = parser.parse_args()
 
@@ -41,15 +56,13 @@ if __name__ == '__main__':
         for candump_line in f.readlines():
             if candump_line == '\n':
                 continue
-            try:
-                timestamp = float(candump_line.split(' ')[0].replace('(', '').replace(')', ''))
-                message_id = bitstring.ConstBitArray(hex=candump_line.split(' ')[2].split('#')[0])
-                message_data = bitstring.ConstBitArray(hex=candump_line.split(' ')[2].split('#')[1])
 
-            except IndexError:
-                print("Warning: error in line '%s'" % candump_line, file=sys.stderr)
-                continue
-            except ValueError:
+            try:
+                timestamp = float(candump_line.split()[0].lstrip('(').rstrip(')'))
+                message = candump_line.split()[2]
+                message_id = bitstring.ConstBitArray(hex=message.split('#')[0])
+                message_data = bitstring.ConstBitArray(hex=message.split('#')[1])
+            except (IndexError, ValueError):
                 print("Warning: error in line '%s'" % candump_line, file=sys.stderr)
                 continue
 
@@ -62,8 +75,6 @@ if __name__ == '__main__':
                 json_description = str(json.dumps(description, separators=(',', ':')))
             if len(description) > 0:
                 desc_line = desc_line + json_description
-            else:
-                desc_line = ''
 
             if args.candata:
                 can_line = candump_line.rstrip() + " ; "
