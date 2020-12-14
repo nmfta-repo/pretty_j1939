@@ -166,7 +166,7 @@ def get_pgn_description(pgn):
     return pgn_description
 
 
-def lookup_all_spn_params(callback, spn, pgn):
+def lookup_all_spn_params(_, spn, pgn):
     # look up items in the database
     name = get_spn_name(spn)
     spn_object = get_spn_object(spn)
@@ -381,7 +381,7 @@ def get_bam_processor(process_bam_found, is_real_time):
                 new_pgn[(da, sa)] = (message_bytes[7] << 16) + (message_bytes[6] << 8) + message_bytes[5]
                 new_length[(da, sa)] = (message_bytes[2] << 8) + message_bytes[1]
                 new_packets[(da, sa)] = message_bytes[3]
-                new_data[(da, sa)] = [None for i in range(7 * new_packets[(da, sa)])]
+                new_data[(da, sa)] = [None for _ in range(7 * new_packets[(da, sa)])]
 
         elif is_data_transfer_message(message_id):
             if (da, sa) in new_data.keys():
