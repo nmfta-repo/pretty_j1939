@@ -11,6 +11,9 @@ from pretty_j1939.prettify import Prettyfier
 parser = argparse.ArgumentParser(description='pretty-printing J1939 candump logs')
 parser.add_argument('candump', help='candump log')
 
+parser.add_argument('--da-json', type=str, const=True, default="J1939db.json", nargs='?',
+                    help='absolute path to the input JSON DA (default=\"./J1939db.json\")')
+
 parser.add_argument('--candata',    dest='candata', action='store_true',  help='print input can data')
 parser.add_argument('--no-candata', dest='candata', action='store_false', help='(default)')
 parser.set_defaults(candata=False)
@@ -44,10 +47,7 @@ parser.add_argument('--format',    dest='format', action='store_true',  help='fo
 parser.add_argument('--no-format', dest='format', action='store_false', help='(default)')
 parser.set_defaults(format=False)
 
-parser.add_argument('--da-json', type=str, const=True, required=True, nargs='?',
-                    help='absolute path to the input JSON DA is required')
-
-parser.add_argument('--real-time',    dest='real_time', action='store_true',  help='prettify SPNs as they are seen in '
+parser.add_argument('--real-time',    dest='real_time', action='store_true',  help='emit SPNs as they are seen in '
                                                                                    'transport sessions')
 parser.add_argument('--no-real-time', dest='real_time', action='store_false', help='(default)')
 parser.set_defaults(real_time=False)
