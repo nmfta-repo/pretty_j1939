@@ -401,6 +401,7 @@ def get_bam_processor(process_bam_found, is_real_time):
                         process_bam_found(data_bytes, sa, new_pgn[(da, sa)], spn_coverage=spn_coverage,
                                           is_last_packet=is_last_packet)
                 except TypeError as e:
+                    #TODO remove normal-path for exceptions...
                     if "TypeError: 'NoneType' object cannot be interpreted as an integer" in str(e):
                         pass
 
