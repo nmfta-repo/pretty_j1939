@@ -3,21 +3,19 @@
 # See the file "LICENSE" for the full license governing this code.
 #
 
+from collections import OrderedDict
+import defusedxml
+from defusedxml.common import EntitiesForbidden
+import xlrd
+import sys
+import re
+import unidecode
+import asteval
+import json
 import argparse
 import functools
-import itertools
-import json
 import operator
-import re
-import sys
-from collections import OrderedDict
-
-import asteval
-import defusedxml
-import unidecode
-import xlrd
-from defusedxml.common import EntitiesForbidden
-
+import itertools
 import pretty_j1939.parse
 
 parser = argparse.ArgumentParser()
@@ -28,6 +26,7 @@ parser.add_argument('-w', '--write-json', type=str, required=True,
                     default='-',
                     help="where to write the output. defaults to stdout")  # Changed: No point in having a default if required
 args = parser.parse_args()
+
 
 class J1939daConverter:
     def __init__(self, digital_annex_xls_list):
@@ -62,8 +61,8 @@ class J1939daConverter:
     # returns an int number of bits, or 'Variable'
     def get_spn_len(contents):
         if 'to' in contents.lower() or \
-                contents.strip() == '' or \
-                'variable' in contents.lower():
+           contents.strip() == '' or \
+           'variable' in contents.lower():
             return 'Variable'
         elif re.match(r'max [0-9]+ bytes', contents):
             return 'Variable'
@@ -101,12 +100,12 @@ class J1939daConverter:
         if '0 to 255 per byte' in norm_contents or 'states/' in norm_contents:
             return 1.0
         elif 'bit-mapped' in norm_contents or \
-                'binary' in norm_contents or \
-                'ascii' in norm_contents or \
-                'not defined' in norm_contents or \
-                'variant determined' in norm_contents or \
-                '7 bit iso latin 1 characters' in norm_contents or \
-                contents.strip() == '':
+             'binary' in norm_contents or \
+             'ascii' in norm_contents or \
+             'not defined' in norm_contents or \
+             'variant determined' in norm_contents or \
+             '7 bit iso latin 1 characters' in norm_contents or \
+             contents.strip() == '':
             return int(0)
         elif 'per bit' in norm_contents or '/bit' in norm_contents:
             first = contents.split(' ')[0]
@@ -139,14 +138,14 @@ class J1939daConverter:
         norm_contents = contents.lower()
         if contents.strip() == '' and units.strip() == '':
             if type(spn_length) is int:
-                return 0, 2 ** spn_length - 1
+                return 0, 2**spn_length-1
             else:
                 return -1, -1
-        elif 'manufacturer defined' in norm_contents or \
-                'bit-mapped' in norm_contents or \
-                'not defined' in norm_contents or \
-                'variant determined' in norm_contents or \
-                contents.strip() == '':
+        elif 'manufacturer defined' in norm_contents or\
+             'bit-mapped' in norm_contents or\
+             'not defined' in norm_contents or\
+             'variant determined' in norm_contents or\
+             contents.strip() == '':
             return -1, -1
         elif ' to ' in norm_contents:
             left, right = norm_contents.split(' to ')[0:2]
@@ -156,7 +155,7 @@ class J1939daConverter:
             range_units = norm_contents.split(' ')
             range_units = range_units[len(range_units) - 1]
             if range_units == 'km' and units == 'm':
-                return float(left) * 1000, float(right) * 1000
+                return float(left)*1000, float(right)*1000
             else:
                 return float(left), float(right)
         raise ValueError('unknown operational range from "%s","%s"' % (contents, units))
@@ -267,7 +266,7 @@ class J1939daConverter:
                     first_val = int(range_boundaries[0], base=10)
                     second_val = int(range_boundaries[1], base=10)
 
-                for i in range(first_val, second_val + 1):
+                for i in range(first_val, second_val+1):
                     bit_object.update(({str(i): enum_description}))
             else:
                 first = re.match(r'[ ]*([0-9bxXA-F]+)', line).groups()[0]
@@ -315,7 +314,7 @@ class J1939daConverter:
         operational_range_col = header_row.index('OPERATIONAL_RANGE')
         spn_description_col = header_row.index('SPN_DESCRIPTION')
 
-        for i in range(header_row_num + 1, sheet.nrows):
+        for i in range(header_row_num+1, sheet.nrows):
             row = sheet.row_values(i)
             pgn = row[pgn_col]
             if pgn == '':
@@ -333,13 +332,13 @@ class J1939daConverter:
 
                 pgn_data_len = self.get_pgn_data_len(row[pgn_data_length_col])
 
-                pgn_object.update({'Label': unidecode.unidecode(row[acronym_col])})
-                pgn_object.update({'Name': unidecode.unidecode(row[pgn_label_col])})
-                pgn_object.update({'PGNLength': pgn_data_len})
-                pgn_object.update({'Rate': unidecode.unidecode(row[transmission_rate_col])})
-                pgn_object.update({'SPNs': list()})
-                pgn_object.update({'SPNStartBits': list()})
-                pgn_object.update({'Temp_SPN_Order': list()})
+                pgn_object.update({'Label':              unidecode.unidecode(row[acronym_col])})
+                pgn_object.update({'Name':               unidecode.unidecode(row[pgn_label_col])})
+                pgn_object.update({'PGNLength':          pgn_data_len})
+                pgn_object.update({'Rate':               unidecode.unidecode(row[transmission_rate_col])})
+                pgn_object.update({'SPNs':               list()})
+                pgn_object.update({'SPNStartBits':       list()})
+                pgn_object.update({'Temp_SPN_Order':     list()})
 
                 j1939_pgn_db.update({pgn_label: pgn_object})
 
@@ -371,17 +370,17 @@ class J1939daConverter:
                 operational_range = unidecode.unidecode(row[operational_range_col])
                 spn_resoluion = unidecode.unidecode(row[resolution_col])
 
-                spn_object.update({'DataRange': data_range})
-                spn_object.update({'Name': spn_name})
-                spn_object.update({'Offset': self.get_spn_offset(row[offset_col])})
-                spn_object.update({'OperationalHigh': high})
-                spn_object.update({'OperationalLow': low})
+                spn_object.update({'DataRange':        data_range})
+                spn_object.update({'Name':             spn_name})
+                spn_object.update({'Offset':           self.get_spn_offset(row[offset_col])})
+                spn_object.update({'OperationalHigh':  high})
+                spn_object.update({'OperationalLow':   low})
                 spn_object.update({'OperationalRange': operational_range})
-                spn_object.update({'Resolution': self.get_spn_resolution(spn_resoluion)})
-                spn_object.update({'SPNLength': spn_length})
+                spn_object.update({'Resolution':       self.get_spn_resolution(spn_resoluion)})
+                spn_object.update({'SPNLength':        spn_length})
                 if spn_delimiter is not None:
-                    spn_object.update({'Delimiter': '0x%s' % spn_delimiter.hex()})
-                spn_object.update({'Units': spn_units})
+                    spn_object.update({'Delimiter':    '0x%s' % spn_delimiter.hex()})
+                spn_object.update({'Units':            spn_units})
 
                 existing_spn = j1939_spn_db.get(str(int(spn)))
                 if existing_spn is not None and not existing_spn == spn_object:
@@ -605,7 +604,7 @@ class J1939daConverter:
         source_address_id_col = header_row.index('SOURCE_ADDRESS_ID')
         name_col = header_row.index('NAME')
 
-        for i in range(header_row_num + 1, sheet.nrows):
+        for i in range(header_row_num+1, sheet.nrows):
             row = sheet.row_values(i)
 
             name = row[name_col]

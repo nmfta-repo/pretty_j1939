@@ -1,8 +1,9 @@
-import argparse
-import json
-import sys
+#!/usr/bin/env python3
 
 import bitstring
+import argparse
+import sys
+import json
 
 from pretty_j1939.prettify import Prettyfier
 
@@ -63,6 +64,7 @@ if __name__ == '__main__':
         for candump_line in f.readlines():
             if candump_line == '\n':
                 continue
+
             try:
                 timestamp = float(candump_line.split()[0].lstrip('(').rstrip(')'))
                 message = candump_line.split()[2]
@@ -97,7 +99,7 @@ if __name__ == '__main__':
                         formatted_lines.remove(first_line)
 
                     for line in formatted_lines:
-                        desc_line = desc_line + '\n' + ' ' * len(candump_line) + "; " + line
+                        desc_line = desc_line + '\n' + ' '*len(candump_line) + "; " + line
 
             if len(desc_line) > 0:
                 print(desc_line)

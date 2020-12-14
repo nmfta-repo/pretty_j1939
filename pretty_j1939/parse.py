@@ -4,10 +4,9 @@
 #
 
 import json
+import bitstring
 import sys
 from collections import OrderedDict
-
-import bitstring
 
 DA_MASK = 0x0000FF00
 SA_MASK = 0x000000FF
@@ -322,6 +321,7 @@ def describe_message_data(pgn, message_data_bitstring, last_packet, include_na=F
         spn_name = get_spn_name(spn)
         spn_units = get_spn_object(spn)["Units"]
         spn_not_covered_yet = False
+
         try:
             if is_spn_numerical_values(spn_units):
                 spn_value = get_spn_value(message_data_bitstring, spn, pgn, last_packet)
