@@ -45,11 +45,10 @@ parser.add_argument('--no-format', dest='format', action='store_false', help='(d
 parser.set_defaults(format=False)
 
 parser.add_argument('--da-json', type=str, const=True, required=True, nargs='?',
-                    help='absolute path to the input JSON DA is required')  # Changed added new argument to take DA-JSON
+                    help='absolute path to the input JSON DA is required')
 
 parser.add_argument('--real_time',    dest='real_time', action='store_true',  help='prettify SPNs as they are seen in '
-                                                                                   'transport sessions') # Changed to
-# transport interpretation per TP.DT
+                                                                                   'transport sessions')
 parser.add_argument('--no-real_time', dest='real_time', action='store_false', help='(default)')
 parser.set_defaults(real_time=False)
 

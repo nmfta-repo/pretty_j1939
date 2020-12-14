@@ -9,8 +9,7 @@ class Prettyfier:
                  include_transport_rawdata=False, describe_pgns=True,
                  describe_spns=True, describe_transport_layer=True, describe_link_layer=True,
                  include_na=False):
-        init_j1939db(da_json)  # Changed moved after argument parsing to account for the new
-        # "--da-json" argument
+        init_j1939db(da_json)
         self.describer = get_describer(describe_pgns=describe_pgns,
                                        describe_spns=describe_spns,
                                        describe_link_layer=describe_link_layer,

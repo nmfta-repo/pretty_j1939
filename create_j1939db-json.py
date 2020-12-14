@@ -116,7 +116,7 @@ class J1939daConverter:
             left = J1939daConverter.just_numerals(left.split(' ')[0])
             right = J1939daConverter.just_numerals(right.split(' ')[0])
             return asteval.Interpreter()('%s/%s' % (left, right))
-        elif 'microsiemens/mm' in norm_contents or 'usiemens/mm' in norm_contents:  # special handling for this weirdness
+        elif 'microsiemens/mm' in norm_contents or 'usiemens/mm' in norm_contents:  # special handling for weirdness
             return float(contents.split(' ')[0])
         raise ValueError('unknown spn resolution "%s"' % contents)
 
@@ -160,26 +160,24 @@ class J1939daConverter:
         raise ValueError('unknown operational range from "%s","%s"' % (contents, units))
 
     @staticmethod
-    # return an int of the start bit of the SPN; or -1 (if unknown or variable).
-    # Changed: return format is a list of [-1], [some_bit_pos] or [some_bit_pos,some_other_bit_pos]
+    # return a list of int of the start bits ([some_bit_pos] or [some_bit_pos,some_other_bit_pos]) of the SPN; or [
+    # -1] (if unknown or variable).
     def get_spn_start_bit(contents):
         norm_contents = contents.lower()
 
         if ';' in norm_contents:  # special handling for e.g. '0x00;2'
             return [-1]
 
-        # Changed synopsis below:
-        """According to 1939-71, "If the data length is larger than 1 byte or the data spans a byte boundary, 
-        then the Start Position consists of two numerical values separated by a comma or dash." Therefore , 
-        and - may be treated in the same way, multi-startbit. To account for multi-startbit we will introduce the following:
-        1> an SPN position is now a pair of bit positions (R,S), where S = None if not multibit
-        2> the SPN length is now a pair (Rs, Ss), where Ss = None if not multibit, else net Rs = (S - R + 1) and Ss = (Length - Rs) 
-        """
+        # Explanation of multi-startbit (from J4L): According to 1939-71, "If the data length is larger than 1 byte
+        # or the data spans a byte boundary, then the Start Position consists of two numerical values separated by a
+        # comma or dash." Therefore , and - may be treated in the same way, multi-startbit. To account for
+        # multi-startbit we will introduce the following: 1> an SPN position is now a pair of bit positions (R,S),
+        # where S = None if not multibit 2> the SPN length is now a pair (Rs, Ss), where Ss = None if not multibit,
+        # else net Rs = (S - R + 1) and Ss = (Length - Rs)
 
         delim = ""
         firsts = [norm_contents]
         if ',' in norm_contents:
-            # raise ValueError("this SPN not in one contiguous bitfield")  # TODO handle multi-startbit SPNs ex '3-4, 5.6' # Changed
             delim = ","
         if '-' in norm_contents:
             delim = "-"

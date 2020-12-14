@@ -22,7 +22,7 @@ bit_encodings = dict()
 
 
 def init_j1939db(jsondb):
-    with open(jsondb, 'r') as j1939_file:  # Changed to include the argument
+    with open(jsondb, 'r') as j1939_file:
         j1939db = json.load(j1939_file)
         for pgn_label, pgn_object in j1939db['J1939PGNdb'].items():
             pgn_objects.update({int(pgn_label): pgn_object})  # TODO check for all expected fields on each object
@@ -57,7 +57,6 @@ def get_sa(can_id):
     return SA_MASK & can_id
 
 
-# Added to account to CTS processing
 # TODO incorporate this method whenever DA is required
 def get_da(can_id):
     pf = (PF_MASK & can_id) >> 16
@@ -114,9 +113,9 @@ def is_transport_pgn(pgn):
     return is_data_transfer_pgn(pgn) or is_connection_management_pgn(pgn) or is_ack_pgn(pgn)
 
 
-def is_bam_rts_message(message_bytes):
-    return message_bytes[0] == 32 or message_bytes[
-        0] == 16  # Changed to account for an actual RTS. BAM and RTS have the same signature
+def is_bam_rts_cts_message(message_bytes):
+    return (message_bytes[0] == 32 or
+            message_bytes[0] == 16)
 
 
 def get_pgn_acronym(pgn):
@@ -211,9 +210,7 @@ def get_spn_cut_bytes(spn_start, spn_length, message_data_bitstring, last_packet
     return cut_data
 
 
-#  Added: SPN bytes are returned if the stipulated end of the SPN is received or is the last packet. Otherwise, waiting for the next packet
-def get_spn_bytes(message_data_bitstring, spn, pgn,
-                  last_packet):  # Added: most msgs are single packet, hence last_packet=True by default
+def get_spn_bytes(message_data_bitstring, spn, pgn, last_packet):
     spn_object = get_spn_object(spn)
     spn_length = spn_object["SPNLength"]
     spn_start = lookup_spn_startbit(spn_object, spn, pgn)
@@ -318,7 +315,7 @@ def describe_message_data(pgn, message_data_bitstring, last_packet, include_na=F
 
     pgn_object = get_pgn_object(pgn)
     for spn in pgn_object["SPNs"]:
-        if spn_coverage.get(spn, ()) != ():  # Added to skip any SPNs that have already been processed. Reduces runtime.
+        if spn_coverage.get(spn, ()) != ():  # skip any SPNs that have already been processed.
             continue
         spn_name = get_spn_name(spn)
         spn_units = get_spn_object(spn)["Units"]
@@ -369,8 +366,7 @@ def describe_message_data(pgn, message_data_bitstring, last_packet, include_na=F
     return description
 
 
-def get_bam_processor(process_bam_found,
-                      isRealTime):  # Added argument is isRealTime to account for real-time stream parsing
+def get_bam_processor(process_bam_found, is_real_time):
     new_pgn = {}
     new_data = {}
     new_packets = {}
@@ -381,9 +377,7 @@ def get_bam_processor(process_bam_found,
         sa = get_sa(message_id)
         da = get_da(message_id)
         if is_connection_management_message(message_id):
-            if is_bam_rts_message(message_bytes):  # BAM,RTS # Changed to account for RTS/CTS transport
-                # Changed to account for unique (sa, da) pairs which is the case if CTS traffic is considered.
-                #  da is always 0xFF for BAM traffic and hence indexing by sa only was ok, not for CTS.
+            if is_bam_rts_cts_message(message_bytes):  # BAM,RTS,CTS
                 new_pgn[(da, sa)] = (message_bytes[7] << 16) + (message_bytes[6] << 8) + message_bytes[5]
                 new_length[(da, sa)] = (message_bytes[2] << 8) + message_bytes[1]
                 new_packets[(da, sa)] = message_bytes[3]
@@ -414,12 +408,10 @@ def get_bam_processor(process_bam_found,
 
 
 def get_describer(describe_pgns=True, describe_spns=True, describe_link_layer=True, describe_transport_layer=True,
-                  include_transport_rawdata=True, include_na=False, real_time=False):  # Added argument real-time
+                  include_transport_rawdata=True, include_na=False, real_time=False):
     transport_messages = list()
 
-    def process_bam_found(data_bytes, sa, pgn,
-                          spn_coverage=None,
-                          isLastPacket=False):  # Added spn_coverage and isLastPacket to ensure state while real-time transportation
+    def process_bam_found(data_bytes, sa, pgn, spn_coverage=None, is_last_packet=False):
         if spn_coverage is None:
             spn_coverage = {}
         transport_found = dict()
