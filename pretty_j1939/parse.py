@@ -252,6 +252,8 @@ def get_spn_bytes(message_data_bitstring, spn, pgn,
             else:  # variable-len field with unspecified start; requires field counting
                 startbits_list = pgn_object["SPNStartBits"]
                 num_fixedlen_spn_fields = sum(1 for s in startbits_list if s != -1)
+                # TODO support older JSON format where startbits are set on SPN , not PGN elements. see changes in
+                #  22a33d6aaffd2387dfd7fdc3be060b6d34e886ca
                 variable_spn_ordinal = spn_ordinal - num_fixedlen_spn_fields
                 if num_fixedlen_spn_fields > 0:
                     variable_spn_fields = spn_fields[1:]
