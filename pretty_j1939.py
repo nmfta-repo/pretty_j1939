@@ -47,9 +47,9 @@ parser.set_defaults(format=False)
 parser.add_argument('--da-json', type=str, const=True, required=True, nargs='?',
                     help='absolute path to the input JSON DA is required')
 
-parser.add_argument('--real_time',    dest='real_time', action='store_true',  help='prettify SPNs as they are seen in '
+parser.add_argument('--real-time',    dest='real_time', action='store_true',  help='prettify SPNs as they are seen in '
                                                                                    'transport sessions')
-parser.add_argument('--no-real_time', dest='real_time', action='store_false', help='(default)')
+parser.add_argument('--no-real-time', dest='real_time', action='store_false', help='(default)')
 parser.set_defaults(real_time=False)
 
 args = parser.parse_args()
