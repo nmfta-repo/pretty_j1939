@@ -3,7 +3,7 @@ from pretty_j1939.parse import init_j1939db, get_describer
 
 class Prettyfier:
     """ A wrapper class around the functions defined in the parse file"""
-    """Simply initiate an object of this class and use the decriber to pass message id and data"""
+    """Simply initiate an object of this class and use the describer to pass message id and data"""
 
     def __init__(self, da_json: str, real_time=False,
                  include_transport_rawdata=False, describe_pgns=True,
