@@ -76,7 +76,6 @@ if __name__ == '__main__':
             desc_line = ''
 
             description = prettyfier.describer(message_data.bytes, message_id.uint)
-            print('RAW: ', json.loads(json.dumps(description)))
             if args.format:
                 json_description = str(json.dumps(description, indent=4))
             else:
