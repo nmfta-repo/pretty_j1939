@@ -199,7 +199,8 @@ def lookup_spn_startbit(spn_object, spn, pgn):
 
 def get_spn_cut_bytes(spn_start, spn_length, message_data_bitstring, last_packet):
     spn_end = spn_start[0] + spn_length - 1
-    if not last_packet and spn_end > message_data_bitstring.length: return bitstring.Bits(bytes=b'')
+    if not last_packet and spn_end > message_data_bitstring.length:
+        return bitstring.Bits(bytes=b'')
 
     cut_data = message_data_bitstring[spn_start[0]:spn_end + 1]
     if len(spn_start) > 1:
@@ -284,7 +285,8 @@ def get_spn_value(message_data_bitstring, spn, pgn, last_packet, validate=True):
         scale = 1
 
     cut_data = bitstring.BitArray(get_spn_bytes(message_data_bitstring, spn, pgn, last_packet))
-    if cut_data.length == 0: return []  # incomplete SPN
+    if cut_data.length == 0:  # incomplete SPN
+        return []
 
     if cut_data.all(True):  # value unavailable in message_data
         return None
