@@ -221,8 +221,6 @@ def get_spn_bytes(message_data_bitstring, spn, pgn, last_packet):
         spn_list = pgn_object["SPNs"]
         if delimiter is None:
             if len(spn_list) == 1:
-                # spn_end = len(message_data_bitstring.bytes) * 8 - 1
-                # cut_data = message_data_bitstring[spn_start:spn_end + 1]
                 if last_packet:
                     return get_spn_cut_bytes(spn_start, len(message_data_bitstring.bytes) * 8, message_data_bitstring,
                                              last_packet)
