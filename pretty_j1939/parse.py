@@ -390,16 +390,16 @@ def get_bam_processor(process_bam_found, is_real_time):
                         new_data[(da, sa)][7 * (message_bytes[0] - 1) + i] = b
                     except Exception as e:
                         print(e)
-                isLastPacket = message_bytes[0] == new_packets[(da, sa)]
+                is_last_packet = message_bytes[0] == new_packets[(da, sa)]
 
                 try:
-                    if isLastPacket and not isRealTime:
+                    if is_last_packet and not is_real_time:
                         data_bytes = bytes(new_data[(da, sa)][0:new_length[(da, sa)]])
-                        process_bam_found(data_bytes, sa, new_pgn[(da, sa)], isLastPacket=isLastPacket)
-                    elif isRealTime:
+                        process_bam_found(data_bytes, sa, new_pgn[(da, sa)], is_last_packet=is_last_packet)
+                    elif is_real_time:
                         data_bytes = bytes(new_data[(da, sa)][0:message_bytes[0] * 7])
                         process_bam_found(data_bytes, sa, new_pgn[(da, sa)], spn_coverage=spn_coverage,
-                                          isLastPacket=isLastPacket)
+                                          is_last_packet=is_last_packet)
                 except TypeError as e:
                     if "TypeError: 'NoneType' object cannot be interpreted as an integer" in str(e):
                         pass
@@ -419,7 +419,7 @@ def get_describer(describe_pgns=True, describe_spns=True, describe_link_layer=Tr
         transport_found['SA'] = sa
         transport_found['data'] = data_bytes
         transport_found['spn_coverage'] = spn_coverage
-        transport_found['isLastPacket'] = isLastPacket
+        transport_found['is_last_packet'] = is_last_packet
         transport_messages.append(transport_found)
 
     bam_processor = get_bam_processor(process_bam_found, real_time)
@@ -450,7 +450,7 @@ def get_describer(describe_pgns=True, describe_spns=True, describe_link_layer=Tr
             if describe_spns:
                 pgn = transport_messages[0]['PGN']
                 description.update(describe_message_data(pgn, bitstring.Bits(bytes=transport_messages[0]['data']),
-                                                         last_packet=transport_messages[0]['isLastPacket'],
+                                                         last_packet=transport_messages[0]['is_last_packet'],
                                                          spn_coverage=transport_messages[0]['spn_coverage']))
 
         return description
