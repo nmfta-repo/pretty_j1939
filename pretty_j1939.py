@@ -67,8 +67,8 @@ if __name__ == '__main__':
             try:
                 timestamp = float(candump_line.split()[0].lstrip('(').rstrip(')'))
                 message = candump_line.split()[2]
-                message_id = bitstring.Bits(hex=message.split('#')[0])
-                message_data = bitstring.Bits(hex=message.split('#')[1])
+                message_id = bitstring.ConstBitArray(hex=message.split('#')[0])
+                message_data = bitstring.ConstBitArray(hex=message.split('#')[1])
             except (IndexError, ValueError):
                 print("Warning: error in line '%s'" % candump_line, file=sys.stderr)
                 continue
