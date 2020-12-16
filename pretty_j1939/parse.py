@@ -57,7 +57,7 @@ def get_sa(can_id):
     return SA_MASK & can_id
 
 
-# TODO incorporate this method whenever DA is required
+# used for transport reassembly and not called in parse_j1939_id below for speed
 def get_da(can_id):
     pf = (PF_MASK & can_id) >> 16
     if pf >= 240:  # PDU2 format
@@ -371,42 +371,41 @@ def describe_message_data(pgn, message_data_bitstring, last_packet, include_na=F
 def get_bam_processor(process_bam_found, is_real_time):
     new_pgn = {}
     new_data = {}
-    new_packets = {}
+    new_count = {}
     new_length = {}
     spn_coverage = {}
 
     def process_for_bams(message_bytes, message_id):
         sa = get_sa(message_id)
         da = get_da(message_id)
-        if is_connection_management_message(message_id):
-            if is_bam_rts_cts_message(message_bytes):  # BAM,RTS,CTS
-                new_pgn[(da, sa)] = (message_bytes[7] << 16) + (message_bytes[6] << 8) + message_bytes[5]
-                new_length[(da, sa)] = (message_bytes[2] << 8) + message_bytes[1]
-                new_packets[(da, sa)] = message_bytes[3]
-                new_data[(da, sa)] = [None for _ in range(7 * new_packets[(da, sa)])]
-
+        if is_connection_management_message(message_id) and is_bam_rts_cts_message(message_bytes):  # track new conn
+            new_pgn[(da, sa)] = (message_bytes[7] << 16) + (message_bytes[6] << 8) + message_bytes[5]
+            new_length[(da, sa)] = (message_bytes[2] << 8) + message_bytes[1]
+            new_count[(da, sa)] = message_bytes[3]
+            new_data[(da, sa)] = [None for _ in range(7 * new_count[(da, sa)])]
         elif is_data_transfer_message(message_id):
             if (da, sa) in new_data.keys():
+                packet_number = message_bytes[0]
                 for b, i in zip(message_bytes[1:], range(7)):
                     try:
-                        new_data[(da, sa)][7 * (message_bytes[0] - 1) + i] = b
+                        new_data[(da, sa)][7 * (packet_number - 1) + i] = b
                     except Exception as e:
                         print(e)
-                is_last_packet = message_bytes[0] == new_packets[(da, sa)]
+                is_last_packet = packet_number == new_count[(da, sa)]
 
-                try:
-                    if is_last_packet and not is_real_time:
-                        data_bytes = bytes(new_data[(da, sa)][0:new_length[(da, sa)]])
-                        process_bam_found(data_bytes, sa, new_pgn[(da, sa)], is_last_packet=is_last_packet)
-                    elif is_real_time:
-                        data_bytes = bytes(new_data[(da, sa)][0:message_bytes[0] * 7])
-                        process_bam_found(data_bytes, sa, new_pgn[(da, sa)], spn_coverage=spn_coverage,
+                if is_real_time:
+                    data_bytes = new_data[(da, sa)][0:packet_number * 7]
+                    if None not in data_bytes:
+                        data_bytes = bytes(data_bytes)
+                        process_bam_found(data_bytes, sa, new_pgn[(da, sa)],
+                                          spn_coverage=spn_coverage,
                                           is_last_packet=is_last_packet)
-                except TypeError as e:
-                    #TODO remove normal-path for exceptions...
-                    if "TypeError: 'NoneType' object cannot be interpreted as an integer" in str(e):
-                        pass
-
+                elif is_last_packet:
+                    data_bytes = new_data[(da, sa)][0:new_length[(da, sa)]]
+                    if None not in data_bytes:
+                        data_bytes = bytes(data_bytes)
+                        process_bam_found(data_bytes, sa, new_pgn[(da, sa)],
+                                          is_last_packet=True)
     return process_for_bams
 
 
