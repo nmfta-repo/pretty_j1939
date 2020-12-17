@@ -217,7 +217,7 @@ class DADescriber:
 
         return value
 
-    def describe_message_data(self, pgn, message_data_bitstring, last_packet, include_na=False, spn_coverage=None):
+    def describe_message_data(self, pgn, message_data_bitstring, last_packet=True, spn_coverage=None):
         if spn_coverage is None:
             spn_coverage = {}
         description = OrderedDict()
@@ -239,7 +239,7 @@ class DADescriber:
                         spn_not_covered_yet = True
                     else:
                         if spn_value is None:
-                            if include_na:
+                            if self.include_na:
                                 description[spn_name] = "N/A"
                             else:
                                 continue
