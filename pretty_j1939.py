@@ -37,10 +37,10 @@ parser.add_argument('--link',    dest='link', action='store_true', help='(defaul
 parser.add_argument('--no-link', dest='link', action='store_false')
 parser.set_defaults(link=pretty_j1939.describe.DEFAULT_LINK)
 
-parser.add_argument('--include_na',    dest='include_na', action='store_true',  help='include not-available (0xff) SPN '
+parser.add_argument('--include-na',    dest='include_na', action='store_true',  help='include not-available (0xff) SPN '
                                                                                      'values')
-parser.add_argument('--no-include_na', dest='include_na', action='store_false', help='(default)')
-parser.set_defaults(include_na=False)
+parser.add_argument('--no-include-na', dest='include_na', action='store_false', help='(default)')
+parser.set_defaults(include_na=pretty_j1939.describe.DEFAULT_INCLUDE_NA)
 
 parser.add_argument('--real-time',    dest='real_time', action='store_true',  help='emit SPNs as they are seen in '
                                                                                    'transport sessions')
