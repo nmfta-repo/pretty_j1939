@@ -50,20 +50,8 @@ class DADescriber:
         self.include_transport_rawdata = include_transport_rawdata
         self.include_na = include_na
 
-    def get_pgn_object(self, pgn):  # TODO: remove this level of abstraction
-        return self.pgn_objects.get(pgn)
-
-    def get_spn_object(self, spn):  # TODO: remove this level of abstraction
-        return self.spn_objects.get(spn)
-
-    def get_address_name(self, address):  # TODO: remove this level of abstraction
-        return self.address_names.get(address)
-
-    def get_bitencodings_object(self, spn):
-        return self.bit_encodings.get(spn)
-
     def get_pgn_acronym(self, pgn):
-        pgn_object = self.get_pgn_object(pgn)
+        pgn_object = self.pgn_objects.get(pgn)
         if pgn_object is None:
             return "Unknown"
         acronym = pgn_object["Label"]
@@ -72,7 +60,7 @@ class DADescriber:
         return acronym
 
     def get_spn_name(self, spn):
-        spn_object = self.get_spn_object(spn)
+        spn_object = self.spn_objects.get(spn)
         if spn_object is None:
             return "Unknown"
         return spn_object["Name"]
@@ -83,7 +71,7 @@ class DADescriber:
             address_name = "All"
         else:
             formatted_address = "({:3d})".format(address)
-            address_name = self.get_address_name(address)
+            address_name = self.address_names.get(address)
             if address_name is None:
                 address_name = "Unknown"
         return formatted_address, address_name
@@ -108,7 +96,7 @@ class DADescriber:
     def lookup_all_spn_params(self, _, spn, pgn):
         # look up items in the database
         name = self.get_spn_name(spn)
-        spn_object = self.get_spn_object(spn)
+        spn_object = self.spn_objects.get(spn)
         units = spn_object["Units"]
         spn_length = spn_object["SPNLength"]
         offset = spn_object["Offset"]
@@ -127,7 +115,7 @@ class DADescriber:
         # support earlier versions of J1939db.json which did not include PGN-to-SPN mappings at the PGN
         spn_start = spn_object.get("StartBit")
         if spn_start is None:  # otherwise, try to use the SPN bit position information at the PGN
-            pgn_object = self.get_pgn_object(pgn)
+            pgn_object = self.pgn_objects.get(pgn)
             spns_in_pgn = pgn_object["SPNs"]
             startbits_in_pgn = pgn_object["SPNStartBits"]
             spn_start = startbits_in_pgn[spns_in_pgn.index(spn)]
@@ -139,13 +127,13 @@ class DADescriber:
         return spn_start
 
     def get_spn_bytes(self, message_data_bitstring, spn, pgn, complete_message):
-        spn_object = self.get_spn_object(spn)
+        spn_object = self.spn_objects.get(spn)
         spn_length = spn_object["SPNLength"]
         spn_start = self.lookup_spn_startbit(spn_object, spn, pgn)
 
         if type(spn_length) is str and spn_length.startswith("Variable"):
             delimiter = spn_object.get("Delimiter")
-            pgn_object = self.get_pgn_object(pgn)
+            pgn_object = self.pgn_objects.get(pgn)
             spn_list = pgn_object["SPNs"]
             if delimiter is None:
                 if len(spn_list) == 1:
@@ -193,7 +181,7 @@ class DADescriber:
     #   if validate == True, raises a ValueError if the value is present in message_data but is beyond the operational
     #   range
     def get_spn_value(self, message_data_bitstring, spn, pgn, complete_message, validate=True):
-        spn_object = self.get_spn_object(spn)
+        spn_object = self.spn_objects.get(spn)
         units = spn_object["Units"]
 
         offset = spn_object["Offset"]
@@ -229,12 +217,12 @@ class DADescriber:
         if is_transport_pgn(pgn):  # transport messages can't be accurately parsed by the DA description
             return description
 
-        pgn_object = self.get_pgn_object(pgn)
+        pgn_object = self.pgn_objects.get(pgn)
         for spn in pgn_object["SPNs"]:
             if skip_spns.get(spn, ()) != ():  # skip any SPNs that have already been processed.
                 continue
             spn_name = self.get_spn_name(spn)
-            spn_units = self.get_spn_object(spn)["Units"]
+            spn_units = self.spn_objects.get(spn)["Units"]
 
             def mark_spn_covered(new_spn, new_spn_name, new_spn_description):
                 skip_spns[new_spn] = (new_spn_name, new_spn_description)  # TODO: move this closer to real-time handling
@@ -255,7 +243,7 @@ class DADescriber:
                             mark_spn_covered(spn, spn_name, "N/A")
                     elif is_spn_bitencoded(spn_units):
                         try:
-                            enum_descriptions = self.get_bitencodings_object(spn)
+                            enum_descriptions = self.bit_encodings.get(spn)
                             if enum_descriptions is None:
                                 add_spn_description(spn, spn_name, "%d (Unknown)" % spn_value)
                                 continue
