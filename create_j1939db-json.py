@@ -16,14 +16,14 @@ import argparse
 import functools
 import operator
 import itertools
-import pretty_j1939.parse
+import pretty_j1939.describe
 
-parser = argparse. ArgumentParser()
+parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--digital_annex_xls', type=str, required=True, action='append',
                     default=[], nargs='+',
                     help="the J1939 Digital Annex excel sheet used as input")
-parser.add_argument('-w', '--write-json', type=str, required=True,
-                    default='-', help="where to write the output. defaults to stdout")
+parser.add_argument('-w', '--write-json', type=str, default='-',
+                    help="where to write the output. defaults to stdout")
 args = parser.parse_args()
 
 
@@ -116,7 +116,7 @@ class J1939daConverter:
             left = J1939daConverter.just_numerals(left.split(' ')[0])
             right = J1939daConverter.just_numerals(right.split(' ')[0])
             return asteval.Interpreter()('%s/%s' % (left, right))
-        elif 'microsiemens/mm' in norm_contents or 'usiemens/mm' in norm_contents:  # special handling for this weirdness
+        elif 'microsiemens/mm' in norm_contents or 'usiemens/mm' in norm_contents:  # special handling for weirdness
             return float(contents.split(' ')[0])
         raise ValueError('unknown spn resolution "%s"' % contents)
 
@@ -160,37 +160,50 @@ class J1939daConverter:
         raise ValueError('unknown operational range from "%s","%s"' % (contents, units))
 
     @staticmethod
-    # return an int of the start bit of the SPN; or -1 (if unknown or variable)
+    # return a list of int of the start bits ([some_bit_pos] or [some_bit_pos,some_other_bit_pos]) of the SPN; or [
+    # -1] (if unknown or variable).
     def get_spn_start_bit(contents):
         norm_contents = contents.lower()
 
         if ';' in norm_contents:  # special handling for e.g. '0x00;2'
-            return -1
+            return [-1]
 
+        # Explanation of multi-startbit (from J4L): According to 1939-71, "If the data length is larger than 1 byte
+        # or the data spans a byte boundary, then the Start Position consists of two numerical values separated by a
+        # comma or dash." Therefore , and - may be treated in the same way, multi-startbit. To account for
+        # multi-startbit we will introduce the following: 1> an SPN position is now a pair of bit positions (R,S),
+        # where S = None if not multibit 2> the SPN length is now a pair (Rs, Ss), where Ss = None if not multibit,
+        # else net Rs = (S - R + 1) and Ss = (Length - Rs)
+
+        delim = ""
+        firsts = [norm_contents]
         if ',' in norm_contents:
-            raise ValueError("this SPN not in one contiguous bitfield")  # TODO handle multi-startbit SPNs ex '3-4, 5.6'
-
+            delim = ","
         if '-' in norm_contents:
-            first = norm_contents.split('-')[0]
+            delim = "-"
         elif ' to ' in norm_contents:
-            first = norm_contents.split(' to ')[0]
-        else:
-            first = norm_contents
+            delim = " to "
 
-        if re.match(r'^[a-z]\+[0-9]', first):
-            return -1
+        if len(delim) > 0:
+            firsts = norm_contents.split(delim)
 
-        first = J1939daConverter.just_numerals(first)
-        if first.strip() == '':
-            return -1
+        if any(re.match(r'^[a-z]\+[0-9]', first) for first in firsts):
+            return [-1]
 
-        if '.' in first:
-            byte_index, bit_index = list(map(int, first.split('.')))
-        else:
-            bit_index = 1
-            byte_index = int(first)
+        firsts = [J1939daConverter.just_numerals(first) for first in firsts]
+        if any(first.strip() == '' for first in firsts):
+            return [-1]
 
-        return (byte_index - 1)*8 + (bit_index - 1)
+        pos_pair = []
+        for first in firsts:
+            if '.' in first:
+                byte_index, bit_index = list(map(int, first.split('.')))
+            else:
+                bit_index = 1
+                byte_index = int(first)
+            pos_pair.append((byte_index - 1) * 8 + (bit_index - 1))
+
+        return pos_pair
 
     @staticmethod
     def get_enum_lines(description_lines):
@@ -326,7 +339,7 @@ class J1939daConverter:
 
                 j1939_pgn_db.update({pgn_label: pgn_object})
 
-            if pretty_j1939.parse.is_transport_pgn(int(pgn)):  # skip all SPNs for transport PGNs
+            if pretty_j1939.describe.is_transport_pgn(int(pgn)):  # skip all SPNs for transport PGNs
                 continue
 
             if not spn == '':
@@ -387,7 +400,7 @@ class J1939daConverter:
                     elif spn_label == '6030' and spn_position_contents.strip() == '4.4':  # bug in 201311 DA
                         spn_startbit_inpgn = self.get_spn_start_bit('4.5')
 
-                    if spn_startbit_inpgn == -1:
+                    if spn_startbit_inpgn == [-1]:
                         spn_order_inpgn = spn_position_contents.strip()
                     else:
                         spn_order_inpgn = spn_startbit_inpgn
@@ -398,7 +411,7 @@ class J1939daConverter:
                     continue
 
                 j1939_pgn_db.get(pgn_label).get('SPNs').append(int(spn))
-                j1939_pgn_db.get(pgn_label).get('SPNStartBits').append(int(spn_startbit_inpgn))
+                j1939_pgn_db.get(pgn_label).get('SPNStartBits').append([int(s) for s in spn_startbit_inpgn])
                 # the Temp_SPN_Order list will be deleted later
                 j1939_pgn_db.get(pgn_label).get('Temp_SPN_Order').append(spn_order_inpgn)
 
@@ -467,8 +480,8 @@ class J1939daConverter:
             spn_in_pgn_list = list(zip(spn_list, spn_startbit_list, spn_order_list))
             if J1939daConverter.all_spns_positioned(spn_startbit_list):
                 for i in range(0, len(spn_in_pgn_list) - 1):
-                    here_startbit = int(spn_in_pgn_list[i][1])
-                    next_startbit = int(spn_in_pgn_list[i + 1][1])
+                    here_startbit = int(spn_in_pgn_list[i][1][0])
+                    next_startbit = int(spn_in_pgn_list[i + 1][1][0])
                     calced_spn_length = next_startbit - here_startbit
                     here_spn = spn_in_pgn_list[i][0]
 
@@ -500,7 +513,7 @@ class J1939daConverter:
 
                 spn_in_pgn_list = list(zip(spn_list, spn_startbit_list, spn_order_list))
                 for i in range(0, len(spn_in_pgn_list)):
-                    here_startbit = int(spn_in_pgn_list[i][1])
+                    here_startbit = int(spn_in_pgn_list[i][1][0])
                     prev_spn = spn_in_pgn_list[i - 1][0]
                     prev_spn_obj = j1939_spn_db.get(str(prev_spn))
                     prev_spn_len = prev_spn_obj.get('SPNLength')
@@ -509,13 +522,13 @@ class J1939daConverter:
                             prev_startbit = 0
                             here_startbit = prev_spn_len
                             prev_tuple = list(spn_in_pgn_list[i - 1])
-                            prev_tuple[1] = prev_startbit
+                            prev_tuple[1] = [prev_startbit]
                             spn_in_pgn_list[i - 1] = tuple(prev_tuple)
                         else:
-                            prev_startbit = int(spn_in_pgn_list[i - 1][1])
+                            prev_startbit = int(spn_in_pgn_list[i - 1][1][0])
                             here_startbit = prev_startbit + prev_spn_len
                         here_tuple = list(spn_in_pgn_list[i])
-                        here_tuple[1] = here_startbit
+                        here_tuple[1] = [here_startbit]
                         spn_in_pgn_list[i] = tuple(here_tuple)
 
                 # update the maps
@@ -575,7 +588,7 @@ class J1939daConverter:
         if len(spn_startbit_list) == 0:
             return True
         else:
-            is_positioned = map(lambda spn_startbit: int(spn_startbit) != -1, spn_startbit_list)
+            is_positioned = map(lambda spn_startbit: int(spn_startbit[0]) != -1, spn_startbit_list)
             return functools.reduce(lambda a, b: a and b, is_positioned)
 
     def process_any_source_addresses_sheet(self, sheet):
