@@ -141,4 +141,6 @@ vehicles.
 [python-can](https://github.com/hardbyte/python-can/) projects
 * default JSON database (of limited content) based on public information
 * support for J1939 aspects not encoded in the Digital Annex (ever, or anymore) e.g. Address Claim, DMs
-
+* integrate and/or move `create_j1939-db-json.py` to [canmatrix](https://canmatrix.readthedocs.io/en/latest/)
+* include some [`jq`](https://stedolan.github.io/jq/manual/) examples here for filtering the `pretty_j1939.py` output
+* colorize the json output (and avoid breaking pipelines)
