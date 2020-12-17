@@ -76,37 +76,44 @@ The `pretty_j1939.py` script (and the `describer` in `pretty_j1939/describe.py` 
 verbosity available when describing J1939 traffic in candump logs:
 
 ```bash
-usage: pretty_j1939.py [-h] [--candata] [--no-candata] [--pgn] [--no-pgn] [--spn] [--no-spn] [--transport] [--no-transport] [--link] [--no-link] [--include_na] [--no-include_na]
-                       [--format] [--no-format]
+usage: pretty_j1939.py [-h] [--da-json [DA_JSON]] [--candata] [--no-candata] [--pgn] [--no-pgn] [--spn] [--no-spn] [--transport] [--no-transport] [--link] [--no-link] [--include-na] [--no-include-na] [--real-time]
+                       [--no-real-time] [--format] [--no-format]
                        candump
 
 pretty-printing J1939 candump logs
 
 positional arguments:
-  candump          candump log
+  candump              candump log
 
 optional arguments:
-  -h, --help       show this help message and exit
-  --candata        print input can data
-  --no-candata     (default)
-  --pgn            (default) print source/destination/type description
+  -h, --help           show this help message and exit
+  --da-json [DA_JSON]  absolute path to the input JSON DA (default="./J1939db.json")
+  --candata            print input can data
+  --no-candata         (default)
+  --pgn                (default) print source/destination/type description
   --no-pgn
-  --spn            (default) print signals description
+  --spn                (default) print signals description
   --no-spn
-  --transport      print details of transport-layer streams found
-  --no-transport   (default)
-  --link           (default) print details of link-layer frames found
+  --transport          print details of transport-layer streams found
+  --no-transport       (default)
+  --link               (default) print details of link-layer frames found
   --no-link
-  --include_na     include not-available (0xff) SPN values
-  --no-include_na  (default)
-  --format         format each structure (otherwise single-line)
-  --no-format      (default)
-  --da-json [DA_JSON]   absolute path to the input JSON DA is required
-  --real-time [REAL_TIME]
-                        prettify SPNs as they are seen in transport sessions
+  --include-na         include not-available (0xff) SPN values
+  --no-include-na      (default)
+  --real-time          emit SPNs as they are seen in transport sessions
+  --no-real-time       (default)
+  --format             format each structure (otherwise single-line)
+  --no-format          (default)
 ```
 
-To use as a library one can import the Prettyfier class as `from pretty_j1939.prettify import Prettyfier`, instantiate it as `prettyfier = Prettyfier("J1939DA2015.json",describe_pgns=False....)` and call the describer property as `prettyfier.describer(message_data.bytes, message_id.uint)` where `message_data` and `message_id` are both of type `bitstring.Bits` created from the hex id and data strings (lsb on left). Note that the interpretation is done per message. In case of multipacket messages, transport messages are buffered unless `real-time=True` is specified as an argument to the `Prettyfier` constructor.
+To use as a library one can import the pretty_j1939 modules class as `import pretty_j1939` and instantiate a `describer`
+with `describe = pretty_j1939.describe.get_describer()`. That `get_describer()` function has defaults that match the
+above command-line utility and accepts similar flags for customization. Then frames can be described by calling
+`describe(message_data.bytes, message_id.uint)` where `message_data` and `message_id` are both of type `bitstring.Bits`
+created from the hex id and data strings (lsb on left).
+
+Note that the interpretation is done per message. In case of multipacket messages, transport messages are buffered
+unless `real-time=True` is specified as an argument to `get_describer()`
 
 ## Installing
 
