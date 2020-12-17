@@ -27,13 +27,15 @@ parser.add_argument('--spn',    dest='spn', action='store_true', help='(default)
 parser.add_argument('--no-spn', dest='spn', action='store_false')
 parser.set_defaults(spn=pretty_j1939.describe.DEFAULT_SPN)
 
+# TODO valid single-frame J1939 is transport also
 parser.add_argument('--transport',    dest='transport', action='store_true',  help='print details of transport-layer '
                                                                                    'streams found')
-parser.add_argument('--no-transport', dest='transport', action='store_false', help='(default)') #TODO valid single-frame J1939 is transport also
+parser.add_argument('--no-transport', dest='transport', action='store_false', help='(default)')
 parser.set_defaults(transport=pretty_j1939.describe.DEFAULT_TRANSPORT)
 
+# TODO as-above, valid single-frame J1939 is not link-layer
 parser.add_argument('--link',    dest='link', action='store_true', help='(default) print details of link-layer frames ' 
-                                                                        'found') # TODO as-above, valid single-frame J1939 is not link-layer
+                                                                        'found')
 parser.add_argument('--no-link', dest='link', action='store_false')
 parser.set_defaults(link=pretty_j1939.describe.DEFAULT_LINK)
 
