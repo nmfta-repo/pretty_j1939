@@ -72,7 +72,7 @@ Place the resulting JSON file at `J1939db.json` in your working directory and us
 pretty_j1939.py example.candump.txt
 ```
 
-The `pretty_j1939.py` script (and the `describer` in `pretty_j1939/parse.py` that it builds-on) has various levels of
+The `pretty_j1939.py` script (and the `describer` in `pretty_j1939/describe.py` that it builds-on) has various levels of
 verbosity available when describing J1939 traffic in candump logs:
 
 ```bash

@@ -16,7 +16,7 @@ import argparse
 import functools
 import operator
 import itertools
-import pretty_j1939.parse
+import pretty_j1939.describe
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--digital_annex_xls', type=str, required=True, action='append',
@@ -339,7 +339,7 @@ class J1939daConverter:
 
                 j1939_pgn_db.update({pgn_label: pgn_object})
 
-            if pretty_j1939.parse.is_transport_pgn(int(pgn)):  # skip all SPNs for transport PGNs
+            if pretty_j1939.describe.is_transport_pgn(int(pgn)):  # skip all SPNs for transport PGNs
                 continue
 
             if not spn == '':
