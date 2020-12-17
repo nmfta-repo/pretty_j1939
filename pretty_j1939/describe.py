@@ -9,6 +9,9 @@ import sys
 import math
 from collections import OrderedDict
 
+NA_NAN = float('nan')
+EMPTY_BITS = bitstring.ConstBitArray(bytes=b'')
+
 DA_MASK = 0x0000FF00
 SA_MASK = 0x000000FF
 PF_MASK = 0x00FF0000
@@ -150,11 +153,11 @@ class DADescriber:
                         return get_spn_cut_bytes(spn_start, len(message_data_bitstring.bytes) * 8,
                                                  message_data_bitstring, complete_message)
                     else:
-                        return bitstring.Bits(bytes=b'')
+                        return EMPTY_BITS
                 else:
                     print("Warning: skipping SPN %d in non-delimited and multi-spn and variable-length PGN %d"
                           " (this is most-likely a problem in the JSONdb or source DA)" % (spn, pgn), file=sys.stderr)
-                    return bitstring.Bits(bytes=b'')  # no way to handle multi-spn messages without a delimiter
+                    return EMPTY_BITS  # no way to handle multi-spn messages without a delimiter
             else:
                 spn_ordinal = spn_list.index(spn)
 
@@ -163,7 +166,7 @@ class DADescriber:
                 spn_fields = message_data_bitstring.bytes.split(delimiter)
 
                 if not complete_message and len(spn_fields) == 1:  # delimiter is not found
-                    return bitstring.Bits(bytes=b'')
+                    return EMPTY_BITS
 
                 if spn_start != [-1]:  # variable-len field with defined start; must be first variable-len field
                     spn_end = len(spn_fields[0]) * 8 - 1
@@ -180,7 +183,7 @@ class DADescriber:
                     try:
                         cut_data = bitstring.Bits(bytes=variable_spn_fields[variable_spn_ordinal])
                     except IndexError:
-                        cut_data = bitstring.Bits(bytes=b'')
+                        cut_data = EMPTY_BITS
                     return cut_data
         else:
             return get_spn_cut_bytes(spn_start, spn_length, message_data_bitstring, complete_message)
@@ -203,7 +206,7 @@ class DADescriber:
             return None
 
         if cut_data.all(True):  # value unavailable in message_data
-            return float('nan')
+            return NA_NAN
 
         cut_data.byteswap()
         if is_spn_bitencoded(units):
