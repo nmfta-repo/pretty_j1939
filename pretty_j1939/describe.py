@@ -277,21 +277,8 @@ class DADescriber:
         return description
 
 
-def get_sa(can_id):
-    return SA_MASK & can_id
-
-
-# used for transport reassembly and not called in parse_j1939_id below for speed
-def get_da(can_id):
-    pf = (PF_MASK & can_id) >> 16
-    if pf >= 240:  # PDU2 format
-        return 0xFF
-    else:
-        return (DA_MASK & can_id) >> 8
-
-
 def parse_j1939_id(can_id):
-    sa = get_sa(can_id)
+    sa = SA_MASK & can_id
     pf = (PF_MASK & can_id) >> 16
     da = (DA_MASK & can_id) >> 8
 
@@ -376,8 +363,7 @@ class TransportTracker:
         self.is_real_time = real_time
 
     def process_for_bams(self, transport_found_processor, message_bytes, message_id):
-        sa = get_sa(message_id)
-        da = get_da(message_id)
+        _, da, sa = parse_j1939_id(message_id)
         if is_connection_management_message(message_id) and is_bam_rts_cts_message(message_bytes):  # track new conn
             self.new_pgn[(da, sa)] = (message_bytes[7] << 16) + (message_bytes[6] << 8) + message_bytes[5]
             self.new_length[(da, sa)] = (message_bytes[2] << 8) + message_bytes[1]
