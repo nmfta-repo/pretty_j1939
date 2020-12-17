@@ -132,7 +132,6 @@ vehicles.
 
 * port this functionality to the [python-j1939](https://github.com/milhead2/python-j1939) and 
 [python-can](https://github.com/hardbyte/python-can/) projects
-* support for discontiguous SPN fields
 * default JSON database (of limited content) based on public information
 * support for J1939 aspects not encoded in the Digital Annex (ever, or anymore) e.g. Address Claim, DMs
 
