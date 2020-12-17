@@ -31,16 +31,20 @@ class DADescriber:
         with open(da_json, 'r') as j1939_file:
             j1939db = json.load(j1939_file)
             for pgn_label, pgn_object in j1939db['J1939PGNdb'].items():
-                self.pgn_objects.update({int(pgn_label): pgn_object})  # TODO check for all expected fields on each object
+                # TODO check for all expected fields on each object
+                self.pgn_objects.update({int(pgn_label): pgn_object})
 
             for spn_label, spn_object in j1939db['J1939SPNdb'].items():
-                self.spn_objects.update({int(spn_label): spn_object})  # TODO check for all expected fields on each object
+                # TODO check for all expected fields on each object
+                self.spn_objects.update({int(spn_label): spn_object})
 
             for address, address_name in j1939db['J1939SATabledb'].items():
-                self.address_names.update({int(address): address_name})  # TODO check for all expected fields on each object
+                # TODO check for all expected fields on each object
+                self.address_names.update({int(address): address_name})
 
             for spn_label, bit_encoding in j1939db['J1939BitDecodings'].items():
-                self.bit_encodings.update({int(spn_label): bit_encoding})  # TODO check for all expected fields on each object
+                # TODO check for all expected fields on each object
+                self.bit_encodings.update({int(spn_label): bit_encoding})
         self.da_json = da_json
         self.describe_pgns = describe_pgns
         self.describe_spns = describe_spns
@@ -393,7 +397,7 @@ class J1939Describer:
     da_describer: DADescriber = None
     transport_tracker: TransportTracker = None
 
-    def __init__(self, describe_link_layer, describe_pgns, describe_spns,describe_transport_layer,
+    def __init__(self, describe_link_layer, describe_pgns, describe_spns, describe_transport_layer,
                  include_transport_rawdata, include_na):
         self.describe_link_layer = describe_link_layer
         self.describe_pgns = describe_pgns
