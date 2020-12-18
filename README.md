@@ -56,6 +56,41 @@ $ pretty_j1939.py --format --no-link --transport example.candump.txt | head
     "Aftertreatment 1 DPF Average Time Between Active Regenerations": "173933 [Seconds]",
 ```
 
+The JSON output can be used as an input to [`jq`](https://stedolan.github.io/jq/manual/) to filter or format the decoded data. E.g. we can show only messages
+from the "Brakes":
+
+```sh
+$ pretty_j1939.py example.candump.txt --format | jq ". | select(.SA | contains(\"Brakes\"))"
+{
+  "PGN": "TSC1(0)",
+  "DA": "Retarder - Engine( 15)",
+  "SA": "Brakes - System Controller( 11)",
+  "Engine Requested Speed/Speed Limit": "8031.875 [rpm]",
+  "Engine Requested Torque/Torque Limit": "-125 [%]"
+}
+{
+  "PGN": "TSC1(0)",
+  "DA": "Retarder - Driveline( 16)",
+  "SA": "Brakes - System Controller( 11)",
+  "Engine Requested Speed/Speed Limit": "8031.875 [rpm]",
+  "Engine Requested Torque/Torque Limit": "-125 [%]"
+}
+{
+  "PGN": "TSC1(0)",
+  "DA": "Retarder, Exhaust, Engine #1( 41)",
+  "SA": "Brakes - System Controller( 11)",
+  "Engine Requested Speed/Speed Limit": "8031.875 [rpm]",
+  "Engine Requested Torque/Torque Limit": "-125 [%]"
+}
+{
+  "PGN": "EBC1(61441)",
+  "DA": "All(255)",
+  "SA": "Brakes - System Controller( 11)",
+  "ASR Brake Control Active": "0 (00 - ASR brake control passive but installed)",
+  "Anti-Lock Braking (ABS) Active": "0 (00 - ABS passive but installed)",
+[...]
+```
+
 ## HOWTO
 
 First, obtain a copy of the digital annex, see https://www.sae.org/standards/content/j1939da_201907/ for details.
@@ -142,5 +177,4 @@ vehicles.
 * default JSON database (of limited content) based on public information
 * support for J1939 aspects not encoded in the Digital Annex (ever, or anymore) e.g. Address Claim, DMs
 * integrate and/or move `create_j1939-db-json.py` to [canmatrix](https://canmatrix.readthedocs.io/en/latest/)
-* include some [`jq`](https://stedolan.github.io/jq/manual/) examples here for filtering the `pretty_j1939.py` output
 * colorize the json output (and avoid breaking pipelines)
