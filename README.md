@@ -11,7 +11,7 @@ This package can:
 *Formatted* content (one per line) next to candump data:
 
 ```bash
-$ pretty_j1939.py --candata --format --transport example.candump.txt | head
+$ pretty_j1939.py --candata --format example.candump.txt | head
 (1543509533.000838) can0 10FDA300#FFFF07FFFFFFFFFF ; {
                                                    ;     "DA": "All(255)",
                                                    ;     "PGN": "EEC6(64931)",
@@ -27,7 +27,7 @@ $ pretty_j1939.py --candata --format --transport example.candump.txt | head
 Single-line contents next to candump data:
 
 ```bash
-$ pretty_j1939.py --candata --transport example.candump.txt | head
+$ pretty_j1939.py --candata example.candump.txt | head
 (1543509533.000838) can0 10FDA300#FFFF07FFFFFFFFFF ; {"SA":"Engine #1(  0)","DA":"All(255)","PGN":"EEC6(64931)","Engine Variable Geometry Turbocharger Actuator #1":"2.8000000000000003 [%]"}
 (1543509533.000915) can0 18FEE000#FFFFFFFFB05C6800 ; {"SA":"Engine #1(  0)","DA":"All(255)","PGN":"VD(65248)","Total Vehicle Distance":"854934.0 [m]"}
 (1543509533.000991) can0 08FE6E0B#0000000000000000 ; {"SA":"Brakes - System Controller( 11)","DA":"All(255)","PGN":"HRW(65134)","Front Axle, Left Wheel Speed":"0.0 [kph]","Front axle, right wheel speed":"0.0 [kph]","Rear axle, left wheel speed":"0.0 [kph]","Rear axle, right wheel speed":"0.0 [kph]"}
@@ -40,10 +40,10 @@ $ pretty_j1939.py --candata --transport example.candump.txt | head
 (1543509533.001528) can0 18FEF131#F7FFFF07CCFFFFFF ; {"SA":"Cab Controller - Primary( 49)","DA":"All(255)","PGN":"CCVS1(65265)","Cruise Control Pause Switch":"1 (01 - On)","Cruise Control Active":"0 (00 - Cruise control switched off)","Cruise Control Enable Switch":"0 (00 - Cruise control disabled)","Brake Switch":"1 (01 - Brake pedal depressed)","Cruise Control Coast (Decelerate) Switch":"0 (00 - Cruise control activator not in the position \"coast\")","Cruise Control Accelerate Switch":"0 (00 - Cruise control activator not in the position \"accelerate\")"}
 ```
 
-*Formatted* contents of the transport SPNs only.
+*Formatted* contents of complete frames only.
 
 ```bash
-$ pretty_j1939.py --format --no-link --transport example.candump.txt | head
+$ pretty_j1939.py --format --no-link example.candump.txt | head
 {
     "PGN": "AT1HI1(64920)",
     "Aftertreatment 1 Total Fuel Used": "227.5 [liters]",
