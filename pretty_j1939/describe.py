@@ -102,7 +102,7 @@ class DADescriber:
     def lookup_all_spn_params(self, _, spn, pgn):
         # look up items in the database
         name = self.get_spn_name(spn)
-        spn_object = self.spn_objects.get(spn)
+        spn_object = self.spn_objects.get(spn, {})
         units = spn_object["Units"]
         spn_length = spn_object["SPNLength"]
         offset = spn_object["Offset"]
@@ -121,7 +121,7 @@ class DADescriber:
         # support earlier versions of J1939db.json which did not include PGN-to-SPN mappings at the PGN
         spn_start = spn_object.get("StartBit")
         if spn_start is None:  # otherwise, try to use the SPN bit position information at the PGN
-            pgn_object = self.pgn_objects.get(pgn)
+            pgn_object = self.pgn_objects.get(pgn, {})
             spns_in_pgn = pgn_object["SPNs"]
             startbits_in_pgn = pgn_object["SPNStartBits"]
             spn_start = startbits_in_pgn[spns_in_pgn.index(spn)]
@@ -133,13 +133,13 @@ class DADescriber:
         return spn_start
 
     def get_spn_bytes(self, message_data_bitstring, spn, pgn, is_complete_message):
-        spn_object = self.spn_objects.get(spn)
+        spn_object = self.spn_objects.get(spn, {})
         spn_length = spn_object["SPNLength"]
         spn_start = self.lookup_spn_startbit(spn_object, spn, pgn)
 
         if type(spn_length) is str and spn_length.startswith("Variable"):
             delimiter = spn_object.get("Delimiter")
-            pgn_object = self.pgn_objects.get(pgn)
+            pgn_object = self.pgn_objects.get(pgn, {})
             spn_list = pgn_object["SPNs"]
             if delimiter is None:
                 if len(spn_list) == 1:
@@ -187,7 +187,7 @@ class DADescriber:
     #   if validate == True, raises a ValueError if the value is present in message_data but is beyond the operational
     #   range
     def get_spn_value(self, message_data_bitstring, spn, pgn, is_complete_message, validate=True):
-        spn_object = self.spn_objects.get(spn)
+        spn_object = self.spn_objects.get(spn, {})
         units = spn_object["Units"]
 
         offset = spn_object["Offset"]
@@ -223,8 +223,8 @@ class DADescriber:
         if is_transport_pgn(pgn):  # transport messages can't be accurately parsed by the DA description
             return description
 
-        pgn_object = self.pgn_objects.get(pgn)
-        for spn in pgn_object["SPNs"]:
+        pgn_object = self.pgn_objects.get(pgn, {})
+        for spn in pgn_object.get("SPNs", []):
             if skip_spns.get(spn, ()) != ():  # skip any SPNs that have already been processed.
                 continue
             spn_name = self.get_spn_name(spn)
