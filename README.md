@@ -45,13 +45,13 @@ $ pretty_j1939.py --candata --transport example.candump.txt | head
 ```bash
 $ pretty_j1939.py --format --no-link --transport example.candump.txt | head
 {
-    "Transport PGN": "AT1HI1(64920)",
+    "PGN": "AT1HI1(64920)",
     "Aftertreatment 1 Total Fuel Used": "227.5 [liters]",
     "Aftertreatment 1 DPF Average Time Between Active Regenerations": "173933 [Seconds]",
     "Aftertreatment 1 DPF Average Distance Between Active Regenerations": "1460.5 [m]"
 }
 {
-    "Transport PGN": "AT1HI1(64920)",
+    "PGN": "AT1HI1(64920)",
     "Aftertreatment 1 Total Fuel Used": "227.5 [liters]",
     "Aftertreatment 1 DPF Average Time Between Active Regenerations": "173933 [Seconds]",
 ```
@@ -76,8 +76,8 @@ The `pretty_j1939.py` script (and the `describer` in `pretty_j1939/describe.py` 
 verbosity available when describing J1939 traffic in candump logs:
 
 ```bash
-usage: pretty_j1939.py [-h] [--da-json [DA_JSON]] [--candata] [--no-candata] [--pgn] [--no-pgn] [--spn] [--no-spn] [--transport] [--no-transport] [--link] [--no-link] [--include-na] [--no-include-na] [--real-time]
-                       [--no-real-time] [--format] [--no-format]
+usage: pretty_j1939.py [-h] [--da-json [DA_JSON]] [--candata] [--no-candata] [--pgn] [--no-pgn] [--spn] [--no-spn] [--transport] [--no-transport]
+                       [--link] [--no-link] [--include-na] [--no-include-na] [--real-time] [--no-real-time] [--format] [--no-format]
                        candump
 
 pretty-printing J1939 candump logs
@@ -94,10 +94,10 @@ optional arguments:
   --no-pgn
   --spn                (default) print signals description
   --no-spn
-  --transport          print details of transport-layer streams found
-  --no-transport       (default)
-  --link               (default) print details of link-layer frames found
-  --no-link
+  --transport          print details of transport-layer streams found (default)
+  --no-transport
+  --link               print details of link-layer frames found
+  --no-link            (default)
   --include-na         include not-available (0xff) SPN values
   --no-include-na      (default)
   --real-time          emit SPNs as they are seen in transport sessions

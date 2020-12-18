@@ -9,6 +9,8 @@ import sys
 import math
 from collections import OrderedDict
 
+PGN_LABEL = 'PGN'
+
 NA_NAN = float('nan')
 EMPTY_BITS = bitstring.ConstBitArray(bytes=b'')
 
@@ -130,7 +132,7 @@ class DADescriber:
 
         return spn_start
 
-    def get_spn_bytes(self, message_data_bitstring, spn, pgn, complete_message):
+    def get_spn_bytes(self, message_data_bitstring, spn, pgn, is_complete_message):
         spn_object = self.spn_objects.get(spn)
         spn_length = spn_object["SPNLength"]
         spn_start = self.lookup_spn_startbit(spn_object, spn, pgn)
@@ -141,9 +143,9 @@ class DADescriber:
             spn_list = pgn_object["SPNs"]
             if delimiter is None:
                 if len(spn_list) == 1:
-                    if complete_message:
+                    if is_complete_message:
                         return get_spn_cut_bytes(spn_start, len(message_data_bitstring.bytes) * 8,
-                                                 message_data_bitstring, complete_message)
+                                                 message_data_bitstring, is_complete_message)
                     else:
                         return EMPTY_BITS
                 else:
@@ -157,7 +159,7 @@ class DADescriber:
                 delimiter = bytes.fromhex(delimiter)
                 spn_fields = message_data_bitstring.bytes.split(delimiter)
 
-                if not complete_message and len(spn_fields) == 1:  # delimiter is not found
+                if not is_complete_message and len(spn_fields) == 1:  # delimiter is not found
                     return EMPTY_BITS
 
                 if spn_start != [-1]:  # variable-len field with defined start; must be first variable-len field
@@ -178,13 +180,13 @@ class DADescriber:
                         cut_data = EMPTY_BITS
                     return cut_data
         else:
-            return get_spn_cut_bytes(spn_start, spn_length, message_data_bitstring, complete_message)
+            return get_spn_cut_bytes(spn_start, spn_length, message_data_bitstring, is_complete_message)
 
     # returns a float in units of the SPN, or NaN if the value of the SPN value is not available in the message_data, or
     #   None if the message is incomplete and SPN data is not available.
     #   if validate == True, raises a ValueError if the value is present in message_data but is beyond the operational
     #   range
-    def get_spn_value(self, message_data_bitstring, spn, pgn, complete_message, validate=True):
+    def get_spn_value(self, message_data_bitstring, spn, pgn, is_complete_message, validate=True):
         spn_object = self.spn_objects.get(spn)
         units = spn_object["Units"]
 
@@ -193,8 +195,8 @@ class DADescriber:
         if scale <= 0:
             scale = 1
 
-        cut_data = bitstring.BitArray(self.get_spn_bytes(message_data_bitstring, spn, pgn, complete_message))
-        if (not complete_message) and cut_data.length == 0:  # incomplete SPN
+        cut_data = bitstring.BitArray(self.get_spn_bytes(message_data_bitstring, spn, pgn, is_complete_message))
+        if (not is_complete_message) and cut_data.length == 0:  # incomplete SPN
             return None
 
         if cut_data.all(True):  # value unavailable in message_data
@@ -214,7 +216,7 @@ class DADescriber:
 
         return value
 
-    def describe_message_data(self, pgn, message_data_bitstring, complete_message=True, skip_spns=None):
+    def describe_message_data(self, pgn, message_data_bitstring, is_complete_message=True, skip_spns=None):
         if skip_spns is None:  # TODO have one default for skip_spns
             skip_spns = {}
         description = OrderedDict()
@@ -237,8 +239,8 @@ class DADescriber:
 
             try:
                 if is_spn_numerical_values(spn_units):
-                    spn_value = self.get_spn_value(message_data_bitstring, spn, pgn, complete_message)
-                    if (not complete_message) and (spn_value is None):  # incomplete message
+                    spn_value = self.get_spn_value(message_data_bitstring, spn, pgn, is_complete_message)
+                    if (not is_complete_message) and (spn_value is None):  # incomplete message
                         continue
                     elif math.isnan(spn_value):
                         if self.include_na:
@@ -258,8 +260,8 @@ class DADescriber:
                     else:
                         add_spn_description(spn, spn_name, "%s [%s]" % (spn_value, spn_units))
                 else:
-                    spn_bytes = self.get_spn_bytes(message_data_bitstring, spn, pgn, complete_message)
-                    if spn_bytes.length == 0 and not complete_message:  # incomplete message
+                    spn_bytes = self.get_spn_bytes(message_data_bitstring, spn, pgn, is_complete_message)
+                    if spn_bytes.length == 0 and not is_complete_message:  # incomplete message
                         continue
                     else:
                         if spn_units.lower() in ("request dependent",):
@@ -271,7 +273,7 @@ class DADescriber:
 
             except ValueError:
                 add_spn_description(spn, spn_name, "%s (%s)" % (
-                    self.get_spn_bytes(message_data_bitstring, spn, pgn, complete_message), "Out of range"))
+                    self.get_spn_bytes(message_data_bitstring, spn, pgn, is_complete_message), "Out of range"))
 
         return description
 
@@ -328,9 +330,9 @@ def is_bam_rts_cts_message(message_bytes):
             message_bytes[0] == 16)
 
 
-def get_spn_cut_bytes(spn_start, spn_length, message_data_bitstring, complete_message):
+def get_spn_cut_bytes(spn_start, spn_length, message_data_bitstring, is_complete_message):
     spn_end = spn_start[0] + spn_length - 1
-    if not complete_message and spn_end > message_data_bitstring.length:
+    if not is_complete_message and spn_end > message_data_bitstring.length:
         return bitstring.Bits(bytes=b'')
 
     cut_data = message_data_bitstring[spn_start[0]:spn_end + 1]
@@ -421,47 +423,59 @@ class J1939Describer:
             if spn_coverage is None:
                 spn_coverage = {}
             transport_found = dict()
-            transport_found['PGN'] = found_pgn
+            transport_found[PGN_LABEL] = found_pgn
             transport_found['SA'] = found_sa
             transport_found['data'] = data_bytes
             transport_found['spn_coverage'] = spn_coverage
             transport_found['is_last_packet'] = is_last_packet
             self.transport_messages.append(transport_found)
 
-        self.transport_tracker.process(on_transport_found, message_data_bytes, message_id_uint)
+        is_transport_lower_layer_message = is_transport_message(message_id_uint)
+        if is_transport_lower_layer_message and self.describe_transport_layer:
+            self.transport_tracker.process(on_transport_found, message_data_bytes, message_id_uint)
 
         description = OrderedDict()
 
-        if self.describe_link_layer:
+        is_describe_this_frame = (not is_transport_lower_layer_message)  # always print 'complete' J1939 frames
+        is_describe_this_frame |= is_transport_lower_layer_message \
+            and self.describe_link_layer  # or others when configured to describe 'link layer' frames
+
+        if is_describe_this_frame:
             if self.describe_pgns:
                 description.update(self.da_describer.describe_message_id(message_id_uint))
 
             if self.describe_spns:
                 pgn, _, _ = parse_j1939_id(message_id_uint)
-                message_description = self.da_describer.\
+                message_description = self.da_describer. \
                     describe_message_data(pgn,
                                           bitstring.Bits(bytes=message_data_bytes),
-                                          complete_message=True)
+                                          is_complete_message=True)
                 description.update(message_description)
 
         if self.describe_transport_layer and len(self.transport_messages) > 0:
             transport_message = self.transport_messages[0]
+            transport_pgn = transport_message[PGN_LABEL]
             if self.describe_pgns:
-                transport_pgn = self.da_describer.get_pgn_description(transport_message['PGN'])
-                description.update({'Transport PGN': transport_pgn})
+                description.update(self.da_describer.describe_message_id(message_id_uint))
+                transport_pgn_description = self.da_describer.get_pgn_description(transport_pgn)
+                if self.describe_link_layer:  # when configured to describe 'link layer' don't collide with PGN
+                    description.update({'Transport PGN': transport_pgn_description})
+                else:  # otherwise (and default) describe the transport PGN as _the_ PGN
+                    description.update({PGN_LABEL: transport_pgn_description})
 
-            if self.include_transport_rawdata:
-                transport_data = str(bitstring.Bits(bytes=transport_message['data']))
-                description.update({'Transport Data': transport_data})
-
+            is_complete_message = transport_message['is_last_packet']
             if self.describe_spns:
-                pgn = transport_message['PGN']
-                message_description = self.da_describer.\
+                pgn = transport_pgn
+                message_description = self.da_describer. \
                     describe_message_data(pgn,
                                           bitstring.Bits(bytes=transport_message['data']),
-                                          complete_message=transport_message['is_last_packet'],
+                                          is_complete_message=is_complete_message,
                                           skip_spns=transport_message['spn_coverage'])
                 description.update(message_description)
+
+            if is_complete_message and self.include_transport_rawdata:
+                transport_data = str(bitstring.Bits(bytes=transport_message['data']))
+                description.update({'Transport Data': transport_data})
 
         return description
 
@@ -470,8 +484,8 @@ DEFAULT_DA_JSON = "J1939db.json"
 DEFAULT_CANDATA = False
 DEFAULT_PGN = True
 DEFAULT_SPN = True
-DEFAULT_TRANSPORT = False
-DEFAULT_LINK = True
+DEFAULT_TRANSPORT = True
+DEFAULT_LINK = False
 DEFAULT_INCLUDE_NA = False
 DEFAULT_REAL_TIME = False
 
