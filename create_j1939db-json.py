@@ -18,6 +18,9 @@ import operator
 import itertools
 import pretty_j1939.describe
 
+ENUM_SINGLE_LINE_RE = r'[ ]*([0-9bxXA-F]+)[ ]*[-=:]?(.*)'
+ENUM_RANGE_LINE_RE = r'[ ]*([0-9bxXA-F]+)[ ]*(\-|to|thru)[ ]*([0-9bxXA-F]+)[ ]+[-=:]?(.*)'
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--digital_annex_xls', type=str, required=True, action='append',
                     default=[], nargs='+',
@@ -221,7 +224,7 @@ class J1939daConverter:
     def is_enum_lines_binary(description_lines):
         all_ones_and_zeroes = True
         for line in description_lines:
-            first = re.match(r'[ ]*([0-9bxXA-F]+)', line).groups()[0]
+            first = re.match(ENUM_SINGLE_LINE_RE, line).groups()[0]
             if re.sub(r'[^10b]', '', first) != first:
                 all_ones_and_zeroes = False
                 break
@@ -231,7 +234,7 @@ class J1939daConverter:
     @staticmethod
     # returns a pair of inclusive, inclusive range boundaries or None if this line is not a range
     def get_enum_line_range(line):
-        match = re.match(r'[ ]*([0-9bxXA-F]+)[ ]*(\-|to|thru)[ ]*([0-9bxXA-F]+)[ -=]', line)
+        match = re.match(ENUM_RANGE_LINE_RE, line)
         if match:
             groups = match.groups()
             if re.match(r'[01b]', groups[0]) and not re.match(r'[01b]', groups[2]):
@@ -241,13 +244,30 @@ class J1939daConverter:
             return None
 
     @staticmethod
+    # returns the description part (just that part) of an enum line
+    def get_enum_line_description(line):
+        line = re.sub(r'[ ]+', ' ', line)
+        line = re.sub(r'[ ]?\-\-[ ]?', ' = ', line)
+        match = re.match(ENUM_RANGE_LINE_RE, line)
+        if match:
+            line = match.groups()[-1]
+        else:
+            match = re.match(ENUM_SINGLE_LINE_RE, line)
+            if match:
+                line = match.groups()[-1]
+        line = line.strip()
+        line = line.lower()
+        line = line.replace('sae', 'SAE').replace('iso', 'ISO')
+        return line
+
+    @staticmethod
     def create_bit_object_from_description(spn_description, bit_object):
         description_lines = spn_description.splitlines()
         enum_lines = J1939daConverter.get_enum_lines(description_lines)
         is_binary = J1939daConverter.is_enum_lines_binary(enum_lines)
 
         for line in enum_lines:
-            enum_description = re.sub(r'[ ]+', ' ', line)
+            enum_description = J1939daConverter.get_enum_line_description(line)
 
             range_boundaries = J1939daConverter.get_enum_line_range(line)
             if range_boundaries is not None:
@@ -410,7 +430,10 @@ class J1939daConverter:
                 if spn_label == '6610' or spn_label == '6815':  # bug in PGN map in 201311 DA
                     continue
 
+                # Back to PGN processing
+
                 j1939_pgn_db.get(pgn_label).get('SPNs').append(int(spn))
+                # TODO strip consecutive startbits e.g. '[8, 16, 24]' for a 24bit val should be just '8'
                 j1939_pgn_db.get(pgn_label).get('SPNStartBits').append([int(s) for s in spn_startbit_inpgn])
                 # the Temp_SPN_Order list will be deleted later
                 j1939_pgn_db.get(pgn_label).get('Temp_SPN_Order').append(spn_order_inpgn)
@@ -423,13 +446,13 @@ class J1939daConverter:
                     if len(bit_object) > 0:
                         j1939_bit_decodings.update({spn_label: bit_object})
 
-        # Clean-ups are needed:
-        # * sort SPN lists in PGNs by the Temp_SPN_Order
-        # * fix the starting sequence of -1 startbits in PGNs with fixed-len SPNs mapped
-        # * fix incorrectly variable-len SPNs in a sequence known startbits
-        # * remove any SPN maps that have variable-len, no-delimiter SPNs in a PGN with >1 SPN mapped
-        # * remove Temp_SPN_Order
-        # * remove zero-len startbits arrays
+        # Clean-ups are needed. The next steps are to do:
+        # 1. sort SPN lists in PGNs by the Temp_SPN_Order
+        # 2. fix the starting sequence of -1 startbits in PGNs with fixed-len SPNs mapped
+        # 3. fix incorrectly variable-len SPNs in a sequence known startbits
+        # 4. remove any SPN maps that have variable-len, no-delimiter SPNs in a PGN with >1 SPN mapped
+        # 5. remove Temp_SPN_Order
+        # 6. remove zero-len startbits arrays
 
         # * sort SPN lists in PGNs by the Temp_SPN_Order
         self.sort_spns_by_order(j1939_pgn_db)
