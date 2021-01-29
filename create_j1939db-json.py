@@ -430,7 +430,10 @@ class J1939daConverter:
                 if spn_label == '6610' or spn_label == '6815':  # bug in PGN map in 201311 DA
                     continue
 
+                # Back to PGN processing
+
                 j1939_pgn_db.get(pgn_label).get('SPNs').append(int(spn))
+                # TODO strip consecutive startbits e.g. '[8, 16, 24]' for a 24bit val should be just '8'
                 j1939_pgn_db.get(pgn_label).get('SPNStartBits').append([int(s) for s in spn_startbit_inpgn])
                 # the Temp_SPN_Order list will be deleted later
                 j1939_pgn_db.get(pgn_label).get('Temp_SPN_Order').append(spn_order_inpgn)
@@ -443,13 +446,13 @@ class J1939daConverter:
                     if len(bit_object) > 0:
                         j1939_bit_decodings.update({spn_label: bit_object})
 
-        # Clean-ups are needed:
-        # * sort SPN lists in PGNs by the Temp_SPN_Order
-        # * fix the starting sequence of -1 startbits in PGNs with fixed-len SPNs mapped
-        # * fix incorrectly variable-len SPNs in a sequence known startbits
-        # * remove any SPN maps that have variable-len, no-delimiter SPNs in a PGN with >1 SPN mapped
-        # * remove Temp_SPN_Order
-        # * remove zero-len startbits arrays
+        # Clean-ups are needed. The next steps are to do:
+        # 1. sort SPN lists in PGNs by the Temp_SPN_Order
+        # 2. fix the starting sequence of -1 startbits in PGNs with fixed-len SPNs mapped
+        # 3. fix incorrectly variable-len SPNs in a sequence known startbits
+        # 4. remove any SPN maps that have variable-len, no-delimiter SPNs in a PGN with >1 SPN mapped
+        # 5. remove Temp_SPN_Order
+        # 6. remove zero-len startbits arrays
 
         # * sort SPN lists in PGNs by the Temp_SPN_Order
         self.sort_spns_by_order(j1939_pgn_db)
