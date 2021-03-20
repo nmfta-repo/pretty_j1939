@@ -119,7 +119,9 @@ class J1939daConverter:
             left = J1939daConverter.just_numerals(left.split(' ')[0])
             right = J1939daConverter.just_numerals(right.split(' ')[0])
             return asteval.Interpreter()('%s/%s' % (left, right))
-        elif 'microsiemens/mm' in norm_contents or 'usiemens/mm' in norm_contents:  # special handling for weirdness
+        elif 'microsiemens/mm' in norm_contents or \
+             'usiemens/mm' in norm_contents or \
+             'kw/s' in norm_contents:  # special handling for this weirdness
             return float(contents.split(' ')[0])
         raise ValueError('unknown spn resolution "%s"' % contents)
 
@@ -280,8 +282,16 @@ class J1939daConverter:
                     first_val = int(range_boundaries[0], base=16)
                     second_val = int(range_boundaries[1], base=16)
                 else:
-                    first_val = int(range_boundaries[0], base=10)
-                    second_val = int(range_boundaries[1], base=10)
+                    try:
+                        first_val = int(range_boundaries[0], base=10)
+                        second_val = int(range_boundaries[1], base=10)
+                    except ValueError:
+                        #Try binary
+                        first = re.sub(r'b', '', range_boundaries[0])
+                        first_val = (int(first, base=2))
+                        second = re.sub(r'b', '', range_boundaries[1])
+                        second_val = (int(second, base=2))
+
 
                 for i in range(first_val, second_val+1):
                     bit_object.update(({str(i): enum_description}))
@@ -294,7 +304,12 @@ class J1939daConverter:
                 elif 'x' in first.lower():
                     val = str(int(first, base=16))
                 else:
-                    val = str(int(first, base=10))
+                    try:
+                        val = str(int(first, base=10))
+                    except ValueError:
+                        #Try binary
+                        first = re.sub(r'b', '', first)
+                        val = str(int(first, base=2))
 
                 bit_object.update(({val: enum_description}))
 
@@ -314,22 +329,22 @@ class J1939daConverter:
         spn_factcheck_map = dict()
 
         header_row, header_row_num = self.get_header_row(sheet)
-
+        #print(header_row)
         pgn_col = header_row.index('PGN')
         spn_col = header_row.index('SPN')
-        acronym_col = header_row.index('ACRONYM')
-        pgn_label_col = header_row.index('PARAMETER_GROUP_LABEL')
-        pgn_data_length_col = header_row.index('PGN_DATA_LENGTH')
+        acronym_col = header_row.index('PG_ACRONYM')
+        pgn_label_col = header_row.index('PG_LABEL')
+        pgn_data_length_col = header_row.index('PG_DATA_LENGTH')
         transmission_rate_col = header_row.index('TRANSMISSION_RATE')
-        spn_position_in_pgn_col = header_row.index('SPN_POSITION_IN_PGN')
-        spn_name_col = header_row.index('SPN_NAME')
+        spn_position_in_pgn_col = header_row.index('SP_POSITION_IN_PG')
+        spn_name_col = header_row.index('SP_LABEL')
         offset_col = header_row.index('OFFSET')
         data_range_col = header_row.index('DATA_RANGE')
         resolution_col = header_row.index('RESOLUTION')
-        spn_length_col = header_row.index('SPN_LENGTH')
+        spn_length_col = header_row.index('SP_LENGTH')
         units_col = header_row.index('UNITS')
         operational_range_col = header_row.index('OPERATIONAL_RANGE')
-        spn_description_col = header_row.index('SPN_DESCRIPTION')
+        spn_description_col = header_row.index('SP_DESCRIPTION')
 
         for i in range(header_row_num+1, sheet.nrows):
             row = sheet.row_values(i)

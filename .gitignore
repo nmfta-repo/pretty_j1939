@@ -30,3 +30,4 @@ MANIFEST
 # Excel spreadsheets
 *.xls
 *.xlsx
+j1939db.json
