@@ -211,22 +211,40 @@ class J1939daConverter:
         return pos_pair
 
     @staticmethod
+    def is_enum_line(line):
+        if line.lower().startswith('bit state'):
+            return True
+        elif re.match(r'^[ ]*[0-9][0-9bxXA-F\-:]*[ ]+[^ ]+', line):
+            return True
+        return False
+
+    @staticmethod
     def get_enum_lines(description_lines):
         enum_lines = list()
+
+        def add_enum_line(test_line):
+            test_line = re.sub(r'(Bit States|Bit State)', '', test_line, flags=re.IGNORECASE)
+            if any(e in test_line for e in [':  Tokyo', ' SPN 8846 ', ' SPN 8842 ', ' SPN 3265 ', ' SPN 3216 ', '13 preprogrammed intermediate ', '3 ASCII space characters']):
+                return False
+            enum_lines.append(test_line)
+            return True
+
+        any_found = False
         for line in description_lines:
-            if line.lower().startswith('bit state'):
-                line = re.sub(r'(Bit States|Bit State)', '', line, flags=re.IGNORECASE)
-                enum_lines.append(line)
-            elif re.match(r'^[ ]*[0-9][0-9bxXA-F\-:]*[ ]+[^ ]+', line):
-                enum_lines.append(line)
+            if J1939daConverter.is_enum_line(line):
+                if any_found:
+                    add_enum_line(line)
+                else:
+                    if J1939daConverter.match_single_enum_line(line):  # special handling: first enum must use single assignment
+                        any_found = add_enum_line(line)
 
         return enum_lines
 
     @staticmethod
-    def is_enum_lines_binary(description_lines):
+    def is_enum_lines_binary(enum_lines_only):
         all_ones_and_zeroes = True
-        for line in description_lines:
-            first = re.match(ENUM_SINGLE_LINE_RE, line).groups()[0]
+        for line in enum_lines_only:
+            first = J1939daConverter.match_single_enum_line(line).groups()[0]
             if re.sub(r'[^10b]', '', first) != first:
                 all_ones_and_zeroes = False
                 break
@@ -246,6 +264,12 @@ class J1939daConverter:
             return None
 
     @staticmethod
+    def match_single_enum_line(line):
+        line = re.sub(r'[ ]+', ' ', line)
+        line = re.sub(r'[ ]?\-\-[ ]?', ' = ', line)
+        return re.match(ENUM_SINGLE_LINE_RE, line)
+
+    @staticmethod
     # returns the description part (just that part) of an enum line
     def get_enum_line_description(line):
         line = re.sub(r'[ ]+', ' ', line)
@@ -254,7 +278,7 @@ class J1939daConverter:
         if match:
             line = match.groups()[-1]
         else:
-            match = re.match(ENUM_SINGLE_LINE_RE, line)
+            match = J1939daConverter.match_single_enum_line(line)
             if match:
                 line = match.groups()[-1]
         line = line.strip()
