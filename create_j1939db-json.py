@@ -342,22 +342,30 @@ class J1939daConverter:
         spn_factcheck_map = dict()
 
         header_row, header_row_num = self.get_header_row(sheet)
-        #print(header_row)
-        pgn_col = header_row.index('PGN')
-        spn_col = header_row.index('SPN')
-        acronym_col = header_row.index('PG_ACRONYM')
-        pgn_label_col = header_row.index('PG_LABEL')
-        pgn_data_length_col = header_row.index('PG_DATA_LENGTH')
-        transmission_rate_col = header_row.index('TRANSMISSION_RATE')
-        spn_position_in_pgn_col = header_row.index('SP_POSITION_IN_PG')
-        spn_name_col = header_row.index('SP_LABEL')
-        offset_col = header_row.index('OFFSET')
-        data_range_col = header_row.index('DATA_RANGE')
-        resolution_col = header_row.index('RESOLUTION')
-        spn_length_col = header_row.index('SP_LENGTH')
-        units_col = header_row.index('UNITS')
-        operational_range_col = header_row.index('OPERATIONAL_RANGE')
-        spn_description_col = header_row.index('SP_DESCRIPTION')
+        pgn_col = self.get_any_header_column(header_row, 'PGN')
+        spn_col = self.get_any_header_column(header_row, 'SPN')
+        acronym_col = self.get_any_header_column(header_row,
+                                                 ['ACRONYM', 'PG_ACRONYM'])
+        pgn_label_col = self.get_any_header_column(header_row,
+                                                   ['PARAMETER_GROUP_LABEL', 'PG_LABEL'])
+        pgn_data_length_col = self.get_any_header_column(header_row,
+                                                         ['PGN_DATA_LENGTH', 'PG_DATA_LENGTH'])
+        transmission_rate_col = self.get_any_header_column(header_row, 'TRANSMISSION_RATE')
+        spn_position_in_pgn_col = self.get_any_header_column(header_row,
+                                                             ['SPN_POSITION_IN_PGN','SP_POSITION_IN_PG'])
+        spn_name_col = self.get_any_header_column(header_row,
+                                                  ['SPN_NAME', 'SP_LABEL'])
+        offset_col = self.get_any_header_column(header_row, 'OFFSET')
+        data_range_col = self.get_any_header_column(header_row, 'DATA_RANGE')
+        resolution_col = self.get_any_header_column(header_row,
+                                                    ['RESOLUTION', 'SCALING'])
+        spn_length_col = self.get_any_header_column(header_row,
+                                                    ['SPN_LENGTH', 'SP_LENGTH'])
+        units_col = self.get_any_header_column(header_row,
+                                               ['UNITS', 'UNIT'])
+        operational_range_col = self.get_any_header_column(header_row, 'OPERATIONAL_RANGE')
+        spn_description_col = self.get_any_header_column(header_row,
+                                                         ['SPN_DESCRIPTION', 'SP_DESCRIPTION'])
 
         for i in range(header_row_num+1, sheet.nrows):
             row = sheet.row_values(i)
@@ -506,6 +514,16 @@ class J1939daConverter:
 
         return
 
+    def get_any_header_column(self, header_row, header_texts):
+        if not isinstance(header_texts, list):
+            header_texts = [header_texts]
+        for t in header_texts:
+            try:
+                return header_row.index(t)
+            except ValueError:
+                continue
+        return -1
+
     def get_header_row(self, sheet):
         header_row_num = self.lookup_header_row(sheet)
 
@@ -649,8 +667,8 @@ class J1939daConverter:
 
         header_row, header_row_num = self.get_header_row(sheet)
 
-        source_address_id_col = header_row.index('SOURCE_ADDRESS_ID')
-        name_col = header_row.index('NAME')
+        source_address_id_col = self.get_any_header_column(header_row, 'SOURCE_ADDRESS_ID')
+        name_col = self.get_any_header_column(header_row, 'NAME')
 
         for i in range(header_row_num+1, sheet.nrows):
             row = sheet.row_values(i)
