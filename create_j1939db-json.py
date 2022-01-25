@@ -685,7 +685,7 @@ class J1939daConverter:
 
     def convert(self, output_file):
         self.j1939db = OrderedDict()
-        sheet_name = 'SPNs & PGNs'
+        sheet_name = ['SPNs & PGNs', 'SPs & PGs']
         self.process_spns_and_pgns_tab(self.find_first_sheet_by_name(sheet_name))
         sheet_name = 'Global Source Addresses (B2)'
         self.process_any_source_addresses_sheet(self.find_first_sheet_by_name(sheet_name))
@@ -704,11 +704,14 @@ class J1939daConverter:
 
         return
 
-    def find_first_sheet_by_name(self, sheet_name):
-        for book in self.digital_annex_xls_list:
-            if sheet_name in book.sheet_names():
-                sheet = book.sheet_by_name(sheet_name)
-                return sheet
+    def find_first_sheet_by_name(self, sheet_names):
+        if not isinstance(sheet_names, list):
+            sheet_names = [sheet_names]
+        for sheet_name in sheet_names:
+            for book in self.digital_annex_xls_list:
+                if sheet_name in book.sheet_names():
+                    sheet = book.sheet_by_name(sheet_name)
+                    return sheet
         return None
 
 
