@@ -306,16 +306,8 @@ class J1939daConverter:
                     first_val = int(range_boundaries[0], base=16)
                     second_val = int(range_boundaries[1], base=16)
                 else:
-                    try:
-                        first_val = int(range_boundaries[0], base=10)
-                        second_val = int(range_boundaries[1], base=10)
-                    except ValueError:
-                        #Try binary
-                        first = re.sub(r'b', '', range_boundaries[0])
-                        first_val = (int(first, base=2))
-                        second = re.sub(r'b', '', range_boundaries[1])
-                        second_val = (int(second, base=2))
-
+                    first_val = int(range_boundaries[0], base=10)
+                    second_val = int(range_boundaries[1], base=10)
 
                 for i in range(first_val, second_val+1):
                     bit_object.update(({str(i): enum_description}))
@@ -328,12 +320,7 @@ class J1939daConverter:
                 elif 'x' in first.lower():
                     val = str(int(first, base=16))
                 else:
-                    try:
-                        val = str(int(first, base=10))
-                    except ValueError:
-                        #Try binary
-                        first = re.sub(r'b', '', first)
-                        val = str(int(first, base=2))
+                    val = str(int(first, base=10))
 
                 bit_object.update(({val: enum_description}))
 
