@@ -24,7 +24,7 @@ ENUM_RANGE_LINE_RE = r'[ ]*([0-9bxXA-F]+)[ ]*(\-|to|thru)[ ]*([0-9bxXA-F]+)[ ]+[
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--digital_annex_xls', type=str, required=True, action='append',
                     default=[], nargs='+',
-                    help="the J1939 Digital Annex excel sheet used as input")
+                    help="the J1939 Digital Annex .xls excel file used as input")
 parser.add_argument('-w', '--write-json', type=str, default='-',
                     help="where to write the output. defaults to stdout")
 args = parser.parse_args()
