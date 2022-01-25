@@ -99,7 +99,9 @@ class J1939daConverter:
     # returns a float in X per bit or int(0)
     def get_spn_resolution(contents):
         norm_contents = contents.lower()
-        if '0 to 255 per byte' in norm_contents or 'states/' in norm_contents:
+        if '0 to 255 per byte' in norm_contents or \
+           ' states' in norm_contents or \
+           norm_contents == 'data specific':
             return 1.0
         elif 'bit-mapped' in norm_contents or \
              'binary' in norm_contents or \
