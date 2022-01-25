@@ -24,7 +24,7 @@ ENUM_RANGE_LINE_RE = r'[ ]*([0-9bxXA-F]+)[ ]*(\-|to|thru)[ ]*([0-9bxXA-F]+)[ ]+[
 parser = argparse.ArgumentParser()
 parser.add_argument('-f', '--digital_annex_xls', type=str, required=True, action='append',
                     default=[], nargs='+',
-                    help="the J1939 Digital Annex excel sheet used as input")
+                    help="the J1939 Digital Annex .xls excel file used as input")
 parser.add_argument('-w', '--write-json', type=str, default='-',
                     help="where to write the output. defaults to stdout")
 args = parser.parse_args()
@@ -99,7 +99,9 @@ class J1939daConverter:
     # returns a float in X per bit or int(0)
     def get_spn_resolution(contents):
         norm_contents = contents.lower()
-        if '0 to 255 per byte' in norm_contents or 'states/' in norm_contents:
+        if '0 to 255 per byte' in norm_contents or \
+           ' states' in norm_contents or \
+           norm_contents == 'data specific':
             return 1.0
         elif 'bit-mapped' in norm_contents or \
              'binary' in norm_contents or \
@@ -119,7 +121,9 @@ class J1939daConverter:
             left = J1939daConverter.just_numerals(left.split(' ')[0])
             right = J1939daConverter.just_numerals(right.split(' ')[0])
             return asteval.Interpreter()('%s/%s' % (left, right))
-        elif 'microsiemens/mm' in norm_contents or 'usiemens/mm' in norm_contents:  # special handling for weirdness
+        elif 'microsiemens/mm' in norm_contents or \
+             'usiemens/mm' in norm_contents or \
+             'kw/s' in norm_contents:  # special handling for this weirdness
             return float(contents.split(' ')[0])
         raise ValueError('unknown spn resolution "%s"' % contents)
 
@@ -209,22 +213,40 @@ class J1939daConverter:
         return pos_pair
 
     @staticmethod
+    def is_enum_line(line):
+        if line.lower().startswith('bit state'):
+            return True
+        elif re.match(r'^[ ]*[0-9][0-9bxXA-F\-:]*[ ]+[^ ]+', line):
+            return True
+        return False
+
+    @staticmethod
     def get_enum_lines(description_lines):
         enum_lines = list()
+
+        def add_enum_line(test_line):
+            test_line = re.sub(r'(Bit States|Bit State)', '', test_line, flags=re.IGNORECASE)
+            if any(e in test_line for e in [':  Tokyo', ' SPN 8846 ', ' SPN 8842 ', ' SPN 3265 ', ' SPN 3216 ', '13 preprogrammed intermediate ', '3 ASCII space characters']):
+                return False
+            enum_lines.append(test_line)
+            return True
+
+        any_found = False
         for line in description_lines:
-            if line.lower().startswith('bit state'):
-                line = re.sub(r'(Bit States|Bit State)', '', line, flags=re.IGNORECASE)
-                enum_lines.append(line)
-            elif re.match(r'^[ ]*[0-9][0-9bxXA-F\-:]*[ ]+[^ ]+', line):
-                enum_lines.append(line)
+            if J1939daConverter.is_enum_line(line):
+                if any_found:
+                    add_enum_line(line)
+                else:
+                    if J1939daConverter.match_single_enum_line(line):  # special handling: first enum must use single assignment
+                        any_found = add_enum_line(line)
 
         return enum_lines
 
     @staticmethod
-    def is_enum_lines_binary(description_lines):
+    def is_enum_lines_binary(enum_lines_only):
         all_ones_and_zeroes = True
-        for line in description_lines:
-            first = re.match(ENUM_SINGLE_LINE_RE, line).groups()[0]
+        for line in enum_lines_only:
+            first = J1939daConverter.match_single_enum_line(line).groups()[0]
             if re.sub(r'[^10b]', '', first) != first:
                 all_ones_and_zeroes = False
                 break
@@ -244,6 +266,12 @@ class J1939daConverter:
             return None
 
     @staticmethod
+    def match_single_enum_line(line):
+        line = re.sub(r'[ ]+', ' ', line)
+        line = re.sub(r'[ ]?\-\-[ ]?', ' = ', line)
+        return re.match(ENUM_SINGLE_LINE_RE, line)
+
+    @staticmethod
     # returns the description part (just that part) of an enum line
     def get_enum_line_description(line):
         line = re.sub(r'[ ]+', ' ', line)
@@ -252,7 +280,7 @@ class J1939daConverter:
         if match:
             line = match.groups()[-1]
         else:
-            match = re.match(ENUM_SINGLE_LINE_RE, line)
+            match = J1939daConverter.match_single_enum_line(line)
             if match:
                 line = match.groups()[-1]
         line = line.strip()
@@ -314,22 +342,30 @@ class J1939daConverter:
         spn_factcheck_map = dict()
 
         header_row, header_row_num = self.get_header_row(sheet)
-
-        pgn_col = header_row.index('PGN')
-        spn_col = header_row.index('SPN')
-        acronym_col = header_row.index('ACRONYM')
-        pgn_label_col = header_row.index('PARAMETER_GROUP_LABEL')
-        pgn_data_length_col = header_row.index('PGN_DATA_LENGTH')
-        transmission_rate_col = header_row.index('TRANSMISSION_RATE')
-        spn_position_in_pgn_col = header_row.index('SPN_POSITION_IN_PGN')
-        spn_name_col = header_row.index('SPN_NAME')
-        offset_col = header_row.index('OFFSET')
-        data_range_col = header_row.index('DATA_RANGE')
-        resolution_col = header_row.index('RESOLUTION')
-        spn_length_col = header_row.index('SPN_LENGTH')
-        units_col = header_row.index('UNITS')
-        operational_range_col = header_row.index('OPERATIONAL_RANGE')
-        spn_description_col = header_row.index('SPN_DESCRIPTION')
+        pgn_col = self.get_any_header_column(header_row, 'PGN')
+        spn_col = self.get_any_header_column(header_row, 'SPN')
+        acronym_col = self.get_any_header_column(header_row,
+                                                 ['ACRONYM', 'PG_ACRONYM'])
+        pgn_label_col = self.get_any_header_column(header_row,
+                                                   ['PARAMETER_GROUP_LABEL', 'PG_LABEL'])
+        pgn_data_length_col = self.get_any_header_column(header_row,
+                                                         ['PGN_DATA_LENGTH', 'PG_DATA_LENGTH'])
+        transmission_rate_col = self.get_any_header_column(header_row, 'TRANSMISSION_RATE')
+        spn_position_in_pgn_col = self.get_any_header_column(header_row,
+                                                             ['SPN_POSITION_IN_PGN','SP_POSITION_IN_PG'])
+        spn_name_col = self.get_any_header_column(header_row,
+                                                  ['SPN_NAME', 'SP_LABEL'])
+        offset_col = self.get_any_header_column(header_row, 'OFFSET')
+        data_range_col = self.get_any_header_column(header_row, 'DATA_RANGE')
+        resolution_col = self.get_any_header_column(header_row,
+                                                    ['RESOLUTION', 'SCALING'])
+        spn_length_col = self.get_any_header_column(header_row,
+                                                    ['SPN_LENGTH', 'SP_LENGTH'])
+        units_col = self.get_any_header_column(header_row,
+                                               ['UNITS', 'UNIT'])
+        operational_range_col = self.get_any_header_column(header_row, 'OPERATIONAL_RANGE')
+        spn_description_col = self.get_any_header_column(header_row,
+                                                         ['SPN_DESCRIPTION', 'SP_DESCRIPTION'])
 
         for i in range(header_row_num+1, sheet.nrows):
             row = sheet.row_values(i)
@@ -478,6 +514,16 @@ class J1939daConverter:
 
         return
 
+    def get_any_header_column(self, header_row, header_texts):
+        if not isinstance(header_texts, list):
+            header_texts = [header_texts]
+        for t in header_texts:
+            try:
+                return header_row.index(t)
+            except ValueError:
+                continue
+        return -1
+
     def get_header_row(self, sheet):
         header_row_num = self.lookup_header_row(sheet)
 
@@ -621,8 +667,8 @@ class J1939daConverter:
 
         header_row, header_row_num = self.get_header_row(sheet)
 
-        source_address_id_col = header_row.index('SOURCE_ADDRESS_ID')
-        name_col = header_row.index('NAME')
+        source_address_id_col = self.get_any_header_column(header_row, 'SOURCE_ADDRESS_ID')
+        name_col = self.get_any_header_column(header_row, 'NAME')
 
         for i in range(header_row_num+1, sheet.nrows):
             row = sheet.row_values(i)
@@ -639,7 +685,7 @@ class J1939daConverter:
 
     def convert(self, output_file):
         self.j1939db = OrderedDict()
-        sheet_name = 'SPNs & PGNs'
+        sheet_name = ['SPNs & PGNs', 'SPs & PGs']
         self.process_spns_and_pgns_tab(self.find_first_sheet_by_name(sheet_name))
         sheet_name = 'Global Source Addresses (B2)'
         self.process_any_source_addresses_sheet(self.find_first_sheet_by_name(sheet_name))
@@ -658,11 +704,14 @@ class J1939daConverter:
 
         return
 
-    def find_first_sheet_by_name(self, sheet_name):
-        for book in self.digital_annex_xls_list:
-            if sheet_name in book.sheet_names():
-                sheet = book.sheet_by_name(sheet_name)
-                return sheet
+    def find_first_sheet_by_name(self, sheet_names):
+        if not isinstance(sheet_names, list):
+            sheet_names = [sheet_names]
+        for sheet_name in sheet_names:
+            for book in self.digital_annex_xls_list:
+                if sheet_name in book.sheet_names():
+                    sheet = book.sheet_by_name(sheet_name)
+                    return sheet
         return None
 
 
