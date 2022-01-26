@@ -339,8 +339,9 @@ def get_spn_cut_bytes(spn_start, spn_length, message_data_bitstring, is_complete
     if len(spn_start) > 1:
         lsplit = int(spn_start[1] / 8) * 8 - spn_start[0]
         rsplit = spn_length - lsplit
-        cut_data = bitstring.BitArray(message_data_bitstring[spn_start[0]:spn_start[0] + lsplit]).append(
-            message_data_bitstring[spn_start[1]:spn_start[1] + rsplit])
+        b = bitstring.BitArray(message_data_bitstring[spn_start[0]:spn_start[0] + lsplit])
+        b.append(message_data_bitstring[spn_start[1]:spn_start[1] + rsplit])
+        cut_data = b
     return cut_data
 
 
