@@ -118,7 +118,7 @@ usage: pretty_j1939.py [-h] [--da-json [DA_JSON]] [--candata] [--no-candata] [--
 pretty-printing J1939 candump logs
 
 positional arguments:
-  candump              candump log
+  candump              candump log, use - for stdin
 
 optional arguments:
   -h, --help           show this help message and exit

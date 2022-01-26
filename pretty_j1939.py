@@ -9,7 +9,7 @@ import pretty_j1939.describe
 
 
 parser = argparse.ArgumentParser(description='pretty-printing J1939 candump logs')
-parser.add_argument('candump', help='candump log')
+parser.add_argument('candump', help='candump log, use - for stdin')
 
 parser.add_argument('--da-json', type=str, const=True, default=pretty_j1939.describe.DEFAULT_DA_JSON, nargs='?',
                     help='absolute path to the input JSON DA (default=\"./J1939db.json\")')
@@ -55,6 +55,49 @@ parser.set_defaults(format=False)
 args = parser.parse_args()
 
 
+def process_lines(candump_file):
+    for candump_line in candump_file.readlines():
+        if candump_line == '\n':
+            continue
+
+        try:
+            message = candump_line.split()[2]
+            message_id = bitstring.ConstBitArray(hex=message.split('#')[0])
+            message_data = bitstring.ConstBitArray(hex=message.split('#')[1])
+        except (IndexError, ValueError):
+            print("Warning: error in line '%s'" % candump_line, file=sys.stderr)
+            continue
+
+        desc_line = ''
+
+        description = describe(message_data.bytes, message_id.uint)
+        if args.format:
+            json_description = str(json.dumps(description, indent=4))
+        else:
+            json_description = str(json.dumps(description, separators=(',', ':')))
+        if len(description) > 0:
+            desc_line = desc_line + json_description
+
+        if args.candata:
+            can_line = candump_line.rstrip() + " ; "
+            if not args.format:
+                desc_line = can_line + desc_line
+            else:
+                formatted_lines = desc_line.splitlines()
+                if len(formatted_lines) == 0:
+                    desc_line = can_line
+                else:
+                    first_line = formatted_lines[0]
+                    desc_line = can_line + first_line
+                    formatted_lines.remove(first_line)
+
+                for line in formatted_lines:
+                    desc_line = desc_line + '\n' + ' ' * len(candump_line) + "; " + line
+
+        if len(desc_line) > 0:
+            print(desc_line)
+
+
 if __name__ == '__main__':
     describe = pretty_j1939.describe.get_describer(
                                 da_json=args.da_json,
@@ -65,45 +108,8 @@ if __name__ == '__main__':
                                 real_time=args.real_time,
                                 include_transport_rawdata=args.candata,
                                 include_na=args.include_na)
-    with open(args.candump, 'r') as f:
-        for candump_line in f.readlines():
-            if candump_line == '\n':
-                continue
-
-            try:
-                timestamp = float(candump_line.split()[0].lstrip('(').rstrip(')'))
-                message = candump_line.split()[2]
-                message_id = bitstring.ConstBitArray(hex=message.split('#')[0])
-                message_data = bitstring.ConstBitArray(hex=message.split('#')[1])
-            except (IndexError, ValueError):
-                print("Warning: error in line '%s'" % candump_line, file=sys.stderr)
-                continue
-
-            desc_line = ''
-
-            description = describe(message_data.bytes, message_id.uint)
-            if args.format:
-                json_description = str(json.dumps(description, indent=4))
-            else:
-                json_description = str(json.dumps(description, separators=(',', ':')))
-            if len(description) > 0:
-                desc_line = desc_line + json_description
-
-            if args.candata:
-                can_line = candump_line.rstrip() + " ; "
-                if not args.format:
-                    desc_line = can_line + desc_line
-                else:
-                    formatted_lines = desc_line.splitlines()
-                    if len(formatted_lines) == 0:
-                        desc_line = can_line
-                    else:
-                        first_line = formatted_lines[0]
-                        desc_line = can_line + first_line
-                        formatted_lines.remove(first_line)
-
-                    for line in formatted_lines:
-                        desc_line = desc_line + '\n' + ' '*len(candump_line) + "; " + line
-
-            if len(desc_line) > 0:
-                print(desc_line)
+    if args.candump == '-':
+        f = sys.stdin
+    else:
+        f = open(args.candump, 'r')
+    process_lines(f)
