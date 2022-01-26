@@ -118,7 +118,7 @@ usage: pretty_j1939.py [-h] [--da-json [DA_JSON]] [--candata] [--no-candata] [--
 pretty-printing J1939 candump logs
 
 positional arguments:
-  candump              candump log
+  candump              candump log, use - for stdin
 
 optional arguments:
   -h, --help           show this help message and exit
@@ -155,6 +155,16 @@ unless `real-time=True` is specified as an argument to `get_describer()`
 ```bash
 pip3 install pretty_j1939
 ```
+
+## Testing
+
+There is a very basic testing script `testme.sh` which will attempt to `create_j1939db-json.py` each `tmp/*.xls` and
+then try some `pretty_j1939.py` runs with each of the resulting DA json files over all `tmp/*.log`. This is
+meant as a sanity test only. To test changes in `create_j1939db-json.py` the contents of the resulting DA json file must
+be compared to previous versions and analyzed manually; to test changes in `describe.py` or `pretty_j1939.py` the output
+needs to be similarly analyzed manually.
+
+There are unfortunately no `*.xls`, `*.json`, nor `*.log` distributed with this repo, you will need to bring your own.
 
 ## Notes on Digital Annex Sources
 
