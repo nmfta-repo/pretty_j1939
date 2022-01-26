@@ -90,15 +90,30 @@ class J1939daConverter:
             return None
 
     @staticmethod
-    def just_numerals(contents):
+    def just_numeric_expr(contents):
         contents = re.sub(r'[^0-9\.\-/]', '', contents)  # remove all but number and '.'
-        contents = re.sub(r'/$', '', contents)  # remove trailing '/' that are sometimes left
+        contents = re.sub(r'[/-]+[ ]*$', '', contents)  # remove trailing '/' or '-' that are sometimes left
         return contents
+
+    @staticmethod
+    def get_spn_units(contents, raw_spn_resolution):
+        norm_contents = unidecode.unidecode(contents).lower().strip()
+        raw_spn_resolution = unidecode.unidecode(raw_spn_resolution).lower().strip()
+        if norm_contents == '':
+            if 'states' in raw_spn_resolution:
+                norm_contents = 'bit'
+            elif 'bit-mapped' in raw_spn_resolution:
+                norm_contents = 'bit-mapped'
+            elif 'binary' in raw_spn_resolution:
+                norm_contents = 'binary'
+            elif 'ascii' in raw_spn_resolution:
+                norm_contents = 'ascii'
+        return norm_contents
 
     @staticmethod
     # returns a float in X per bit or int(0)
     def get_spn_resolution(contents):
-        norm_contents = contents.lower()
+        norm_contents = unidecode.unidecode(contents).lower()
         if '0 to 255 per byte' in norm_contents or \
            ' states' in norm_contents or \
            norm_contents == 'data specific':
@@ -112,15 +127,13 @@ class J1939daConverter:
              contents.strip() == '':
             return int(0)
         elif 'per bit' in norm_contents or '/bit' in norm_contents:
-            first = contents.split(' ')[0]
-            first = first.replace('/bit', '')
-            first = J1939daConverter.just_numerals(first)
-            return asteval.Interpreter()(first)
+            expr = J1939daConverter.just_numeric_expr(norm_contents)
+            return J1939daConverter.asteval_eval(expr)
         elif 'bit' in norm_contents and '/' in norm_contents:
             left, right = contents.split('/')
-            left = J1939daConverter.just_numerals(left.split(' ')[0])
-            right = J1939daConverter.just_numerals(right.split(' ')[0])
-            return asteval.Interpreter()('%s/%s' % (left, right))
+            left = J1939daConverter.just_numeric_expr(left)
+            right = J1939daConverter.just_numeric_expr(right)
+            return J1939daConverter.asteval_eval('(%s)/(%s)' % (left, right))
         elif 'microsiemens/mm' in norm_contents or \
              'usiemens/mm' in norm_contents or \
              'kw/s' in norm_contents:  # special handling for this weirdness
@@ -128,15 +141,22 @@ class J1939daConverter:
         raise ValueError('unknown spn resolution "%s"' % contents)
 
     @staticmethod
+    def asteval_eval(expr):
+        interpreter = asteval.Interpreter()
+        ret = interpreter(expr)
+        if len(interpreter.error)>0:
+            raise interpreter.error[0]
+        return ret
+
+    @staticmethod
     # returns a float in 'units' of the SPN or int(0)
     def get_spn_offset(contents):
-        norm_contents = contents.lower()
+        norm_contents = unidecode.unidecode(contents).lower()
         if 'manufacturer defined' in norm_contents or 'not defined' in norm_contents or contents.strip() == '':
             return int(0)
         else:
-            first = contents.split(' ')[0]
-            first = J1939daConverter.just_numerals(first)
-            return asteval.Interpreter()(first)
+            first = J1939daConverter.just_numeric_expr(contents)
+            return J1939daConverter.asteval_eval(first)
 
     @staticmethod
     # returns a pair of floats (low, high) in 'units' of the SPN or (-1, -1) for undefined operational ranges
@@ -155,15 +175,17 @@ class J1939daConverter:
             return -1, -1
         elif ' to ' in norm_contents:
             left, right = norm_contents.split(' to ')[0:2]
-            left = J1939daConverter.just_numerals(left.split(' ')[0])
-            right = J1939daConverter.just_numerals(right.split(' ')[0])
+            left = J1939daConverter.just_numeric_expr(left)
+            right = J1939daConverter.just_numeric_expr(right)
 
             range_units = norm_contents.split(' ')
             range_units = range_units[len(range_units) - 1]
+            lo = float(J1939daConverter.asteval_eval(left))
+            hi = float(J1939daConverter.asteval_eval(right))
             if range_units == 'km' and units == 'm':
-                return float(left)*1000, float(right)*1000
+                return lo * 1000, hi * 1000
             else:
-                return float(left), float(right)
+                return lo, hi
         raise ValueError('unknown operational range from "%s","%s"' % (contents, units))
 
     @staticmethod
@@ -197,7 +219,7 @@ class J1939daConverter:
         if any(re.match(r'^[a-z]\+[0-9]', first) for first in firsts):
             return [-1]
 
-        firsts = [J1939daConverter.just_numerals(first) for first in firsts]
+        firsts = [J1939daConverter.just_numeric_expr(first) for first in firsts]
         if any(first.strip() == '' for first in firsts):
             return [-1]
 
@@ -415,21 +437,22 @@ class J1939daConverter:
                 else:
                     spn_delimiter = None
 
-                spn_units = unidecode.unidecode(row[units_col])
+                spn_resolution = self.get_spn_resolution(row[resolution_col])
+                spn_units = self.get_spn_units(row[units_col], row[resolution_col])
                 data_range = unidecode.unidecode(row[data_range_col])
                 low, high = self.get_operational_hilo(data_range, spn_units, spn_length)
 
                 spn_name = unidecode.unidecode(row[spn_name_col])
                 operational_range = unidecode.unidecode(row[operational_range_col])
-                spn_resoluion = unidecode.unidecode(row[resolution_col])
+                spn_offset = self.get_spn_offset(row[offset_col])
 
                 spn_object.update({'DataRange':        data_range})
                 spn_object.update({'Name':             spn_name})
-                spn_object.update({'Offset':           self.get_spn_offset(row[offset_col])})
+                spn_object.update({'Offset':           spn_offset})
                 spn_object.update({'OperationalHigh':  high})
                 spn_object.update({'OperationalLow':   low})
                 spn_object.update({'OperationalRange': operational_range})
-                spn_object.update({'Resolution':       self.get_spn_resolution(spn_resoluion)})
+                spn_object.update({'Resolution':       spn_resolution})
                 spn_object.update({'SPNLength':        spn_length})
                 if spn_delimiter is not None:
                     spn_object.update({'Delimiter':    '0x%s' % spn_delimiter.hex()})
