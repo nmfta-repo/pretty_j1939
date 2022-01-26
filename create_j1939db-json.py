@@ -697,13 +697,21 @@ class J1939daConverter:
             row = sheet.row_values(i)
 
             name = row[name_col]
-            if name.startswith('thru'):
-                continue
-
-            val = str(int(row[source_address_id_col]))
-            name = name.strip()
-
-            j1939_sa_tabledb.update({val: name})
+            if name.startswith('thru') or name.startswith('through'):
+                start_range = int(row[source_address_id_col])
+                range_clues = name.replace('thru', '').replace('through', '')
+                range_clues = range_clues.strip()
+                end_range = int(range_clues.split(' ')[0])
+                description = ''.join(name.split(str(end_range))[1:]).strip()
+                description = description + ' ' + row[name_col + 1]
+                description = re.sub(r'^are ', '', description)
+                description = description.strip()
+                for val in range(start_range, end_range + 1):
+                    j1939_sa_tabledb.update({str(val): description})
+            else:
+                val = str(int(row[source_address_id_col]))
+                name = name.strip()
+                j1939_sa_tabledb.update({val: name})
         return
 
     def convert(self, output_file):
