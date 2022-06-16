@@ -392,7 +392,7 @@ class J1939daConverter:
         for i in range(header_row_num+1, sheet.nrows):
             row = sheet.row_values(i)
             pgn = row[pgn_col]
-            if pgn == '':
+            if pgn == '' or pgn == 'N/A':
                 continue
 
             pgn_label = str(int(pgn))
@@ -420,7 +420,7 @@ class J1939daConverter:
             if pretty_j1939.describe.is_transport_pgn(int(pgn)):  # skip all SPNs for transport PGNs
                 continue
 
-            if not spn == '':
+            if not spn == '' and not spn == 'N/A':
                 if spn_factcheck_map.get(spn, None) is None:
                     spn_factcheck_map.update({spn: [pgn, ]})
                 else:
