@@ -12,7 +12,7 @@ from collections import OrderedDict
 PGN_LABEL = 'PGN'
 
 NA_NAN = float('nan')
-EMPTY_BITS = bitstring.ConstBitArray(bytes=b'')
+EMPTY_BITS = bitstring.Bits(bytes=b'')
 
 DA_MASK = 0x0000FF00
 SA_MASK = 0x000000FF
