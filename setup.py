@@ -18,7 +18,7 @@ setuptools.setup(
         'defusedxml',
         'unidecode',
         'xlrd',
-        'bitstring',
+        'bitstring<4.0',
     ],
     scripts=[
         'create_j1939db-json.py',
