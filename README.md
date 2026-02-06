@@ -94,17 +94,10 @@ $ pretty_j1939 example.candump.txt --format | jq ". | select(.SA | contains(\"Br
 
 First, obtain a copy of the digital annex, see https://www.sae.org/standards/content/j1939da_201907/ for details.
 
-<<<<<<< HEAD
 Then, use the `create_j1939db-json` script to convert that Digital Annex into a JSON file. Both `.xls` and `.xlsx` files are supported:
 
 ```bash
 create_j1939db-json -f tmp/J1939DA_DEC2020.xlsx -w tmp/J1939DA_DEC2020.json
-=======
-Then, use the `create_j1939db-json` script to convert that Digital Annex into a JSON file e.g.
-
-```bash
-create_j1939db-json -f tmp/J1939DA_201611.xls -w tmp/J1939DA_201611.json
->>>>>>> 38eb656... Refactor: Move scripts to package and add entry points (Fixes #35)
 ```
 
 Place the resulting JSON file at `J1939db.json` in your working directory (or specify it with `--da-json`) and use the pretty-printing script:
@@ -201,6 +194,11 @@ DA started migrating 'technical' SPNs (e.g. DMs) to other documents and out of t
 as input (with multiple `-f` arguments); however, the isobus.net definitions omit almost all of the commercial vehicle
 SPNs and PGNs so the resulting `J1939db.json` file may not be of great use in examining candump captures from commercial
 vehicles.
+
+* **Request Decoding**: PGN 59904 (Request) is hardcoded for reliable decoding even with incomplete databases.
+
+* **PDU Format**: The tool correctly handles PDU1 (destination-specific) and PDU2 (broadcast) formats, extracting the full 18-bit PGN.
+* **Variable Length**: Improved support for variable-length SPNs and multi-SPN PGNs.
 
 ## Future Work
 

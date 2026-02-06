@@ -6,6 +6,8 @@
 DA_MASK = 0x0000FF00
 SA_MASK = 0x000000FF
 PF_MASK = 0x00FF0000
+DP_MASK = 0x01000000
+EDP_MASK = 0x02000000
 TM_MASK = 0x00EB0000
 CM_MASK = 0x00EC0000
 ACK_MASK = 0x0E80000
@@ -13,14 +15,17 @@ ACK_MASK = 0x0E80000
 
 def parse_j1939_id(can_id):
     sa = SA_MASK & can_id
-    pf = (PF_MASK & can_id) >> 16
-    da = (DA_MASK & can_id) >> 8
+    pf = (can_id >> 16) & 0xFF
+    ps = (can_id >> 8) & 0xFF
+    dp = (can_id >> 24) & 1
+    edp = (can_id >> 25) & 1
 
-    if pf >= 240:  # PDU2 format
-        pgn = pf * 256 + da
+    if pf < 240:  # PDU1 format
+        pgn = (edp << 17) | (dp << 16) | (pf << 8)
+        da = ps
+    else:  # PDU2 format
+        pgn = (edp << 17) | (dp << 16) | (pf << 8) | ps
         da = 0xFF
-    else:
-        pgn = pf * 256
     return pgn, da, sa
 
 
