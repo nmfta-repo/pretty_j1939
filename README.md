@@ -10,7 +10,7 @@ This package can:
 *Formatted* content (one per line) next to candump data:
 
 ```bash
-$ pretty_j1939.py --candata --format example.candump.txt | head
+$ pretty_j1939 --candata --format example.candump.txt | head
 (1543509533.000838) can0 10FDA300#FFFF07FFFFFFFFFF ; {
                                                    ;     "DA": "All(255)",
                                                    ;     "PGN": "EEC6(64931)",
@@ -26,7 +26,7 @@ $ pretty_j1939.py --candata --format example.candump.txt | head
 Single-line contents next to candump data:
 
 ```bash
-$ pretty_j1939.py --candata example.candump.txt | head
+$ pretty_j1939 --candata example.candump.txt | head
 (1543509533.000838) can0 10FDA300#FFFF07FFFFFFFFFF ; {"SA":"Engine #1(  0)","DA":"All(255)","PGN":"EEC6(64931)","Engine Variable Geometry Turbocharger Actuator #1":"2.8000000000000003 [%]"}
 (1543509533.000915) can0 18FEE000#FFFFFFFFB05C6800 ; {"SA":"Engine #1(  0)","DA":"All(255)","PGN":"VD(65248)","Total Vehicle Distance":"854934.0 [m]"}
 (1543509533.000991) can0 08FE6E0B#0000000000000000 ; {"SA":"Brakes - System Controller( 11)","DA":"All(255)","PGN":"HRW(65134)","Front Axle, Left Wheel Speed":"0.0 [kph]","Front axle, right wheel speed":"0.0 [kph]","Rear axle, left wheel speed":"0.0 [kph]","Rear axle, right wheel speed":"0.0 [kph]"}
@@ -42,7 +42,7 @@ $ pretty_j1939.py --candata example.candump.txt | head
 *Formatted* contents of complete frames only.
 
 ```bash
-$ pretty_j1939.py --format --no-link example.candump.txt | head
+$ pretty_j1939 --format --no-link example.candump.txt | head
 {
     "PGN": "AT1HI1(64920)",
     "Aftertreatment 1 Total Fuel Used": "227.5 [liters]",
@@ -59,7 +59,7 @@ The JSON output can be used as an input to [`jq`](https://stedolan.github.io/jq/
 from the "Brakes":
 
 ```sh
-$ pretty_j1939.py example.candump.txt --format | jq ". | select(.SA | contains(\"Brakes\"))"
+$ pretty_j1939 example.candump.txt --format | jq ". | select(.SA | contains(\"Brakes\"))"
 {
   "PGN": "TSC1(0)",
   "DA": "Retarder - Engine( 15)",
@@ -94,16 +94,23 @@ $ pretty_j1939.py example.candump.txt --format | jq ". | select(.SA | contains(\
 
 First, obtain a copy of the digital annex, see https://www.sae.org/standards/content/j1939da_201907/ for details.
 
+<<<<<<< HEAD
 Then, use the `create_j1939db-json` script to convert that Digital Annex into a JSON file. Both `.xls` and `.xlsx` files are supported:
 
 ```bash
 create_j1939db-json -f tmp/J1939DA_DEC2020.xlsx -w tmp/J1939DA_DEC2020.json
+=======
+Then, use the `create_j1939db-json` script to convert that Digital Annex into a JSON file e.g.
+
+```bash
+create_j1939db-json -f tmp/J1939DA_201611.xls -w tmp/J1939DA_201611.json
+>>>>>>> 38eb656... Refactor: Move scripts to package and add entry points (Fixes #35)
 ```
 
 Place the resulting JSON file at `J1939db.json` in your working directory (or specify it with `--da-json`) and use the pretty-printing script:
 
 ```bash
-pretty_j1939.py example.candump.txt
+pretty_j1939 example.candump.txt
 ```
 
 The script supports multiple log formats, including standard `candump` and `python-can` logger output. It also accepts stdin using `-`:
@@ -116,7 +123,7 @@ The `pretty_j1939` script (and the `describer` in `pretty_j1939/describe.py` tha
 verbosity available when describing J1939 traffic in candump logs:
 
 ```bash
-usage: pretty_j1939.py [-h] [--da-json [DA_JSON]] [--candata] [--no-candata] [--pgn] [--no-pgn] [--spn] [--no-spn] [--transport] [--no-transport]
+usage: pretty_j1939 [-h] [--da-json [DA_JSON]] [--candata] [--no-candata] [--pgn] [--no-pgn] [--spn] [--no-spn] [--transport] [--no-transport]
                        [--link] [--no-link] [--include-na] [--no-include-na] [--real-time] [--no-real-time] [--format] [--no-format]
                        candump
 
@@ -146,11 +153,21 @@ optional arguments:
   --no-format          (default)
 ```
 
-To use as a library one can import the pretty_j1939 modules class as `import pretty_j1939` and instantiate a `describer`
-with `describe = pretty_j1939.describe.get_describer()`. That `get_describer()` function has defaults that match the
-above command-line utility and accepts similar flags for customization. Then frames can be described by calling
-`describe(message_data.bytes, message_id.uint)` where `message_data` and `message_id` are both of type `bitstring.Bits`
-created from the hex id and data strings (lsb on left).
+To use as a library:
+
+```python
+import pretty_j1939.describe
+import bitstring
+
+# Initialize the describer
+describe = pretty_j1939.describe.get_describer(da_json="J1939db.json")
+
+# Describe a frame
+message_id = bitstring.Bits(hex="0CF00400")
+message_data = bitstring.Bits(hex="207D87481400F087")
+description = describe(message_data.bytes, message_id.uint)
+print(description)
+```
 
 Note that the interpretation is done per message. In case of multipacket messages, transport messages are buffered
 unless `real-time=True` is specified as an argument to `get_describer()`
@@ -163,24 +180,24 @@ pip3 install pretty_j1939
 
 ## Testing
 
-There is a very basic testing script `testme.sh` which will attempt to `create_j1939db-json.py` each `tmp/*.xls` and
-then try some `pretty_j1939.py` runs with each of the resulting DA json files over all `tmp/*.log`. This is
-meant as a sanity test only. To test changes in `create_j1939db-json.py` the contents of the resulting DA json file must
-be compared to previous versions and analyzed manually; to test changes in `describe.py` or `pretty_j1939.py` the output
+There is a very basic testing script `testme.sh` which will attempt to `create_j1939db-json` each `tmp/*.xls` and
+then try some `pretty_j1939` runs with each of the resulting DA json files over all `tmp/*.log`. This is
+meant as a sanity test only. To test changes in `create_j1939db-json` the contents of the resulting DA json file must
+be compared to previous versions and analyzed manually; to test changes in `describe.py` or `pretty_j1939` the output
 needs to be similarly analyzed manually.
 
 There are unfortunately no `*.xls`, `*.json`, nor `*.log` distributed with this repo, you will need to bring your own.
 
 ## Notes on Digital Annex Sources
 
-You need to obtain a J1939 Digital Annex from the SAE to create a JSON file that can be used by `pretty_j1939.py` see
+You need to obtain a J1939 Digital Annex from the SAE to create a JSON file that can be used by `pretty_j1939` see
 https://www.sae.org/standards/content/j1939da_201907/ for details.
 
 There are multiple releases; here are a couple notes to consider when purchasing your copy of the Digital Annex.
 * the 201611 Digital Annex has fewer defined SPNs in it than the 201311 Digital Annex; at some point the owners of the
 DA started migrating 'technical' SPNs (e.g. DMs) to other documents and out of the DA
-* the 201311 Digital Annex has a couple bugs in it that the `create_j1939db-json.py` has workarounds for
-* the `create_j1939db-json.py` can also handle the XLS Export from isobus.net by supplying multiple excel sheets
+* the 201311 Digital Annex has a couple bugs in it that the `create_j1939db-json` has workarounds for
+* the `create_j1939db-json` can also handle the XLS Export from isobus.net by supplying multiple excel sheets
 as input (with multiple `-f` arguments); however, the isobus.net definitions omit almost all of the commercial vehicle
 SPNs and PGNs so the resulting `J1939db.json` file may not be of great use in examining candump captures from commercial
 vehicles.
