@@ -101,13 +101,19 @@ Then, use the `create_j1939db-json.py` script to convert that Digital Annex into
 create_j1939db-json.py -f tmp/J1939DA_201611.xls -w tmp/J1939DA_201611.json
 ```
 
-Place the resulting JSON file at `J1939db.json` in your working directory and use the pretty-printing script e.g.
+Place the resulting JSON file at `J1939db.json` in your working directory (or specify it with `--da-json`) and use the pretty-printing script:
 
 ```bash
 pretty_j1939.py example.candump.txt
 ```
 
-The `pretty_j1939.py` script (and the `describer` in `pretty_j1939/describe.py` that it builds-on) has various levels of
+The script supports multiple log formats, including standard `candump` and `python-can` logger output. It also accepts stdin using `-`:
+
+```bash
+tail -f /var/log/can.log | pretty_j1939 -
+```
+
+The `pretty_j1939` script (and the `describer` in `pretty_j1939/describe.py` that it builds-on) has various levels of
 verbosity available when describing J1939 traffic in candump logs:
 
 ```bash
