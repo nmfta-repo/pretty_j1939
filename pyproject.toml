@@ -22,6 +22,7 @@ dependencies = [
     "defusedxml",
     "unidecode",
     "xlrd",
+    "openpyxl",
     "bitstring>=4.0.1"
 ]
 

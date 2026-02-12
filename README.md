@@ -4,8 +4,7 @@ python3 libs and scripts for pretty-printing J1939 candump logs.
 
 This package can:
 1. pretty-print J1939 traffic captured in candump logs AND
-1. convert a J1939 Digital Annex (Excel) file into a JSON structure for use in the above 
-
+1. convert a J1939 Digital Annex (Excel) file into a JSON structure for use in the above. Support for both legacy `.xls` and modern `.xlsx` formats is included.
 ## Some examples of pretty printing
 
 *Formatted* content (one per line) next to candump data:
@@ -95,10 +94,10 @@ $ pretty_j1939.py example.candump.txt --format | jq ". | select(.SA | contains(\
 
 First, obtain a copy of the digital annex, see https://www.sae.org/standards/content/j1939da_201907/ for details.
 
-Then, use the `create_j1939db-json.py` script to convert that Digital Annex into a JSON file e.g.
+Then, use the `create_j1939db-json` script to convert that Digital Annex into a JSON file. Both `.xls` and `.xlsx` files are supported:
 
 ```bash
-create_j1939db-json.py -f tmp/J1939DA_201611.xls -w tmp/J1939DA_201611.json
+create_j1939db-json -f tmp/J1939DA_DEC2020.xlsx -w tmp/J1939DA_DEC2020.json
 ```
 
 Place the resulting JSON file at `J1939db.json` in your working directory (or specify it with `--da-json`) and use the pretty-printing script:
