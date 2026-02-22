@@ -1,0 +1,287 @@
+{
+  "J1939SATabledb": {
+    "0": "Engine #1",
+    "1": "Engine #2",
+    "3": "Transmission #1",
+    "11": "Brake System Controller",
+    "17": "Cruise Control",
+    "42": "Headway Controller",
+    "247": "Auxiliary Power Unit (APU) #1",
+    "254": "Null Address",
+    "255": "Global Address"
+  },
+  "SATableMetadata": {
+    "0": {
+      "Source-Url": "https://github.com/jackm/j1939decode",
+      "License": "MIT"
+    },
+    "1": {
+      "Source-Url": "https://pyramidsolutions.com/wp-content/uploads/2018/07/J1939-Data-Mapping-Explained_Final-1.pdf",
+      "License": "Public Domain (Factual Standard Data)"
+    },
+    "3": {
+      "Source-Url": "https://pyramidsolutions.com/wp-content/uploads/2018/07/J1939-Data-Mapping-Explained_Final-1.pdf",
+      "License": "Public Domain (Factual Standard Data)"
+    },
+    "11": {
+      "Source-Url": "https://static.nhtsa.gov/odi/tsbs/2018/MC-10141869-9999.pdf",
+      "License": "Public Domain"
+    },
+    "17": {
+      "Source-Url": "https://static.nhtsa.gov/odi/tsbs/2018/MC-10141869-9999.pdf",
+      "License": "Public Domain"
+    },
+    "42": {
+      "Source-Url": "https://static.nhtsa.gov/odi/tsbs/2018/MC-10141869-9999.pdf",
+      "License": "Public Domain"
+    },
+    "247": {
+      "Source-Url": "https://github.com/andrewdodd/decoda",
+      "License": "MIT"
+    },
+    "254": {
+      "Source-Url": "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/can/j1939.h",
+      "License": "GPL-2.0 WITH Linux-syscall-note"
+    },
+    "255": {
+      "Source-Url": "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/can/j1939.h",
+      "License": "GPL-2.0 WITH Linux-syscall-note"
+    }
+  },
+  "J1939PGNdb": {
+    "59904": {
+      "Label": "RQST",
+      "Name": "Request",
+      "SPNs": [],
+      "SPNStartBits": [],
+      "Source-Url": "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/can/j1939.h",
+      "License": "GPL-2.0 WITH Linux-syscall-note"
+    },
+    "60928": {
+      "Label": "ACL",
+      "Name": "Address Claimed",
+      "SPNs": [
+        2848
+      ],
+      "SPNStartBits": [
+        0
+      ],
+      "Source-Url": "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/can/j1939.h",
+      "License": "GPL-2.0 WITH Linux-syscall-note"
+    },
+    "61444": {
+      "Label": "EEC1",
+      "Name": "Electronic Engine Controller 1",
+      "SPNs": [
+        190,
+        513
+      ],
+      "SPNStartBits": [
+        24,
+        16
+      ],
+      "Source-Url": "https://github.com/jackm/j1939decode",
+      "License": "MIT"
+    },
+    "65226": {
+      "Label": "DM1",
+      "Name": "Active Diagnostic Trouble Codes",
+      "SPNs": [
+        1214
+      ],
+      "SPNStartBits": [
+        16
+      ],
+      "Source-Url": "https://github.com/andrewdodd/decoda/blob/main/demo.py",
+      "License": "MIT"
+    },
+    "65248": {
+      "Label": "VD",
+      "Name": "Vehicle Distance",
+      "SPNs": [
+        245
+      ],	
+      "SPNStartBits": [
+        32
+      ],
+      "Source-Url": "https://www.auelectronics.com/downloads/usermanual_gw2.pdf",
+      "License": "Public Domain (Factual Standard Data)"
+    },
+    "65262": {
+      "Label": "ET1",
+      "Name": "Engine Temperature 1",
+      "SPNs": [
+        110,
+        174,
+        175
+      ],
+      "SPNStartBits": [
+        0,
+        8,
+        16
+      ],
+      "Source-Url": "https://pyramidsolutions.com/wp-content/uploads/2018/07/J1939-Data-Mapping-Explained_Final-1.pdf",
+      "License": "Public Domain (Factual Standard Data)"
+    },
+    "65263": {
+      "Label": "EFL/P1",
+      "Name": "Engine Fluid Level/Pressure 1",
+      "SPNs": [
+        100
+      ],
+      "SPNStartBits": [
+        24
+      ],
+      "Source-Url": "https://pyramidsolutions.com/wp-content/uploads/2018/07/J1939-Data-Mapping-Explained_Final-1.pdf",
+      "License": "Public Domain (Factual Standard Data)"
+    },
+    "65265": {
+      "Label": "CCVS",
+      "Name": "Cruise Control/Vehicle Speed",
+      "SPNs": [
+        84
+      ],
+      "SPNStartBits": [
+        8
+      ],
+      "Source-Url": "https://www.auelectronics.com/downloads/usermanual_gw2.pdf",
+      "License": "Public Domain (Factual Standard Data)"
+    },
+    "65271": {
+      "Label": "VEP1",
+      "Name": "Vehicle Electrical Power 1",
+      "SPNs": [
+        168
+      ],
+      "SPNStartBits": [
+        16
+      ],
+      "Source-Url": "https://www.auelectronics.com/downloads/usermanual_gw2.pdf",
+      "License": "Public Domain (Factual Standard Data)"
+    }
+  },
+  "J1939SPNdb": {
+    "84": {
+      "Name": "Wheel-Based Vehicle Speed",
+      "Resolution": 0.00390625,
+      "Offset": 0,
+      "Units": "km/h",
+      "Source-Url": "https://www.auelectronics.com/downloads/usermanual_gw2.pdf",
+      "License": "Public Domain (Factual Standard Data)",
+      "SPNLength": 16,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    },
+    "100": {
+      "Name": "Engine Oil Pressure",
+      "Resolution": 4.0,
+      "Offset": 0,
+      "Units": "kPa",
+      "Source-Url": "https://pyramidsolutions.com/wp-content/uploads/2018/07/J1939-Data-Mapping-Explained_Final-1.pdf",
+      "License": "Public Domain (Factual Standard Data)",
+      "SPNLength": 8,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    },
+    "110": {
+      "Name": "Engine Coolant Temperature",
+      "Resolution": 1.0,
+      "Offset": -40,
+      "Units": "deg C",
+      "Source-Url": "https://pyramidsolutions.com/wp-content/uploads/2018/07/J1939-Data-Mapping-Explained_Final-1.pdf",
+      "License": "Public Domain (Factual Standard Data)",
+      "SPNLength": 8,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    },
+    "168": {
+      "Name": "Battery Potential / Power Input 1",
+      "Resolution": 0.05,
+      "Offset": 0,
+      "Units": "V",
+      "Source-Url": "https://www.auelectronics.com/downloads/usermanual_gw2.pdf",
+      "License": "Public Domain (Factual Standard Data)",
+      "SPNLength": 16,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    },
+    "174": {
+      "Name": "Fuel Temperature",
+      "Resolution": 1.0,
+      "Offset": -40,
+      "Units": "deg C",
+      "Source-Url": "https://pyramidsolutions.com/wp-content/uploads/2018/07/J1939-Data-Mapping-Explained_Final-1.pdf",
+      "License": "Public Domain (Factual Standard Data)",
+      "SPNLength": 8,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    },
+    "175": {
+      "Name": "Engine Oil Temperature 1",
+      "Resolution": 0.03125,
+      "Offset": -273,
+      "Units": "deg C",
+      "Source-Url": "https://pyramidsolutions.com/wp-content/uploads/2018/07/J1939-Data-Mapping-Explained_Final-1.pdf",
+      "License": "Public Domain (Factual Standard Data)",
+      "SPNLength": 16,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    },
+    "190": {
+      "Name": "Engine Speed",
+      "Resolution": 0.125,
+      "Offset": 0,
+      "Units": "rpm",
+      "Source-Url": "https://github.com/jackm/j1939decode",
+      "License": "MIT",
+      "SPNLength": 16,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    },
+    "245": {
+      "Name": "Total Vehicle Distance",
+      "Resolution": 0.125,
+      "Offset": 0,
+      "Units": "km",
+      "Source-Url": "https://www.auelectronics.com/downloads/usermanual_gw2.pdf",
+      "License": "Public Domain (Factual Standard Data)",
+      "SPNLength": 32,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    },
+    "513": {
+      "Name": "Actual Engine - Percent Torque",
+      "Resolution": 1.0,
+      "Offset": -125,
+      "Units": "%",
+      "Source-Url": "https://github.com/DanielMartensson/Open-SAE-J1939",
+      "License": "MIT",
+      "SPNLength": 8,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    },
+    "1214": {
+      "Name": "Suspect Parameter Number",
+      "Resolution": 1.0,
+      "Offset": 0,
+      "Units": "ID",
+      "Source-Url": "https://github.com/andrewdodd/decoda/blob/main/demo.py",
+      "License": "MIT",
+      "SPNLength": 19,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    },
+    "2848": {
+      "Name": "Controller Application NAME",
+      "Resolution": 1.0,
+      "Offset": 0,
+      "Units": "bit",
+      "Source-Url": "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/can/j1939.h",
+      "License": "GPL-2.0 WITH Linux-syscall-note",
+      "SPNLength": 64,
+      "OperationalLow": -1e12,
+      "OperationalHigh": 1e12
+    }
+  },
+  "J1939BitDecodings": {}
+}
