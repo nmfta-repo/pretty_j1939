@@ -1,0 +1,10 @@
+{
+    "keys": "#3465a4",
+    "strings": "default",
+    "numbers": "#f57900",
+    "disabled_bytes": "#555753",
+    "zero_bytes": "#babdb6",
+    "ascii_bytes": "#75507b",
+    "normal_bytes": "default",
+    "highlight": "#ffffff"
+}
