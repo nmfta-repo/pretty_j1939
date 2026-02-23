@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2019 National Motor Freight Traffic Association Inc. All Rights Reserved.
+# Copyright (c) 2019-2026 National Motor Freight Traffic Association Inc. All Rights Reserved.
 # See the file "LICENSE" for the full license governing this code.
 #
 
@@ -7,8 +7,11 @@ import json
 import bitstring
 import sys
 import math
+import os
+import importlib.resources
 from collections import OrderedDict
 from .parse import *
+from .isotp import IsoTpTracker
 
 PGN_LABEL = "PGN"
 
@@ -17,11 +20,6 @@ EMPTY_BITS = bitstring.Bits(bytes=b"")
 
 
 class DADescriber:
-    pgn_objects = dict()
-    spn_objects = dict()
-    address_names = dict()
-    bit_encodings = dict()
-
     def __init__(
         self,
         da_json,
@@ -34,24 +32,34 @@ class DADescriber:
         include_na,
         include_raw_data,
     ):
-        with open(da_json, "r") as j1939_file:
-            j1939db = json.load(j1939_file)
-            for pgn_label, pgn_object in j1939db["J1939PGNdb"].items():
-                # TODO check for all expected fields on each object
-                self.pgn_objects.update({int(pgn_label): pgn_object})
+        self.pgn_objects = {}
+        self.spn_objects = {}
+        self.address_names = {}
+        self.bit_encodings = {}
 
-            for spn_label, spn_object in j1939db["J1939SPNdb"].items():
-                # TODO check for all expected fields on each object
-                self.spn_objects.update({int(spn_label): spn_object})
+        if isinstance(da_json, dict):
+            j1939db = da_json
+        else:
+            with open(da_json, "r") as j1939_file:
+                j1939db = json.load(j1939_file)
 
-            for address, address_name in j1939db["J1939SATabledb"].items():
-                # TODO check for all expected fields on each object
-                self.address_names.update({int(address): address_name})
+        for pgn_label, pgn_object in j1939db.get("J1939PGNdb", {}).items():
+            # TODO check for all expected fields on each object
+            self.pgn_objects.update({int(pgn_label): pgn_object})
 
-            for spn_label, bit_encoding in j1939db["J1939BitDecodings"].items():
-                # TODO check for all expected fields on each object
-                self.bit_encodings.update({int(spn_label): bit_encoding})
-        self.da_json = da_json
+        for spn_label, spn_object in j1939db.get("J1939SPNdb", {}).items():
+            # TODO check for all expected fields on each object
+            self.spn_objects.update({int(spn_label): spn_object})
+
+        for address, address_name in j1939db.get("J1939SATabledb", {}).items():
+            # TODO check for all expected fields on each object
+            self.address_names.update({int(address): address_name})
+
+        for spn_label, bit_encoding in j1939db.get("J1939BitDecodings", {}).items():
+            # TODO check for all expected fields on each object
+            self.bit_encodings.update({int(spn_label): bit_encoding})
+
+        self.da_json = da_json if isinstance(da_json, str) else "in-memory"
         self.describe_pgns = describe_pgns
         self.describe_spns = describe_spns
         self.describe_link_layer = describe_link_layer
@@ -60,10 +68,27 @@ class DADescriber:
         self.include_transport_rawdata = include_transport_rawdata
         self.include_na = include_na
         self.include_raw_data = include_raw_data
+        # performance optimization: cache SPN properties to avoid redundant dictionary lookups and pre-calculate
+        # fixed values like start bits and lengths. This significantly reduces CPU time during the main decoding loop.
+        self._spn_cache = (
+            {}
+        )  # Cache for (name, units, bitencoded, numerical, start, length, spn_obj)
 
     def get_pgn_acronym(self, pgn):
         if pgn == 59904:
             return "Request"
+        if pgn == 60928:
+            return "Address Claimed"
+        if pgn == 65226:
+            return "DM1"
+        if pgn == 61184:
+            return "PropA"
+        if pgn == 126720:
+            return "PropA2"
+        if 65280 <= pgn <= 65535:
+            return "PropB"
+        if 130816 <= pgn <= 131071:
+            return "PropB2"
         pgn_object = self.pgn_objects.get(pgn)
         if pgn_object is None:
             return None
@@ -86,28 +111,70 @@ class DADescriber:
             formatted_address = "({:3d})".format(address)
             address_name = self.address_names.get(address)
             if address_name is None:
-                address_name = "Unknown"
+                address_name = "???"
         return formatted_address, address_name
 
+    def resolve_pgn(self, query):
+        """Find PGNs matching query string (case-insensitive substring match)."""
+        query = query.lower()
+        results = set()
+
+        # 1. Check hardcoded acronyms
+        hardcoded_pgns = [59904, 60928, 65226, 61184, 126720]
+        for p in hardcoded_pgns:
+            acr = self.get_pgn_acronym(p)
+            if acr and query in acr.lower():
+                results.add(p)
+
+        # 2. Check database PGNs
+        for pgn, obj in self.pgn_objects.items():
+            label = obj.get("Label", "").lower()
+            name = obj.get("Name", "").lower()
+            if query in label or query in name:
+                results.add(pgn)
+
+        return sorted(list(results))
+
+    def resolve_address(self, query):
+        """Find addresses matching query string (case-insensitive substring match)."""
+        query = query.lower()
+        results = set()
+
+        # Include hardcoded "All"
+        if query in "all" or query in "global":
+            results.add(255)
+
+        for addr, name in self.address_names.items():
+            if query in name.lower():
+                results.add(addr)
+
+        return sorted(list(results))
+
     def describe_message_id(self, message_id):
-        description = {}
+        description = OrderedDict()
 
         pgn, da, sa = parse_j1939_id(message_id)
+        # Priority is bits 26-28 of the 29-bit ID
+        priority = (message_id >> 26) & 0x7
         da_formatted_address, da_address_name = self.get_formatted_address_and_name(da)
         sa_formatted_address, sa_address_name = self.get_formatted_address_and_name(sa)
 
+        if priority != 6:  # 6 is 0x18 shifted
+            description["Priority"] = str(priority)
         description["PGN"] = self.get_pgn_description(pgn)
-        description["DA"] = "%s%s" % (da_address_name, da_formatted_address)
         description["SA"] = "%s%s" % (sa_address_name, sa_formatted_address)
+        description["DA"] = "%s%s" % (da_address_name, da_formatted_address)
+
+        description["_pgn"] = pgn
+        description["_sa"] = sa
+        description["_da"] = da
+
         return description
 
     def get_pgn_description(self, pgn):
         pgn_acronym = self.get_pgn_acronym(pgn)
         if pgn_acronym is None:
-            # PGN is EDP:1 DP:1 PF:8 PS:8 (18 bits total)
-            pf = (pgn >> 8) & 0xFF
-            pdu_format = "PDU1" if pf < 240 else "PDU2"
-            return "Unknown(PGN=%d/0x%05X, %s)" % (pgn, pgn, pdu_format)
+            return "???(%d/0x%05X)" % (pgn, pgn)
         else:
             return "%s(%s)" % (pgn_acronym, pgn)
 
@@ -147,12 +214,13 @@ class DADescriber:
         return spn_start
 
     def get_spn_bytes(self, message_data_bitstring, spn, pgn, is_complete_message):
-        spn_object = self.spn_objects.get(spn, {})
-        spn_length = spn_object["SPNLength"]
-        spn_start = self.lookup_spn_startbit(spn_object, spn, pgn)
+        # Use cached properties
+        spn_name, spn_units, is_num, is_bit, spn_start, spn_length, spn_obj = (
+            self._spn_cache[spn]
+        )
 
         if type(spn_length) is str and spn_length.startswith("Variable"):
-            delimiter = spn_object.get("Delimiter")
+            delimiter = spn_obj.get("Delimiter")
             pgn_object = self.pgn_objects.get(pgn, {})
             spn_list = pgn_object["SPNs"]
             if delimiter is None:
@@ -224,16 +292,53 @@ class DADescriber:
     def get_spn_value(
         self, message_data_bitstring, spn, pgn, is_complete_message, validate=True
     ):
-        spn_object = self.spn_objects.get(spn, {})
-        units = spn_object["Units"]
+        # Use cached properties
+        spn_name, spn_units, is_num, is_bit, spn_start, spn_length, spn_obj = (
+            self._spn_cache[spn]
+        )
 
-        offset = spn_object["Offset"]
-        scale = spn_object["Resolution"]
+        offset = spn_obj["Offset"]
+        scale = spn_obj["Resolution"]
         if scale <= 0:
             scale = 1
 
-        cut_data = bitstring.BitArray(
-            self.get_spn_bytes(message_data_bitstring, spn, pgn, is_complete_message)
+        # performance optimization: fast path for byte-aligned SPNs using direct byte access and int.from_bytes.
+        # This bypasses the overhead of the bitstring library for the majority of standard J1939 data fields.
+        if len(spn_start) == 1 and spn_start[0] % 8 == 0 and spn_length % 8 == 0:
+            start_byte = spn_start[0] // 8
+            byte_len = spn_length // 8
+            data_bytes = message_data_bitstring.bytes
+            if start_byte + byte_len <= len(data_bytes):
+                cut_bytes = data_bytes[start_byte : start_byte + byte_len]
+                if all(b == 0xFF for b in cut_bytes):
+                    return NA_NAN
+
+                if byte_len == 1:
+                    value = cut_bytes[0]
+                elif byte_len == 2:
+                    value = cut_bytes[0] | (cut_bytes[1] << 8)
+                elif byte_len == 4:
+                    value = (
+                        cut_bytes[0]
+                        | (cut_bytes[1] << 8)
+                        | (cut_bytes[2] << 16)
+                        | (cut_bytes[3] << 24)
+                    )
+                else:
+                    value = int.from_bytes(cut_bytes, byteorder="little")
+
+                if not is_bit:
+                    value = value * scale + offset
+                    if validate:
+                        if (
+                            value < spn_obj["OperationalLow"]
+                            or value > spn_obj["OperationalHigh"]
+                        ):
+                            raise ValueError
+                return value
+
+        cut_data = self.get_spn_bytes(
+            message_data_bitstring, spn, pgn, is_complete_message
         )
         if (not is_complete_message) and cut_data.length == 0:  # incomplete SPN
             return None
@@ -241,15 +346,17 @@ class DADescriber:
         if cut_data.all(True):  # value unavailable in message_data
             return NA_NAN
 
-        cut_data.byteswap()
-        if is_spn_bitencoded(units):
-            value = cut_data.uint
+        if cut_data.length % 8 == 0 and cut_data.length > 8:
+            value = cut_data.uintle
         else:
-            value = cut_data.uint * scale + offset
+            value = cut_data.uint
+
+        if not is_bit:
+            value = value * scale + offset
 
             if validate:
-                operational_min = spn_object["OperationalLow"]
-                operational_max = spn_object["OperationalHigh"]
+                operational_min = spn_obj["OperationalLow"]
+                operational_max = spn_obj["OperationalHigh"]
                 if value < operational_min or value > operational_max:
                     raise ValueError
 
@@ -275,17 +382,112 @@ class DADescriber:
                 )
                 requested_pgn_desc = self.get_pgn_description(requested_pgn)
                 description["Requested:"] = requested_pgn_desc
+                description["_requested_pgn"] = requested_pgn
             if not self.include_raw_data:
                 return description
 
+        if pgn == 60928:  # Address Claimed
+            name_decoded = decode_j1939_name(message_data_bitstring.bytes)
+            if name_decoded:
+                description.update(name_decoded)
+
+            if not self.include_raw_data:
+                return description
+
+        if pgn == 65226:  # DM1
+            data = message_data_bitstring.bytes
+            if len(data) >= 2:
+                lamp_status = data[0]
+                description["Malfunction Indicator Lamp Status"] = [
+                    "Off",
+                    "On",
+                    "Error",
+                    "Not Available",
+                ][(lamp_status >> 6) & 0x03]
+                description["Red Stop Lamp Status"] = [
+                    "Off",
+                    "On",
+                    "Error",
+                    "Not Available",
+                ][(lamp_status >> 4) & 0x03]
+                description["Amber Warning Lamp Status"] = [
+                    "Off",
+                    "On",
+                    "Error",
+                    "Not Available",
+                ][(lamp_status >> 2) & 0x03]
+                description["Protect Lamp Status"] = [
+                    "Off",
+                    "On",
+                    "Error",
+                    "Not Available",
+                ][lamp_status & 0x03]
+
+                # DTCs start at byte 3 (index 2), 4 bytes each
+                for i in range(2, len(data) - 3, 4):
+                    spn_val = (
+                        data[i] | (data[i + 1] << 8) | ((data[i + 2] & 0xE0) << 11)
+                    )
+                    fmi = data[i + 2] & 0x1F
+                    cm = (data[i + 3] >> 7) & 0x01
+                    oc = data[i + 3] & 0x7F
+
+                    if spn_val == 0 and fmi == 0 and oc == 0:
+                        continue  # Skip "No DTCs" filler if present
+
+                    dtc_idx = (i - 2) // 4 + 1
+                    spn_name = self.get_spn_name(spn_val)
+
+                    desc_str = f"SPN {spn_val} ({spn_name}), FMI {fmi}, OC {oc}"
+                    if cm == 1:
+                        desc_str += " (CM=1, J1587)"
+
+                    description[f"DTC {dtc_idx}"] = desc_str
+
+            if not self.include_raw_data:
+                # If we have something, return it now
+                if len(description) > 0:
+                    return description
+
         pgn_object = self.pgn_objects.get(pgn, {})
-        for spn in pgn_object.get("SPNs", []):
+        spn_list = pgn_object.get("SPNs", [])
+        if not spn_list:
+            if (
+                len(description) == 0 and not is_transport_pgn(pgn)
+            ) or self.include_raw_data:
+                description["Bytes"] = message_data_bitstring.hex.upper()
+            return description
+
+        for spn in spn_list:
             if (
                 skip_spns.get(spn, ()) != ()
             ):  # skip any SPNs that have already been processed.
                 continue
-            spn_name = self.get_spn_name(spn)
-            spn_units = self.spn_objects.get(spn)["Units"]
+
+            # Use cache for SPN properties
+            if spn in self._spn_cache:
+                spn_name, spn_units, is_num, is_bit, spn_start, spn_length, spn_obj = (
+                    self._spn_cache[spn]
+                )
+            else:
+                spn_obj = self.spn_objects.get(spn)
+                if not spn_obj:
+                    continue
+                spn_name = spn_obj["Name"]
+                spn_units = spn_obj["Units"]
+                is_num = is_spn_numerical_values(spn_units)
+                is_bit = is_spn_bitencoded(spn_units)
+                spn_start = self.lookup_spn_startbit(spn_obj, spn, pgn)
+                spn_length = spn_obj["SPNLength"]
+                self._spn_cache[spn] = (
+                    spn_name,
+                    spn_units,
+                    is_num,
+                    is_bit,
+                    spn_start,
+                    spn_length,
+                    spn_obj,
+                )
 
             def mark_spn_covered(new_spn, new_spn_name, new_spn_description):
                 skip_spns[new_spn] = (
@@ -298,7 +500,7 @@ class DADescriber:
                 mark_spn_covered(new_spn, new_spn_name, new_spn_description)
 
             try:
-                if is_spn_numerical_values(spn_units):
+                if is_num:
                     spn_value = self.get_spn_value(
                         message_data_bitstring, spn, pgn, is_complete_message
                     )
@@ -311,7 +513,7 @@ class DADescriber:
                             add_spn_description(spn, spn_name, "N/A")
                         else:
                             mark_spn_covered(spn, spn_name, "N/A")
-                    elif is_spn_bitencoded(spn_units):
+                    elif is_bit:
                         try:
                             enum_descriptions = self.bit_encodings.get(spn)
                             if enum_descriptions is None:
@@ -418,16 +620,53 @@ def get_spn_cut_bytes(
     return cut_data
 
 
-class TransportTracker:
+def decode_j1939_name(payload):
+    if len(payload) != 8:
+        return None
 
-    new_pgn = {}
-    new_data = {}
-    new_count = {}
-    new_length = {}
-    spn_coverage = {}
+    # Convert bytes to a single 64-bit integer (Little Endian)
+    name_value = int.from_bytes(payload, byteorder="little")
+
+    industry_groups = {
+        0: "Global",
+        1: "On-Highway Equipment",
+        2: "Agricultural and Forestry Equipment",
+        3: "Construction Equipment",
+        4: "Marine Equipment",
+        5: "Industrial - Process Control - Stationary (Gen-Sets)",
+    }
+
+    # Simplified Vehicle System mapping for common ones
+    vehicle_systems = {0: "Non-specific System", 1: "Tractor", 2: "Trailer"}
+
+    ig_val = (name_value >> 60) & 0x07
+    vs_val = (name_value >> 49) & 0x7F
+
+    decoded = {
+        "Identity Number": (name_value >> 0) & 0x1FFFFF,
+        "Manufacturer Code": (name_value >> 21) & 0x7FF,
+        "ECU Instance": (name_value >> 32) & 0x07,
+        "Function Instance": (name_value >> 35) & 0x1F,
+        "Function ID": (name_value >> 40) & 0xFF,
+        "Reserved": (name_value >> 48) & 0x01,
+        "Vehicle System": f"{vs_val} ({vehicle_systems.get(vs_val, 'Unknown')})",
+        "Vehicle System Instance": (name_value >> 56) & 0x0F,
+        "Industry Group": f"{ig_val} ({industry_groups.get(ig_val, 'Unknown')})",
+        "Arbitrary Address Capable": (name_value >> 63) & 0x01,
+    }
+
+    return decoded
+
+
+class J1939TransportTracker:
 
     def __init__(self, real_time):
         self.is_real_time = real_time
+        self.new_pgn = {}
+        self.new_data = {}
+        self.new_count = {}
+        self.new_length = {}
+        self.spn_coverage = {}
 
     def process(self, transport_found_processor, message_bytes, message_id):
         _, da, sa = parse_j1939_id(message_id)
@@ -445,11 +684,16 @@ class TransportTracker:
         elif is_data_transfer_message(message_id):
             if (da, sa) in self.new_data.keys():
                 packet_number = message_bytes[0]
+
+                # Bounds check
+                if packet_number > self.new_count[(da, sa)] or packet_number < 1:
+                    return
+
                 for b, i in zip(message_bytes[1:], range(7)):
-                    try:
-                        self.new_data[(da, sa)][7 * (packet_number - 1) + i] = b
-                    except Exception as e:
-                        print(e)
+                    idx = 7 * (packet_number - 1) + i
+                    if idx < len(self.new_data[(da, sa)]):
+                        self.new_data[(da, sa)][idx] = b
+
                 is_last_packet = packet_number == self.new_count[(da, sa)]
 
                 if self.is_real_time:
@@ -463,6 +707,12 @@ class TransportTracker:
                             spn_coverage=self.spn_coverage,
                             is_last_packet=is_last_packet,
                         )
+                    if is_last_packet:
+                        # Clear session
+                        del self.new_data[(da, sa)]
+                        del self.new_pgn[(da, sa)]
+                        del self.new_length[(da, sa)]
+                        del self.new_count[(da, sa)]
                 elif is_last_packet:
                     data_bytes = self.new_data[(da, sa)][0 : self.new_length[(da, sa)]]
                     if None not in data_bytes:
@@ -470,11 +720,15 @@ class TransportTracker:
                         transport_found_processor(
                             data_bytes, sa, self.new_pgn[(da, sa)], is_last_packet=True
                         )
+                    # Clear session
+                    del self.new_data[(da, sa)]
+                    del self.new_pgn[(da, sa)]
+                    del self.new_length[(da, sa)]
+                    del self.new_count[(da, sa)]
 
 
 class J1939Describer:
     da_describer: DADescriber = None
-    transport_tracker: TransportTracker = None
 
     def __init__(
         self,
@@ -485,6 +739,8 @@ class J1939Describer:
         include_transport_rawdata,
         include_na,
         include_raw_data,
+        enable_isotp=True,
+        real_time=False,
     ):
         self.describe_link_layer = describe_link_layer
         self.describe_pgns = describe_pgns
@@ -496,22 +752,55 @@ class J1939Describer:
 
         self.transport_messages = list()
 
+        self.trackers = []
+        self.trackers.append(J1939TransportTracker(real_time=real_time))
+        if enable_isotp:
+            self.trackers.append(IsoTpTracker(real_time=real_time))
+
+        self.summary_data = {}
+
+    def get_summary(self):
+        return self.summary_data
+
     def set_da_describer(self, da_describer):
         self.da_describer = da_describer
 
-    def set_transport_tracker(self, transport_tracker):
-        self.transport_tracker = transport_tracker
+    def __call__(self, message_data, message_id_uint: int):
+        if isinstance(message_data, (bytes, bytearray)):
+            message_data = bitstring.Bits(bytes=message_data)
+        elif not isinstance(message_data, bitstring.Bits):
+            # Fallback for other bitstring types if necessary
+            message_data = bitstring.Bits(message_data)
 
-    def __call__(
-        self, message_data_bytes: bitstring.Bits, message_id_uint: bitstring.Bits
-    ):
         self.transport_messages.clear()
+
+        pgn, da, sa = parse_j1939_id(message_id_uint)
+        summary_key = (sa, da)
+        if summary_key not in self.summary_data:
+            self.summary_data[summary_key] = {"sent": set(), "req": set()}
+
+        if pgn == 59904:  # Request
+            # Request data is 3 bytes (LSB PGN)
+            if len(message_data) >= 24:
+                req_pgn = (
+                    message_data.bytes[0]
+                    | (message_data.bytes[1] << 8)
+                    | (message_data.bytes[2] << 16)
+                )
+                self.summary_data[summary_key]["req"].add(req_pgn)
 
         def on_transport_found(
             data_bytes, found_sa, found_pgn, spn_coverage=None, is_last_packet=False
         ):
             if spn_coverage is None:
                 spn_coverage = {}
+
+            # Update summary for transport
+            t_key = (found_sa, da)
+            if t_key not in self.summary_data:
+                self.summary_data[t_key] = {"sent": set(), "req": set()}
+            self.summary_data[t_key]["sent"].add(found_pgn)
+
             transport_found = dict()
             transport_found[PGN_LABEL] = found_pgn
             transport_found["SA"] = found_sa
@@ -520,11 +809,18 @@ class J1939Describer:
             transport_found["is_last_packet"] = is_last_packet
             self.transport_messages.append(transport_found)
 
-        is_transport_lower_layer_message = is_transport_message(message_id_uint)
-        if is_transport_lower_layer_message and self.describe_transport_layer:
-            self.transport_tracker.process(
-                on_transport_found, message_data_bytes, message_id_uint
-            )
+        is_transport_lower_layer_message = (
+            is_transport_message(message_id_uint)
+            or (message_id_uint & PF_MASK) == DIAG3_MASK
+        )
+
+        if self.describe_transport_layer:
+            for tracker in self.trackers:
+                tracker.process(on_transport_found, message_data.bytes, message_id_uint)
+
+        # Also add the immediate PGN if it's not a transport management PGN
+        if not is_transport_pgn(pgn):
+            self.summary_data[summary_key]["sent"].add(pgn)
 
         description = OrderedDict()
 
@@ -545,7 +841,7 @@ class J1939Describer:
                 pgn, _, _ = parse_j1939_id(message_id_uint)
                 message_description = self.da_describer.describe_message_data(
                     pgn,
-                    bitstring.Bits(bytes=message_data_bytes),
+                    message_data,
                     is_complete_message=True,
                 )
                 description.update(message_description)
@@ -566,23 +862,66 @@ class J1939Describer:
                     description.update({"Transport PGN": transport_pgn_description})
                 else:  # otherwise (and default) describe the transport PGN as _the_ PGN
                     description.update({PGN_LABEL: transport_pgn_description})
+                    description.move_to_end(PGN_LABEL, last=False)
+
+            description["_pgn"] = transport_pgn
 
             is_complete_message = transport_message["is_last_packet"]
+            transport_bits = bitstring.Bits(bytes=transport_message["data"])
             if self.describe_spns:
                 pgn = transport_pgn
                 message_description = self.da_describer.describe_message_data(
                     pgn,
-                    bitstring.Bits(bytes=transport_message["data"]),
+                    transport_bits,
                     is_complete_message=is_complete_message,
                     skip_spns=transport_message["spn_coverage"],
                 )
                 description.update(message_description)
 
             if is_complete_message and self.include_transport_rawdata:
-                transport_data = str(bitstring.Bits(bytes=transport_message["data"]))
-                description.update({"Transport Data": transport_data})
+                description.update({"Bytes": transport_bits.hex.upper()})
 
+        return self.reorder_description(description)
+
+    def reorder_description(self, description):
+        # We want PGN, SA, DA, Priority to be the first four keys if they exist
+        for key in reversed(["PGN", "SA", "DA", "Priority"]):
+            if key in description:
+                description.move_to_end(key, last=False)
         return description
+
+
+def get_default_da_json():
+    filename = "J1939db.json"
+
+    if os.path.exists(filename):
+        return filename
+
+    if sys.platform == "win32":
+        config_dir = os.environ.get("APPDATA")
+    else:
+        config_dir = os.path.expanduser("~/.config")
+
+    if config_dir:
+        config_path = os.path.join(config_dir, "pretty_j1939", filename)
+        if os.path.exists(config_path):
+            return config_path
+
+    try:
+        if hasattr(importlib.resources, "files"):
+            # For Python 3.9+
+            ref = importlib.resources.files("pretty_j1939") / filename
+            if ref.is_file():
+                return str(ref)
+        else:
+            # Fallback for older versions
+            if importlib.resources.is_resource("pretty_j1939", filename):
+                with importlib.resources.path("pretty_j1939", filename) as p:
+                    return str(p)
+    except Exception:
+        pass
+
+    return filename  # Final fallback to just the name
 
 
 DEFAULT_DA_JSON = "J1939db.json"
@@ -597,7 +936,7 @@ DEFAULT_INCLUDE_RAW_DATA = False
 
 
 def get_describer(
-    da_json=DEFAULT_DA_JSON,
+    da_json=None,
     describe_pgns=DEFAULT_PGN,
     describe_spns=DEFAULT_SPN,
     describe_link_layer=DEFAULT_LINK,
@@ -606,7 +945,11 @@ def get_describer(
     include_transport_rawdata=DEFAULT_CANDATA,  # TODO: separate show transport data from candata
     include_na=DEFAULT_INCLUDE_NA,
     include_raw_data=DEFAULT_INCLUDE_RAW_DATA,
+    enable_isotp=True,
 ):
+    if da_json is None or da_json == DEFAULT_DA_JSON:
+        da_json = get_default_da_json()
+
     describer = J1939Describer(
         describe_pgns=describe_pgns,
         describe_spns=describe_spns,
@@ -615,10 +958,9 @@ def get_describer(
         include_transport_rawdata=include_transport_rawdata,
         include_na=include_na,
         include_raw_data=include_raw_data,
+        enable_isotp=enable_isotp,
+        real_time=real_time,
     )
-
-    transport_tracker = TransportTracker(real_time=real_time)
-    describer.set_transport_tracker(transport_tracker)
 
     da_describer = DADescriber(
         da_json=da_json,

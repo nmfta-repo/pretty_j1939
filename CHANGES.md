@@ -1,6 +1,14 @@
 # 0.0.3
 
-* added support for modern Digital Annex (.xlsx) files using `openpyxl`
+* Improved error handling for invalid input
+* Enhanced performance
+* support for DM1, TP, NAME, ISO-TP
+* implemented a public-domain default J1939 database based on community-sourced information.
+* support for --filter-* and --highlight-*
+* support for --theme
+* added direct live CAN capture support via `python-can` (using `-i`, `-c`, `-b`)
+* added colorized JSON output support using `pygments` (via `--color`)
+* fixed live streaming/piping support by enabling line-buffered input and output flushing
 * optimized `.xlsx` processing performance with row caching
 * improved header detection in Digital Annexes (content-aware instead of fixed indices)
 * improved unknown PGN description to include hex value and PDU format (Fixes #20)

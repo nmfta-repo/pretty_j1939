@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2019 National Motor Freight Traffic Association Inc. All Rights Reserved.
+# Copyright (c) 2019-2026 National Motor Freight Traffic Association Inc. All Rights Reserved.
 # See the file "LICENSE" for the full license governing this code.
 #
 
@@ -11,6 +11,8 @@ EDP_MASK = 0x02000000
 TM_MASK = 0x00EB0000
 CM_MASK = 0x00EC0000
 ACK_MASK = 0x0E80000
+DIAG3_MASK = 0x00DA0000
+DIAG3_PGN = 0xDA00
 
 
 def parse_j1939_id(can_id):

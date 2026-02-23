@@ -5,6 +5,8 @@ python3 libs and scripts for pretty-printing J1939 candump logs.
 This package can:
 1. pretty-print J1939 traffic captured in candump logs AND
 1. convert a J1939 Digital Annex (Excel) file into a JSON structure for use in the above. Support for both legacy `.xls` and modern `.xlsx` formats is included.
+
+
 ## Some examples of pretty printing
 
 *Formatted* content (one per line) next to candump data:
@@ -90,6 +92,14 @@ $ pretty_j1939 example.candump.txt --format | jq ". | select(.SA | contains(\"Br
 [...]
 ```
 
+
+## Installing
+
+```bash
+pip install pretty_j1939
+```
+
+
 ## HOWTO
 
 First, obtain a copy of the digital annex, see https://www.sae.org/standards/content/j1939da_201907/ for details.
@@ -100,86 +110,193 @@ Then, use the `create_j1939db-json` script to convert that Digital Annex into a 
 create_j1939db-json -f tmp/J1939DA_DEC2020.xlsx -w tmp/J1939DA_DEC2020.json
 ```
 
-Place the resulting JSON file at `J1939db.json` in your working directory (or specify it with `--da-json`) and use the pretty-printing script:
+### Storing and Using your J1939db.json
+
+The tool looks for `J1939db.json` in the following locations (in order):
+1.  The path provided via `--da-json`
+2.  The current working directory
+3.  The user's configuration directory:
+    *   Windows: `%APPDATA%\pretty_j1939\J1939db.json`
+    *   Linux/macOS: `~/.config/pretty_j1939/J1939db.json`
+4.  Fallback: A default (very limited) J1939db.json bundled with the package. This .json is built from freely available information only.
+
+To use your own database, simply place it in one of the search locations or specify it on the command line:
 
 ```bash
-pretty_j1939 example.candump.txt
+pretty_j1939 example.candump.txt --da-json my_full_db.json
 ```
 
-The script supports multiple log formats, including standard `candump` and `python-can` logger output. It also accepts stdin using `-`:
+### Network Summary
+
+The tool can generate a Mermaid flowchart summary of all captured traffic. This is useful for visualizing the network topology and message flow between Controller Applications.
+
+```bash
+pretty_j1939 example.candump.txt --summary
+```
+
+The output is a JSON object with a `Summary` key containing the Mermaid syntax:
+
+```json
+{
+    "Summary": "graph LR; N0[\"Engine #1(0)\"]; All[\"All(255)\"]; N0 -- EEC1(61444) --> All"
+}
+```
+
+When using `--format`, the summary is printed in a multi-line, human-readable format:
+
+```json
+{
+    "Summary": "graph LR
+                   N0[\"Engine #1(0)\"]
+                   All[\"All(255)\"]
+                   N0 -- EEC1(61444) --> All"
+}
+```
+
+
+### Advanced Filtering
+
+In addition to support for the python-can bitmask filters, you can filter by J1939-specific fields:
+
+- `--filter-pgn`: Filter by PGN (e.g., `61444` or `0xF004`).
+- `--filter-sa`: Filter by Source Address.
+- `--filter-da`: Filter by Destination Address.
+- `--filter-ca`: Filter by Controller Application address (matches either SA or DA).
+
+Example: Show all traffic involving address 11 (Brakes):
+
+```bash
+pretty_j1939 example.candump.txt --filter-ca 11
+```
+
+
+### Highlighting
+
+You can highlight specific messages based on J1939 fields. Highlighting overrides the default theme colors for the entire line with a high-contrast style.
+
+- `--highlight-pgn`: Highlight by PGN.
+- `--highlight-sa`: Highlight by Source Address.
+- `--highlight-da`: Highlight by Destination Address.
+- `--highlight-ca`: Highlight by Controller Application address.
+
+Example: Highlight all engine-related traffic while showing everything:
+
+```bash
+pretty_j1939 example.candump.txt --highlight-ca 0 --color always
+```
+
+Note: Highlighting requires `--color` to be active (`always` or `auto` when outputting to a terminal).
+
+
+### Live Capture
+
+pretty-j1939 supports live CAN capture using `python-can`. You can specify the interface, channel, and bitrate:
+
+```bash
+pretty_j1939 -i cantact -c 0 -b 500000 --candata
+```
+
+Additional driver-specific arguments can be passed using `--key=value` syntax:
+
+```bash
+pretty_j1939 -i vector -c 1 --app-name=MyCanApp
+```
+
+The script also supports multiple log formats when reading from files or pipes, including standard `candump` and `python-can` logger output. It also accepts stdin using `-`:
 
 ```bash
 tail -f /var/log/can.log | pretty_j1939 -
 ```
 
-The `pretty_j1939` script (and the `describer` in `pretty_j1939/describe.py` that it builds-on) has various levels of
-verbosity available when describing J1939 traffic in candump logs:
 
-```bash
-usage: pretty_j1939 [-h] [--da-json [DA_JSON]] [--candata] [--no-candata] [--pgn] [--no-pgn] [--spn] [--no-spn] [--transport] [--no-transport]
-                       [--link] [--no-link] [--include-na] [--no-include-na] [--real-time] [--no-real-time] [--format] [--no-format]
-                       candump
+### CANdump Format
 
-pretty-printing J1939 candump logs
+The `--candata` flag supports two modes:
+- `--candata=raw` (or just `--candata`): Prints the input line exactly as provided.
+- `--candata=candump`: Reformats the input into the standardized `(TIMESTAMP) INTERFACE ID#DATA` format, even when capturing live or reading from different log formats.
 
-positional arguments:
-  candump              candump log, use - for stdin
 
-optional arguments:
-  -h, --help           show this help message and exit
-  --da-json [DA_JSON]  absolute path to the input JSON DA (default="./J1939db.json")
-  --candata            print input can data
-  --no-candata         (default)
-  --pgn                (default) print source/destination/type description
-  --no-pgn
-  --spn                (default) print signals description
-  --no-spn
-  --transport          print details of transport-layer streams found (default)
-  --no-transport
-  --link               print details of link-layer frames found
-  --no-link            (default)
-  --include-na         include not-available (0xff) SPN values
-  --no-include-na      (default)
-  --real-time          emit SPNs as they are seen in transport sessions
-  --no-real-time       (default)
-  --format             format each structure (otherwise single-line)
-  --no-format          (default)
-```
+### Library Usage
 
-To use as a library:
+The `pretty_j1939` library is designed for high-performance decoding and rendering in other Python projects.
+
+
+#### Basic Usage
+
+You can pass the CAN ID as an integer and the message data as either `bytes` or a `bitstring.Bits` object.
 
 ```python
 import pretty_j1939.describe
-import bitstring
+import pretty_j1939.render
 
-# Initialize the describer
-describe = pretty_j1939.describe.get_describer(da_json="J1939db.json")
+# 1. Initialize the describer (supports JSON paths or in-memory dicts)
+describer = pretty_j1939.describe.get_describer(da_json="J1939db.json")
 
-# Describe a frame
-message_id = bitstring.Bits(hex="0CF00400")
-message_data = bitstring.Bits(hex="207D87481400F087")
-description = describe(message_data.bytes, message_id.uint)
-print(description)
+# 2. Initialize the high-performance renderer with an optional theme and describer for label resolution
+theme = pretty_j1939.render.HighPerformanceRenderer.load_theme("darcula")
+renderer = pretty_j1939.render.HighPerformanceRenderer(
+    theme_dict=theme, 
+    color_system="truecolor",
+    da_describer=describer.da_describer
+)
+
+# 3. Describe and render a frame
+can_id = 0x0CF00400
+can_data = b"\x00\x41\xFF\x20\x48\x14\x00\xF0"
+
+description = describer(can_data, can_id)
+output = renderer.render(description, indent=True)
+print(output)
 ```
 
-Note that the interpretation is done per message. In case of multipacket messages, transport messages are buffered
-unless `real-time=True` is specified as an argument to `get_describer()`
 
-## Installing
+#### Transport Reassembly (J1939 TP & ISO-TP)
 
-```bash
-pip3 install pretty_j1939
+The library automatically handles multi-packet reassembly for standard J1939 Transport Protocol (BAM and RTS-CTS). ISO-TP (PGN 0xDA00) reassembly works similarly and is enabled by default.
+
+```python
+# Feed sequential frames of a J1939 BAM session
+# 1. Connection Management (BAM) - PGN 61444 (EEC1), 14 bytes, 2 packets
+describer(b"\x20\x0E\x00\x02\xFF\x04\xF0\x00", 0x18ECFF00)
+# 2. Data Transfer Packet 1
+describer(b"\x01\x01\x02\x03\x04\x05\x06\x07", 0x18EBFF00)
+# 3. Data Transfer Packet 2 (Final)
+res = describer(b"\x02\x08\x09\x0A\x0B\x0C\x0D\x0E", 0x18EBFF00)
+
+# 'res' will contain the decoded description of the reassembled PGN 61444
+print(res["PGN"]) # "EEC1(61444)"
 ```
+
+
+#### Generating a Network Summary
+
+At the end of a session, you can generate a Mermaid flowchart representing the network activity.
+
+```python
+# 4. Generate and print a network summary
+summary_data = describer.get_summary()
+summary_output = renderer.render_summary(summary_data, indent=True)
+print(summary_output)
+```
+
 
 ## Testing
 
-There is a very basic testing script `testme.sh` which will attempt to `create_j1939db-json` each `tmp/*.xls` and
-then try some `pretty_j1939` runs with each of the resulting DA json files over all `tmp/*.log`. This is
-meant as a sanity test only. To test changes in `create_j1939db-json` the contents of the resulting DA json file must
-be compared to previous versions and analyzed manually; to test changes in `describe.py` or `pretty_j1939` the output
-needs to be similarly analyzed manually.
+### Core Unit Tests
 
-There are unfortunately no `*.xls`, `*.json`, nor `*.log` distributed with this repo, you will need to bring your own.
+The package includes an in-tree unit test suite based on `pytest`. These tests verify core reassembly logic, PGN/SPN decoding, and CLI functionality using the bundled default database.
+
+```bash
+python -m pytest
+```
+
+### Integration Tests
+
+The `verify_all.py` script runs the core `pytest` suite and then attempts additional "extensive" tests that require a full database at `tmp\J1939db.json` (although they should do a cursory job with the default database).
+
+```bash
+python verify_all.py
+```
 
 ## Notes on Digital Annex Sources
 
@@ -195,16 +312,10 @@ as input (with multiple `-f` arguments); however, the isobus.net definitions omi
 SPNs and PGNs so the resulting `J1939db.json` file may not be of great use in examining candump captures from commercial
 vehicles.
 
-* **Request Decoding**: PGN 59904 (Request) is hardcoded for reliable decoding even with incomplete databases.
-
-* **PDU Format**: The tool correctly handles PDU1 (destination-specific) and PDU2 (broadcast) formats, extracting the full 18-bit PGN.
-* **Variable Length**: Improved support for variable-length SPNs and multi-SPN PGNs.
 
 ## Future Work
 
-* port this functionality to the [python-j1939](https://github.com/milhead2/python-j1939) and 
+* port this functionality to the [python-j1939](https://github.com/milhead2/python-j1939) and
 [python-can](https://github.com/hardbyte/python-can/) projects
-* default JSON database (of limited content) based on public information
-* support for J1939 aspects not encoded in the Digital Annex (ever, or anymore) e.g. Address Claim, DMs
 * integrate and/or move `create_j1939-db-json.py` to [canmatrix](https://canmatrix.readthedocs.io/en/latest/)
-* colorize the json output (and avoid breaking pipelines)
+
