@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pretty_j1939"
+version = "0.0.4.dev0"
+description = "python libs and scripts for pretty-printing J1939 logs"
+readme = "README.md"
+authors = [
+    {name = "Ben Gardiner", email = "ben.gardiner@nmfta.org"},
+    {name = "Jeremy Daily", email = "jeremy.daily@colostate.edu"},
+    {name = "Subhojeet Mukherjee", email = "subhojeet.mukherjee@colostate.edu"}
+]
+urls = {Homepage = "https://github.com/nmfta-repo/pretty_j1939"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "asteval",
+    "defusedxml",
+    "unidecode",
+    "xlrd",
+    "openpyxl",
+    "rich",
+    "bitstring>=4.0.1",
+    "python-can>=4.0.0"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov"
+]
+
+[project.scripts]
+pretty_j1939 = "pretty_j1939.__main__:main"
+pretty-j1939 = "pretty_j1939.__main__:main"
+create_j1939db-json = "pretty_j1939.create_j1939db_json:main"
+create-j1939db-json = "pretty_j1939.create_j1939db_json:main"
+
+[tool.setuptools]
+packages = ["pretty_j1939"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+pretty_j1939 = ["*.json"]
