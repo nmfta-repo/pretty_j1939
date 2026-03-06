@@ -192,7 +192,10 @@ class DADescriber:
         if scale <= 0:
             scale = 1
 
-        spn_end = spn_start + spn_length - 1
+        if not isinstance(spn_start, list):
+            spn_start = [spn_start]
+
+        spn_end = spn_start[0] + spn_length - 1
 
         return name, offset, scale, spn_end, spn_length, spn_start, units
 
@@ -203,21 +206,49 @@ class DADescriber:
             spn_start is None
         ):  # otherwise, try to use the SPN bit position information at the PGN
             pgn_object = self.pgn_objects.get(pgn, {})
-            spns_in_pgn = pgn_object["SPNs"]
-            startbits_in_pgn = pgn_object["SPNStartBits"]
-            spn_start = startbits_in_pgn[spns_in_pgn.index(spn)]
+            spns_in_pgn = pgn_object.get("SPNs", [])
+            startbits_in_pgn = pgn_object.get("SPNStartBits", [])
+            if spn in spns_in_pgn and len(startbits_in_pgn) > spns_in_pgn.index(spn):
+                spn_start = startbits_in_pgn[spns_in_pgn.index(spn)]
+            else:
+                spn_start = -1  # Unknown start bit
 
-            # finally, support earlier versions of J1939db.json which did not include multi-startbit SPNs
-            if not type(spn_start) is list:
-                spn_start = [spn_start]
+        # finally, support earlier versions of J1939db.json which did not include multi-startbit SPNs
+        if not isinstance(spn_start, list):
+            spn_start = [spn_start]
 
         return spn_start
 
     def get_spn_bytes(self, message_data_bitstring, spn, pgn, is_complete_message):
         # Use cached properties
+        cache_key = (pgn, spn)
+        if cache_key not in self._spn_cache:
+            # Defensive: populate cache if missing
+            spn_obj = self.spn_objects.get(spn)
+            if not spn_obj:
+                return EMPTY_BITS
+            spn_name = spn_obj["Name"]
+            spn_units = spn_obj["Units"]
+            is_num = is_spn_numerical_values(spn_units)
+            is_bit = is_spn_bitencoded(spn_units)
+            spn_start = self.lookup_spn_startbit(spn_obj, spn, pgn)
+            spn_length = spn_obj["SPNLength"]
+            self._spn_cache[cache_key] = (
+                spn_name,
+                spn_units,
+                is_num,
+                is_bit,
+                spn_start,
+                spn_length,
+                spn_obj,
+            )
+
         spn_name, spn_units, is_num, is_bit, spn_start, spn_length, spn_obj = (
-            self._spn_cache[spn]
+            self._spn_cache[cache_key]
         )
+
+        if not isinstance(spn_start, list):
+            spn_start = [spn_start]
 
         if type(spn_length) is str and spn_length.startswith("Variable"):
             delimiter = spn_obj.get("Delimiter")
@@ -266,7 +297,13 @@ class DADescriber:
                     ]
                     return cut_data
                 else:  # variable-len field with unspecified start; requires field counting
-                    startbits_list = pgn_object["SPNStartBits"]
+                    startbits_list = pgn_object.get("SPNStartBits")
+                    if startbits_list is None:
+                        # Old schema: derive start bits from SPN objects
+                        startbits_list = [
+                            self.spn_objects.get(s, {}).get("StartBit", -1)
+                            for s in spn_list
+                        ]
                     num_fixedlen_spn_fields = sum(1 for s in startbits_list if s != -1)
                     variable_spn_ordinal = spn_ordinal - num_fixedlen_spn_fields
                     if num_fixedlen_spn_fields > 0:
@@ -293,10 +330,34 @@ class DADescriber:
         self, message_data_bitstring, spn, pgn, is_complete_message, validate=True
     ):
         # Use cached properties
+        cache_key = (pgn, spn)
+        if cache_key not in self._spn_cache:
+            # Defensive: populate cache if missing
+            spn_obj = self.spn_objects.get(spn)
+            if not spn_obj:
+                return NA_NAN
+            spn_name = spn_obj["Name"]
+            spn_units = spn_obj["Units"]
+            is_num = is_spn_numerical_values(spn_units)
+            is_bit = is_spn_bitencoded(spn_units)
+            spn_start = self.lookup_spn_startbit(spn_obj, spn, pgn)
+            spn_length = spn_obj["SPNLength"]
+            self._spn_cache[cache_key] = (
+                spn_name,
+                spn_units,
+                is_num,
+                is_bit,
+                spn_start,
+                spn_length,
+                spn_obj,
+            )
+
         spn_name, spn_units, is_num, is_bit, spn_start, spn_length, spn_obj = (
-            self._spn_cache[spn]
+            self._spn_cache[cache_key]
         )
 
+        if isinstance(spn_start, int):
+            spn_start = [spn_start]
         offset = spn_obj["Offset"]
         scale = spn_obj["Resolution"]
         if scale <= 0:
@@ -459,15 +520,11 @@ class DADescriber:
             return description
 
         for spn in spn_list:
-            if (
-                skip_spns.get(spn, ()) != ()
-            ):  # skip any SPNs that have already been processed.
-                continue
-
             # Use cache for SPN properties
-            if spn in self._spn_cache:
+            cache_key = (pgn, spn)
+            if cache_key in self._spn_cache:
                 spn_name, spn_units, is_num, is_bit, spn_start, spn_length, spn_obj = (
-                    self._spn_cache[spn]
+                    self._spn_cache[cache_key]
                 )
             else:
                 spn_obj = self.spn_objects.get(spn)
@@ -479,7 +536,7 @@ class DADescriber:
                 is_bit = is_spn_bitencoded(spn_units)
                 spn_start = self.lookup_spn_startbit(spn_obj, spn, pgn)
                 spn_length = spn_obj["SPNLength"]
-                self._spn_cache[spn] = (
+                self._spn_cache[cache_key] = (
                     spn_name,
                     spn_units,
                     is_num,
@@ -488,6 +545,11 @@ class DADescriber:
                     spn_length,
                     spn_obj,
                 )
+
+            if (
+                skip_spns.get(spn, ()) != ()
+            ):  # skip any SPNs that have already been processed.
+                continue
 
             def mark_spn_covered(new_spn, new_spn_name, new_spn_description):
                 skip_spns[new_spn] = (
@@ -603,7 +665,8 @@ class DADescriber:
 def get_spn_cut_bytes(
     spn_start, spn_length, message_data_bitstring, is_complete_message
 ):
-
+    if isinstance(spn_start, int):
+        spn_start = [spn_start]
     spn_end = spn_start[0] + spn_length - 1
     if not is_complete_message and spn_end > message_data_bitstring.length:
         return bitstring.Bits(bytes=b"")
