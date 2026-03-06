@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pretty_j1939"
-version = "0.0.4"
+version = "0.0.5.dev0"
 description = "python libs and scripts for pretty-printing J1939 logs"
 readme = "README.md"
 authors = [
