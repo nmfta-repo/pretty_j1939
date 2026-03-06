@@ -1,3 +1,6 @@
+# 0.0.4
+* restore support for old J1939db.json schema
+
 # 0.0.3
 
 * Improved error handling for invalid input
