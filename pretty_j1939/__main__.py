@@ -778,6 +778,12 @@ def get_parser():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "viewer":
+        from .viewer import main as viewer_main
+        sys.argv.pop(1)
+        viewer_main()
+        return
+
     parser = get_parser()
     args, unknown_args = parser.parse_known_args()
 
