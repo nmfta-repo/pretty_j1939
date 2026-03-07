@@ -39,8 +39,8 @@ class SheetWrapper:
     def _clean_value(self, v):
         if isinstance(v, str):
             # Clean up XML artifacts like _x000d_ (case-insensitive)
-            # We replace them with space then strip to avoid joining words if they were intended as separators
-            v = re.sub(r"_x000[dD]_", " ", v)
+            # Use a more robust regex that catches all xNNNN artifacts commonly found in Excel/XML
+            v = re.sub(r"_x[0-9a-fA-F]{4}_", " ", v)
             v = v.replace("\r", " ")
             v = v.replace("\n", " ")
             # Collapse multiple spaces
@@ -408,7 +408,7 @@ class J1939daConverter:
     # returns the description part (just that part) of an enum line
     def get_enum_line_description(line):
         # Additional cleanup for artifacts that might be in multiline descriptions
-        line = re.sub(r"_x000[dD]_", " ", line)
+        line = re.sub(r"_x[0-9a-fA-F]{4}_", " ", line)
         line = re.sub(r"[ ]+", " ", line)
         line = re.sub(r"[ ]?\-\-[ ]?", " = ", line)
         match = re.match(ENUM_RANGE_LINE_RE, line)

@@ -150,14 +150,14 @@ def main():
         run_command(cmd)
         official_jsons.append(json_file)
 
-    # Phase 1.5: Regression Sweep for _x000d_ artifacts
-    print("\n--- Phase 1.5: Regression Sweep for _x000d_ artifacts ---")
+    # Phase 1.5: Regression Sweep for XML artifacts
+    print("\n--- Phase 1.5: Regression Sweep for XML artifacts ---")
     artifact_found = False
     for json_file in official_jsons:
         with open(json_file, "r", encoding="utf-8") as f:
             content = f.read()
-            # Case-insensitive search for _x000d_
-            matches = re.findall(r"_x000[dD]_", content)
+            # Case-insensitive search for xNNNN artifacts
+            matches = re.findall(r"_x[0-9a-fA-F]{4}_", content)
             if matches:
                 print(
                     f"  [FAIL] Artifacts found in {json_file.name}: {len(matches)} occurrences."
