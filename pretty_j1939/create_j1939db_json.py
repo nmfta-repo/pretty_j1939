@@ -19,9 +19,9 @@ import operator
 import itertools
 from . import describe
 
-ENUM_SINGLE_LINE_RE = r"[ ]*([0-9bxXA-F]+)[ ]*[-=:]?(.*)"
+ENUM_SINGLE_LINE_RE = r"[ ]*([0-9bxXA-F]+)[ ]*[-=:]?[ ]*(.*)"
 ENUM_RANGE_LINE_RE = (
-    r"[ ]*([0-9bxXA-F]+)[ ]*(\-|to|thru)[ ]*([0-9bxXA-F]+)[ ]+[-=:]?(.*)"
+    r"[ ]*([0-9bxXA-F]+)[ ]*(\-|to|thru)[ ]*([0-9bxXA-F]+)[ ]+[-=:]?[ ]*(.*)"
 )
 
 
@@ -39,12 +39,11 @@ class SheetWrapper:
     def _clean_value(self, v):
         if isinstance(v, str):
             # Clean up XML artifacts like _x000d_ (case-insensitive)
-            # We replace them with space then strip to avoid joining words if they were intended as separators
-            v = re.sub(r"_x000[dD]_", " ", v)
-            v = v.replace("\r", " ")
-            v = v.replace("\n", " ")
-            # Collapse multiple spaces
-            v = re.sub(r"[ ]+", " ", v)
+            # Use a more robust regex that catches all xNNNN artifacts commonly found in Excel/XML
+            v = re.sub(r"_x[0-9a-fA-F]{4}_", " ", v)
+            # Collapse multiple spaces, but PRESERVE newlines
+            # We only collapse horizontal whitespace (space and tab)
+            v = re.sub(r"[ \t]+", " ", v)
             return v.strip()
         return v
 
@@ -165,17 +164,17 @@ class J1939daConverter:
     @staticmethod
     def get_spn_units(contents, raw_spn_resolution):
         norm_contents = unidecode.unidecode(str(contents)).lower().strip()
-        raw_spn_resolution = (
+        raw_spn_resolution_norm = (
             unidecode.unidecode(str(raw_spn_resolution)).lower().strip()
         )
         if norm_contents == "":
-            if "states" in raw_spn_resolution:
+            if "states" in raw_spn_resolution_norm:
                 norm_contents = "bit"
-            elif "bit-mapped" in raw_spn_resolution:
+            elif "bit-mapped" in raw_spn_resolution_norm:
                 norm_contents = "bit-mapped"
-            elif "binary" in raw_spn_resolution:
+            elif "binary" in raw_spn_resolution_norm:
                 norm_contents = "binary"
-            elif "ascii" in raw_spn_resolution:
+            elif "ascii" in raw_spn_resolution_norm:
                 norm_contents = "ascii"
         return norm_contents
 
@@ -273,9 +272,14 @@ class J1939daConverter:
     # return a list of int of the start bits ([some_bit_pos] or [some_bit_pos,some_other_bit_pos]) of the SPN; or [
     # -1] (if unknown or variable).
     def get_spn_start_bit(contents):
-        norm_contents = str(contents).lower()
+        norm_contents = str(contents).lower().strip()
 
-        if ";" in norm_contents:  # special handling for e.g. '0x00;2'
+        if norm_contents == "":
+            return [0]
+
+        if (
+            norm_contents == "n/a" or ";" in norm_contents
+        ):  # special handling for e.g. '0x00;2'
             return [-1]
 
         # Explanation of multi-startbit (from J4L): According to 1939-71, "If the data length is larger than 1 byte
@@ -332,8 +336,13 @@ class J1939daConverter:
 
     @staticmethod
     def is_enum_line(line):
-        if line.lower().startswith("bit state"):
+        line_norm = line.lower().strip()
+        if line_norm.startswith("bit state"):
             return True
+        # Match "00b =", "01b =", "10b =", "11b =", "00 =", "0x1 =" etc.
+        if re.match(r"^[ ]*[0-9bxXA-F\-:]+[ ]*[-=:]", line):
+            return True
+        # Fallback for old style
         elif re.match(r"^[ ]*[0-9][0-9bxXA-F\-:]*[ ]+[^ ]+", line):
             return True
         return False
@@ -364,7 +373,8 @@ class J1939daConverter:
 
         any_found = False
         for line in description_lines:
-            if J1939daConverter.is_enum_line(line):
+            is_enum = J1939daConverter.is_enum_line(line)
+            if is_enum:
                 if any_found:
                     add_enum_line(line)
                 else:
@@ -372,14 +382,17 @@ class J1939daConverter:
                         line
                     ):  # special handling: first enum must use single assignment
                         any_found = add_enum_line(line)
-
         return enum_lines
 
     @staticmethod
     def is_enum_lines_binary(enum_lines_only):
         all_ones_and_zeroes = True
         for line in enum_lines_only:
-            first = J1939daConverter.match_single_enum_line(line).groups()[0]
+            match = J1939daConverter.match_single_enum_line(line)
+            if not match:
+                all_ones_and_zeroes = False
+                break
+            first = match.groups()[0]
             if re.sub(r"[^10b]", "", first) != first:
                 all_ones_and_zeroes = False
                 break
@@ -392,8 +405,6 @@ class J1939daConverter:
         match = re.match(ENUM_RANGE_LINE_RE, line)
         if match:
             groups = match.groups()
-            if re.match(r"[01b]", groups[0]) and not re.match(r"[01b]", groups[2]):
-                return None
             return groups[0], groups[2]
         else:
             return None
@@ -408,7 +419,7 @@ class J1939daConverter:
     # returns the description part (just that part) of an enum line
     def get_enum_line_description(line):
         # Additional cleanup for artifacts that might be in multiline descriptions
-        line = re.sub(r"_x000[dD]_", " ", line)
+        line = re.sub(r"_x[0-9a-fA-F]{4}_", " ", line)
         line = re.sub(r"[ ]+", " ", line)
         line = re.sub(r"[ ]?\-\-[ ]?", " = ", line)
         match = re.match(ENUM_RANGE_LINE_RE, line)
@@ -434,32 +445,52 @@ class J1939daConverter:
 
             range_boundaries = J1939daConverter.get_enum_line_range(line)
             if range_boundaries is not None:
-                if is_binary:
-                    first = re.sub(r"b", "", range_boundaries[0])
-                    first_val = int(first, base=2)
-                    second = re.sub(r"b", "", range_boundaries[1])
-                    second_val = int(second, base=2)
-                elif "x" in range_boundaries[0].lower():
-                    first_val = int(range_boundaries[0], base=16)
-                    second_val = int(range_boundaries[1], base=16)
-                else:
-                    first_val = int(range_boundaries[0], base=10)
-                    second_val = int(range_boundaries[1], base=10)
+                try:
+                    if is_binary:
+                        first = re.sub(r"b", "", range_boundaries[0])
+                        first_val = int(first, base=2)
+                        second = re.sub(r"b", "", range_boundaries[1])
+                        second_val = int(second, base=2)
+                    elif "x" in range_boundaries[0].lower() or any(
+                        c in range_boundaries[0].upper() for c in "ABCDEF"
+                    ):
+                        first_val = int(
+                            range_boundaries[0].lower().replace("0x", ""), base=16
+                        )
+                        second_val = int(
+                            range_boundaries[1].lower().replace("0x", ""), base=16
+                        )
+                    else:
+                        first_val = int(range_boundaries[0], base=10)
+                        second_val = int(range_boundaries[1], base=10)
 
-                for i in range(first_val, second_val + 1):
-                    bit_object.update(({str(i): enum_description}))
+                    for i in range(first_val, second_val + 1):
+                        val_str = str(i)
+                        if val_str not in bit_object:
+                            bit_object.update(({val_str: enum_description}))
+                except ValueError:
+                    continue
             else:
-                first = re.match(r"[ ]*([0-9bxXA-F]+)", line).groups()[0]
+                match = re.match(r"[ ]*([0-9bxXA-F]+)", line)
+                if not match:
+                    continue
+                first = match.groups()[0]
 
-                if is_binary:
-                    first = re.sub(r"b", "", first)
-                    val = str(int(first, base=2))
-                elif "x" in first.lower():
-                    val = str(int(first, base=16))
-                else:
-                    val = str(int(first, base=10))
+                try:
+                    if is_binary:
+                        first = re.sub(r"b", "", first)
+                        val = str(int(first, base=2))
+                    elif "x" in first.lower() or any(
+                        c in first.upper() for c in "ABCDEF"
+                    ):
+                        val = str(int(first.lower().replace("0x", ""), base=16))
+                    else:
+                        val = str(int(first, base=10))
 
-                bit_object.update(({val: enum_description}))
+                    if val not in bit_object:
+                        bit_object.update(({val: enum_description}))
+                except ValueError:
+                    continue
 
     @staticmethod
     def is_spn_likely_bitmapped(spn_description):
@@ -596,6 +627,9 @@ class J1939daConverter:
                     str(row[units_col]) if row[units_col] is not None else "",
                     str(row[resolution_col]) if row[resolution_col] is not None else "",
                 )
+                if spn_label == "695":
+                    pass
+
                 data_range = (
                     unidecode.unidecode(str(row[data_range_col]))
                     if row[data_range_col] is not None
@@ -705,9 +739,7 @@ class J1939daConverter:
                     if row[spn_description_col] is not None
                     else ""
                 )
-                if row[units_col] == "bit" or self.is_spn_likely_bitmapped(
-                    spn_description
-                ):
+                if spn_units == "bit" or self.is_spn_likely_bitmapped(spn_description):
                     bit_object = OrderedDict()
                     self.create_bit_object_from_description(spn_description, bit_object)
                     if len(bit_object) > 0:

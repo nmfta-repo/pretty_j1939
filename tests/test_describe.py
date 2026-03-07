@@ -76,22 +76,29 @@ def test_isotp_reassembly():
 
 def test_variable_length_spn_ascii():
     """Verify decoding of a variable-length ASCII SPN."""
-    describer = get_describer()
     pgn_id = 65024
-    describer.da_describer.pgn_objects[pgn_id] = {
-        "Label": "VAR",
-        "Name": "Variable PGN",
-        "SPNs": [8888],
-        "SPNStartBits": [0],
+    db = {
+        "J1939PGNdb": {
+            pgn_id: {
+                "Label": "VAR",
+                "Name": "Variable PGN",
+                "SPNs": [8888],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "8888": {
+                "Name": "Text SPN",
+                "Units": "ASCII",
+                "SPNLength": "Variable",
+                "Resolution": 1.0,
+                "Offset": 0,
+            }
+        },
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
     }
-    describer.da_describer.spn_objects[8888] = {
-        "Name": "Text SPN",
-        "Units": "ASCII",
-        "SPNLength": "Variable",
-        "Resolution": 1.0,
-        "Offset": 0,
-    }
-    describer.da_describer._spn_cache.clear()
+    describer = get_describer(da_json=db)
     message_data = bitstring.Bits(bytes=b"J1939")
     message_id = 0x18FE0039
     description = describer(message_data, message_id)
@@ -100,24 +107,34 @@ def test_variable_length_spn_ascii():
 
 def test_bit_aligned_spn():
     """Verify decoding of an SPN that is not byte-aligned."""
-    describer = get_describer()
     pgn_id = 65285
-    describer.da_describer.pgn_objects[pgn_id] = {
-        "Label": "BIT",
-        "Name": "Bit PGN",
-        "SPNs": [6666],
-        "SPNStartBits": [4],
+    db = {
+        "J1939PGNdb": {
+            pgn_id: {
+                "Label": "BIT",
+                "Name": "Bit PGN",
+                "SPNs": [6666],
+                "SPNStartBits": [
+                    0
+                ],  # Use standard J1939 start bit 0 (LSB of first byte)
+            }
+        },
+        "J1939SPNdb": {
+            "6666": {
+                "Name": "Bit SPN",
+                "Units": "rpm",
+                "SPNLength": 4,
+                "Resolution": 1.0,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 15,
+            }
+        },
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
     }
-    describer.da_describer.spn_objects[6666] = {
-        "Name": "Bit SPN",
-        "Units": "rpm",
-        "SPNLength": 4,
-        "Resolution": 1.0,
-        "Offset": 0,
-        "OperationalLow": 0,
-        "OperationalHigh": 15,
-    }
-    describer.da_describer._spn_cache.clear()
+    describer = get_describer(da_json=db)
+    # 0x5A (binary 0101 1010). LSB bits 0-3 are 1010 (10).
     message_data = bitstring.Bits(hex="5A00000000000000")
     message_id = 0x18FF0539
     description = describer(message_data, message_id)
@@ -126,68 +143,78 @@ def test_bit_aligned_spn():
 
 def test_spn_unavailable():
     """Verify handling of 'Unavailable' SPN values (all bits set)."""
-    describer = get_describer()
     pgn_id = 65286
-    describer.da_describer.pgn_objects[pgn_id] = {
-        "Label": "NA",
-        "Name": "NA PGN",
-        "SPNs": [5555],
-        "SPNStartBits": [0],
+    db = {
+        "J1939PGNdb": {
+            pgn_id: {
+                "Label": "NA",
+                "Name": "NA PGN",
+                "SPNs": [5555],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "5555": {
+                "Name": "NA SPN",
+                "Units": "rpm",
+                "SPNLength": 8,
+                "Resolution": 1.0,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 250,
+            }
+        },
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
     }
-    describer.da_describer.spn_objects[5555] = {
-        "Name": "NA SPN",
-        "Units": "rpm",
-        "SPNLength": 8,
-        "Resolution": 1.0,
-        "Offset": 0,
-        "OperationalLow": 0,
-        "OperationalHigh": 250,
-    }
-    describer.da_describer._spn_cache.clear()
     message_data = bitstring.Bits(hex="FF00000000000000")
     message_id = 0x18FF0639
+
+    describer = get_describer(da_json=db, include_na=False)
     description = describer(message_data, message_id)
     assert "NA SPN" not in description
-    describer_na = get_describer(include_na=True)
-    describer_na.da_describer.pgn_objects[pgn_id] = describer.da_describer.pgn_objects[
-        pgn_id
-    ]
-    describer_na.da_describer.spn_objects[5555] = describer.da_describer.spn_objects[
-        5555
-    ]
+
+    describer_na = get_describer(da_json=db, include_na=True)
     description_na = describer_na(message_data, message_id)
     assert description_na["NA SPN"] == "N/A"
 
 
 def test_spn_bit_encoding():
     """Verify decoding of enumerated bit-encodings."""
-    describer = get_describer()
     pgn_id = 65287
     spn_id = 4444
-    describer.da_describer.pgn_objects[pgn_id] = {
-        "Label": "ENUM",
-        "Name": "Enum PGN",
-        "SPNs": [spn_id],
-        "SPNStartBits": [6],  # Use bits 6-7 (LSB nibble)
+    db = {
+        "J1939PGNdb": {
+            pgn_id: {
+                "Label": "ENUM",
+                "Name": "Enum PGN",
+                "SPNs": [spn_id],
+                "SPNStartBits": [0],  # Use bits 0-1 (LSB nibble)
+            }
+        },
+        "J1939SPNdb": {
+            str(spn_id): {
+                "Name": "State SPN",
+                "Units": "bit",
+                "SPNLength": 2,
+                "Resolution": 1.0,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 3,
+            }
+        },
+        "J1939BitDecodings": {
+            str(spn_id): {
+                "0": "Off",
+                "1": "On",
+                "2": "Error",
+                "3": "Not Available",
+            }
+        },
+        "J1939SATabledb": {},
     }
-    describer.da_describer.spn_objects[spn_id] = {
-        "Name": "State SPN",
-        "Units": "bit",
-        "SPNLength": 2,
-        "Resolution": 1.0,
-        "Offset": 0,
-        "OperationalLow": 0,
-        "OperationalHigh": 3,
-    }
-    describer.da_describer.bit_encodings[spn_id] = {
-        "0": "Off",
-        "1": "On",
-        "2": "Error",
-        "3": "Not Available",
-    }
-    describer.da_describer._spn_cache.clear()
-
-    # 0x01 (binary 0000 0001). bitstring bits 6-7 are 01 (1).
+    describer = get_describer(da_json=db)
+    # 0x01 (binary 0000 0001). LSB bits 0-1 are 01 (1).
     message_data = bitstring.Bits(hex="0100000000000000")
     message_id = 0x18FF0739
     description = describer(message_data, message_id)
@@ -196,29 +223,36 @@ def test_spn_bit_encoding():
 
 def test_spn_special_units():
     """Verify handling of 'Request Dependent' and 'ASCII' unit types."""
-    describer = get_describer()
     pgn_id = 65288
-    describer.da_describer.pgn_objects[pgn_id] = {
-        "Label": "SPECIAL",
-        "Name": "Special PGN",
-        "SPNs": [1111, 2222],
-        "SPNStartBits": [0, 8],
+    db = {
+        "J1939PGNdb": {
+            pgn_id: {
+                "Label": "SPECIAL",
+                "Name": "Special PGN",
+                "SPNs": [1111, 2222],
+                "SPNStartBits": [0, 8],
+            }
+        },
+        "J1939SPNdb": {
+            "1111": {
+                "Name": "Req SPN",
+                "Units": "Request Dependent",
+                "SPNLength": 8,
+                "Resolution": 1.0,
+                "Offset": 0,
+            },
+            "2222": {
+                "Name": "ASCII SPN",
+                "Units": "ASCII",
+                "SPNLength": 16,
+                "Resolution": 1.0,
+                "Offset": 0,
+            },
+        },
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
     }
-    describer.da_describer.spn_objects[1111] = {
-        "Name": "Req SPN",
-        "Units": "Request Dependent",
-        "SPNLength": 8,
-        "Resolution": 1.0,
-        "Offset": 0,
-    }
-    describer.da_describer.spn_objects[2222] = {
-        "Name": "ASCII SPN",
-        "Units": "ASCII",
-        "SPNLength": 16,
-        "Resolution": 1.0,
-        "Offset": 0,
-    }
-    describer.da_describer._spn_cache.clear()
+    describer = get_describer(da_json=db)
     message_data = bitstring.Bits(hex="424F4B0000000000")
     message_id = 0x18FF0839
     description = describer(message_data, message_id)
@@ -228,24 +262,31 @@ def test_spn_special_units():
 
 def test_spn_uintle_fallback():
     """Verify decoding of multi-byte SPNs that don't hit the 1,2,4 byte fast path."""
-    describer = get_describer()
     pgn_id = 65289
-    describer.da_describer.pgn_objects[pgn_id] = {
-        "Label": "FALLBACK",
-        "Name": "Fallback PGN",
-        "SPNs": [3333],
-        "SPNStartBits": [0],
+    db = {
+        "J1939PGNdb": {
+            pgn_id: {
+                "Label": "FALLBACK",
+                "Name": "Fallback PGN",
+                "SPNs": [3333],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "3333": {
+                "Name": "3-byte SPN",
+                "Units": "rpm",
+                "SPNLength": 24,  # 3 bytes
+                "Resolution": 1.0,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 0xFFFFFF,
+            }
+        },
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
     }
-    describer.da_describer.spn_objects[3333] = {
-        "Name": "3-byte SPN",
-        "Units": "rpm",
-        "SPNLength": 24,  # 3 bytes
-        "Resolution": 1.0,
-        "Offset": 0,
-        "OperationalLow": 0,
-        "OperationalHigh": 0xFFFFFF,
-    }
-    describer.da_describer._spn_cache.clear()
+    describer = get_describer(da_json=db)
     message_data = bitstring.Bits(hex="1122330000000000")
     message_id = 0x18FF0939
     description = describer(message_data, message_id)
@@ -254,24 +295,31 @@ def test_spn_uintle_fallback():
 
 def test_spn_out_of_range():
     """Verify handling of SPN values that are beyond operational range."""
-    describer = get_describer()
     pgn_id = 65025
-    describer.da_describer.pgn_objects[pgn_id] = {
-        "Label": "RANGE",
-        "Name": "Range PGN",
-        "SPNs": [7777],
-        "SPNStartBits": [0],
+    db = {
+        "J1939PGNdb": {
+            pgn_id: {
+                "Label": "RANGE",
+                "Name": "Range PGN",
+                "SPNs": [7777],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "7777": {
+                "Name": "Limited SPN",
+                "Units": "rpm",
+                "SPNLength": 8,
+                "Resolution": 1.0,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 100,
+            }
+        },
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
     }
-    describer.da_describer.spn_objects[7777] = {
-        "Name": "Limited SPN",
-        "Units": "rpm",
-        "SPNLength": 8,
-        "Resolution": 1.0,
-        "Offset": 0,
-        "OperationalLow": 0,
-        "OperationalHigh": 100,
-    }
-    describer.da_describer._spn_cache.clear()
+    describer = get_describer(da_json=db)
     message_data = bitstring.Bits(hex="7F00000000000000")
     message_id = 0x18FE0139
     description = describer(message_data, message_id)
@@ -432,6 +480,58 @@ def test_old_schema_no_bit_decodings():
     # Without J1939BitDecodings, bit-encoded SPNs should show "Unknown"
     assert "Engine Torque Mode" in description
     assert "Unknown" in description["Engine Torque Mode"]
+
+
+def test_bit_decodings_decode_spn_values():
+    """New schema: J1939BitDecodings entries are used to decode bit-encoded SPN values."""
+    db = {
+        "J1939SATabledb": {"0": "Engine #1"},
+        "J1939PGNdb": {
+            "61444": {
+                "Label": "EEC1",
+                "Name": "Electronic Engine Controller 1",
+                "PGNLength": "8",
+                "Rate": "engine speed dependent",
+                "SPNs": [899],
+                "SPNStartBits": [[0]],
+            }
+        },
+        "J1939SPNdb": {
+            "899": {
+                "Name": "Engine Torque Mode",
+                "Offset": 0.0,
+                "OperationalHigh": 15.0,
+                "OperationalLow": 0.0,
+                "Resolution": 1,
+                "SPNLength": 4,
+                "Units": "bit",
+            },
+        },
+        "J1939BitDecodings": {
+            "899": {
+                "0": "low idle governor/no request",
+                "1": "accelerator pedal/operator selection",
+                "2": "cruise control",
+                "3": "PTO governor",
+            },
+        },
+    }
+
+    describer = get_describer(da_json=db)
+    message_id = 0x0CF00400  # EEC1 from SA 0
+
+    # Test value 0 = low idle governor
+    message_data = bitstring.Bits(hex="0000000000000000")
+    description = describer(message_data, message_id)
+    assert "Engine Torque Mode" in description
+    assert "low idle governor" in description["Engine Torque Mode"]
+
+    # Test value 2 = cruise control
+    # LSB bits 0-3 = 0010 = 2
+    message_data = bitstring.Bits(hex="0200000000000000")
+    description = describer(message_data, message_id)
+    assert "Engine Torque Mode" in description
+    assert "cruise control" in description["Engine Torque Mode"]
 
 
 def test_old_schema_sa_table():
@@ -731,3 +831,41 @@ def test_missing_spn_in_db_fallback_to_bytes():
     assert description["Bytes"] == "1BC9A8001BC9A800"
     # Ensure no individual SPNs were added
     assert "Distance" not in str(description)
+
+
+def test_large_field_ignores_indicators():
+    """Verify that SPNs >= 64 bits ignore J1939 indicators (NA/Error)."""
+    pgn_id = 65259  # VI
+    db = {
+        "J1939PGNdb": {
+            pgn_id: {
+                "Label": "VI",
+                "Name": "Vehicle Identification",
+                "SPNs": [237],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "237": {
+                "Name": "VIN",
+                "Units": "ASCII",
+                "SPNLength": 80,  # 10 bytes
+                "Resolution": 1.0,
+                "Offset": 0,
+            }
+        },
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
+    }
+    describer = get_describer(da_json=db, include_na=True)
+
+    # VIN filled with 0xFF. If indicator check was active, this might show "N/A"
+    # But for >= 64 bits, it should be treated as raw data (ASCII in this case).
+    message_data = bitstring.Bits(hex="FFFFFFFFFFFFFFFFFFFF")
+    description = describer(message_data, 0x18FEEB00)
+
+    # ASCII 0xFF is not a standard printable char, but it shouldn't be "N/A"
+    assert description["VIN"] != "N/A"
+    # Depending on decoding, it might be a string of \xff or empty if it tries to be clever
+    # Main point: it's not the "N/A" indicator.
+    assert "N/A" not in description["VIN"]

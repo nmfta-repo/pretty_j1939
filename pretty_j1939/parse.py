@@ -10,7 +10,7 @@ DP_MASK = 0x01000000
 EDP_MASK = 0x02000000
 TM_MASK = 0x00EB0000
 CM_MASK = 0x00EC0000
-ACK_MASK = 0x0E80000
+ACK_MASK = 0x00E80000
 DIAG3_MASK = 0x00DA0000
 DIAG3_PGN = 0xDA00
 
@@ -72,7 +72,8 @@ def is_transport_pgn(pgn):
 
 
 def is_bam_rts_cts_message(message_bytes):
-    return message_bytes[0] == 32 or message_bytes[0] == 16
+    # 32=BAM, 16=RTS, 17=CTS, 19=EOM, 255=Abort
+    return message_bytes[0] in (32, 16, 17, 19, 255)
 
 
 def is_spn_bitencoded(spn_units):

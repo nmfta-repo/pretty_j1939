@@ -137,6 +137,9 @@ def main():
     for xls_file in xls_files:
         # Use filename with extension to avoid collision between J1939DA_DEC2020.xls and .xlsx
         json_file = xls_file.parent / (xls_file.name + ".json")
+        # Also create a 'clean' version without the extra extension for user inspection
+        clean_json_file = xls_file.parent / (xls_file.stem + ".json")
+        
         cmd = [
             python_exe,
             "-m",
@@ -148,16 +151,22 @@ def main():
         ]
         print(f"Generating {json_file.name}...")
         run_command(cmd)
+        
+        # If it doesn't already match, also write to the clean filename
+        if json_file != clean_json_file:
+            print(f"Generating {clean_json_file.name}...")
+            cmd[-1] = str(clean_json_file)
+            run_command(cmd)
         official_jsons.append(json_file)
 
-    # Phase 1.5: Regression Sweep for _x000d_ artifacts
-    print("\n--- Phase 1.5: Regression Sweep for _x000d_ artifacts ---")
+    # Phase 1.5: Regression Sweep for XML artifacts
+    print("\n--- Phase 1.5: Regression Sweep for XML artifacts ---")
     artifact_found = False
     for json_file in official_jsons:
         with open(json_file, "r", encoding="utf-8") as f:
             content = f.read()
-            # Case-insensitive search for _x000d_
-            matches = re.findall(r"_x000[dD]_", content)
+            # Case-insensitive search for xNNNN artifacts
+            matches = re.findall(r"_x[0-9a-fA-F]{4}_", content)
             if matches:
                 print(
                     f"  [FAIL] Artifacts found in {json_file.name}: {len(matches)} occurrences."
@@ -168,6 +177,28 @@ def main():
 
     if not artifact_found:
         print("  All official JSONs are clean of _x000d_ artifacts.")
+
+    # Phase 1.6: Regression Sweep for missing J1939BitDecodings
+    print("\n--- Phase 1.6: Regression Sweep for J1939BitDecodings ---")
+    bit_decodings_missing = False
+    for json_file in official_jsons:
+        with open(json_file, "r", encoding="utf-8") as f:
+            da = json.load(f)
+            bit_decodings = da.get("J1939BitDecodings", {})
+            if len(bit_decodings) == 0:
+                print(
+                    f"  [FAIL] No J1939BitDecodings in {json_file.name}"
+                )
+                bit_decodings_missing = True
+            else:
+                print(
+                    f"  [PASS] {json_file.name} has {len(bit_decodings)} bit decodings"
+                )
+
+    if bit_decodings_missing:
+        die("  FAILED: Some official JSONs are missing J1939BitDecodings entries.")
+    elif official_jsons:
+        print("  All official JSONs have J1939BitDecodings entries.")
 
     # Find other JSON DAs in tmp/
     other_jsons = [f for f in tmp_dir.glob("*.json") if f.is_file()]
