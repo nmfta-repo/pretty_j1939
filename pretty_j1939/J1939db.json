@@ -2,11 +2,101 @@
   "J1939SATabledb": {
     "0": "Engine #1",
     "1": "Engine #2",
+    "2": "Turbocharger",
     "3": "Transmission #1",
+    "4": "Transmission #2",
+    "5": "Shift Console - Primary",
+    "6": "Shift Console - Secondary",
+    "7": "Power TakeOff - (Main or Rear)",
+    "8": "Axle - Steering",
+    "9": "Axle - Drive #1",
+    "10": "Axle - Drive #2",
     "11": "Brake System Controller",
+    "12": "Brakes - Steer Axle",
+    "13": "Brakes - Drive Axle #1",
+    "14": "Brakes - Drive Axle #2",
+    "15": "Retarder - Engine",
+    "16": "Retarder - Driveline",
     "17": "Cruise Control",
+    "18": "Fuel System",
+    "19": "Steering Controller",
+    "20": "Suspension - Steer Axle",
+    "21": "Suspension - Drive Axle #1",
+    "22": "Suspension - Drive Axle #2",
+    "23": "Instrument Cluster #1",
+    "24": "Trip Recorder",
+    "25": "Passenger-Operator Climate Control #1",
+    "26": "Alternator/Electrical Charging System",
+    "27": "Aerodynamic Control",
+    "28": "Vehicle Navigation",
+    "29": "Vehicle Security",
+    "30": "Electrical System",
+    "31": "Starter System",
+    "32": "Tractor-Trailer Bridge #1",
+    "33": "Body Controller",
+    "34": "Auxiliary Valve Control or Engine Air System Valve Control",
+    "35": "Hitch Control",
+    "36": "Power TakeOff (Front or Secondary)",
+    "37": "Off Vehicle Gateway",
+    "38": "Virtual Terminal (in cab)",
+    "39": "Management Computer #1",
+    "40": "Cab Display #1",
+    "41": "Retarder, Exhaust, Engine #1",
     "42": "Headway Controller",
+    "43": "On-Board Diagnostic Unit",
+    "44": "Retarder, Exhaust, Engine #2",
+    "45": "Endurance Braking System",
+    "46": "Hydraulic Pump Controller",
+    "47": "Suspension - System Controller #1",
+    "48": "Pneumatic - System Controller",
+    "49": "Cab Controller - Primary",
+    "50": "Cab Controller - Secondary",
+    "51": "Tire Pressure Controller",
+    "52": "Ignition Control Module #1",
+    "53": "Ignition Control Module #2",
+    "54": "Seat Control #1",
+    "55": "Lighting - Operator Controls",
+    "56": "Rear Axle Steering Controller #1",
+    "57": "Water Pump Controller",
+    "58": "Passenger-Operator Climate Control #2",
+    "59": "Transmission Display - Primary",
+    "60": "Transmission Display - Secondary",
+    "61": "Exhaust Emission Controller",
+    "62": "Vehicle Dynamic Stability Controller",
+    "63": "Oil Sensor",
+    "64": "Suspension - System Controller #2",
+    "65": "Information System Controller #1",
+    "66": "Ramp Control",
+    "67": "Clutch/Converter Unit",
+    "68": "Auxiliary Heater #1",
+    "69": "Auxiliary Heater #2",
+    "70": "Engine Valve Controller",
+    "71": "Chassis Controller #1",
+    "72": "Chassis Controller #2",
+    "73": "Propulsion Battery Charger",
+    "74": "Communications Unit, Cellular",
+    "75": "Communications Unit, Satellite",
+    "76": "Communications Unit, Radio",
+    "77": "Steering Column Unit",
+    "78": "Fan Drive Controller",
+    "79": "Seat Control #2",
+    "80": "Parking Brake Controller",
+    "81": "Aftertreatment #1 System Gas Intake",
+    "82": "Aftertreatment #1 System Gas Outlet",
+    "83": "Safety Restraint System",
+    "84": "Cab Display #2",
+    "85": "Diesel Particulate Filter Controller",
+    "86": "Aftertreatment #2 System Gas Intake",
+    "87": "Aftertreatment #2 System Gas Outlet",
+    "88": "Safety Restraint System #2",
+    "89": "Atmospheric Sensor",
     "247": "Auxiliary Power Unit (APU) #1",
+    "248": "File Server / Printer",
+    "249": "Off Board Diagnostic-Service Tool #1",
+    "250": "Off Board Diagnostic-Service Tool #2",
+    "251": "On-Board Data Logger",
+    "252": "Reserved for Experimental Use",
+    "253": "Reserved for OEM",
     "254": "Null Address",
     "255": "Global Address"
   },
@@ -19,25 +109,385 @@
       "Source-Url": "https://pyramidsolutions.com/wp-content/uploads/2018/07/J1939-Data-Mapping-Explained_Final-1.pdf",
       "License": "Public Domain (Factual Standard Data)"
     },
+    "2": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
     "3": {
       "Source-Url": "https://pyramidsolutions.com/wp-content/uploads/2018/07/J1939-Data-Mapping-Explained_Final-1.pdf",
       "License": "Public Domain (Factual Standard Data)"
+    },
+    "4": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "5": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "6": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "7": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "8": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "9": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "10": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
     },
     "11": {
       "Source-Url": "https://static.nhtsa.gov/odi/tsbs/2018/MC-10141869-9999.pdf",
       "License": "Public Domain"
     },
+    "12": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "13": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "14": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "15": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "16": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
     "17": {
       "Source-Url": "https://static.nhtsa.gov/odi/tsbs/2018/MC-10141869-9999.pdf",
       "License": "Public Domain"
+    },
+    "18": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "19": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "20": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "21": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "22": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "23": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "24": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "25": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "26": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "27": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "28": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "29": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "30": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "31": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "32": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "33": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "34": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "35": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "36": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "37": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "38": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "39": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "40": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "41": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
     },
     "42": {
       "Source-Url": "https://static.nhtsa.gov/odi/tsbs/2018/MC-10141869-9999.pdf",
       "License": "Public Domain"
     },
+    "43": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "44": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "45": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "46": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "47": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "48": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "49": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "50": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "51": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "52": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "53": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "54": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "55": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "56": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "57": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "58": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "59": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "60": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "61": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "62": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "63": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "64": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "65": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "66": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "67": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "68": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "69": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "70": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "71": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "72": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "73": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "74": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "75": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "76": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "77": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "78": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "79": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "80": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "81": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "82": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "83": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "84": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "85": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "86": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "87": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "88": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "89": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
     "247": {
       "Source-Url": "https://github.com/andrewdodd/decoda",
       "License": "MIT"
+    },
+    "248": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "249": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "250": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "251": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "252": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "253": {
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
     },
     "254": {
       "Source-Url": "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/can/j1939.h",
@@ -49,6 +499,14 @@
     }
   },
   "J1939PGNdb": {
+    "59392": {
+      "Label": "ACK",
+      "Name": "ISO Acknowledgment",
+      "SPNs": [],
+      "SPNStartBits": [],
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
     "59904": {
       "Label": "RQST",
       "Name": "Request",
@@ -56,6 +514,22 @@
       "SPNStartBits": [],
       "Source-Url": "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/uapi/linux/can/j1939.h",
       "License": "GPL-2.0 WITH Linux-syscall-note"
+    },
+    "60160": {
+      "Label": "TP.DT",
+      "Name": "ISO Transport Protocol, Data Transfer",
+      "SPNs": [],
+      "SPNStartBits": [],
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
+    },
+    "60416": {
+      "Label": "TP.CM",
+      "Name": "ISO Transport Protocol, Connection Management",
+      "SPNs": [],
+      "SPNStartBits": [],
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
     },
     "60928": {
       "Label": "ACL",
@@ -94,6 +568,14 @@
       ],
       "Source-Url": "https://github.com/andrewdodd/decoda/blob/main/demo.py",
       "License": "MIT"
+    },
+    "65240": {
+      "Label": "CA",
+      "Name": "ISO Commanded Address",
+      "SPNs": [],
+      "SPNStartBits": [],
+      "Source-Url": "https://github.com/wireshark/wireshark/blob/master/epan/dissectors/packet-j1939.c",
+      "License": "GPL-2.0-or-later"
     },
     "65248": {
       "Label": "VD",
