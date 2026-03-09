@@ -175,8 +175,9 @@ class TestGetEnumLineRange(unittest.TestCase):
         self.assertIsNone(result)
 
     def test_binary_start_decimal_end_is_range(self):
-        # "0b" starts with "0" which matches the binary guard check [01b],
-        # and "15" starts with "1" which also matches, so this IS a range
+        # "0b" starts with "0" which matches the guard regex [01b] for both
+        # groups[0] and groups[2] ("15" starts with "1"), so the guard
+        # doesn't reject this as a non-range
         result = J1939daConverter.get_enum_line_range("0b-15 some text")
         self.assertEqual(result, ("0b", "15"))
 
@@ -236,10 +237,11 @@ class TestGetEnumLines(unittest.TestCase):
             "10 Error",
         ]
         result = J1939daConverter.get_enum_lines(description)
-        # The "Bit State" header line matches is_enum_line and match_single_enum_line
-        # (because 'B' is in [A-F]), so it's included after stripping "Bit State"
+        # The "Bit State" header line matches is_enum_line (starts with "bit state")
+        # and match_single_enum_line ('B' is in regex class [A-F]). After add_enum_line
+        # strips the "Bit State" substring via regex, the remaining " descriptions:"
+        # is kept as an enum line entry alongside the actual enum values.
         self.assertEqual(len(result), 4)
-        # The first entry is the stripped header remnant
         self.assertIn("descriptions:", result[0])
 
 

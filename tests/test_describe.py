@@ -479,7 +479,7 @@ def test_bit_decodings_decode_spn_values():
     assert "low idle governor" in description["Engine Torque Mode"]
 
     # Test value 2 = cruise control
-    # SPN 899 is 4 bits at bit 0; 0x20 in first byte puts value 2 in MSB nibble
+    # bitstring uses MSB-first indexing: 0x20 = 0b00100000, so bits[0:4] = 0010 = 2
     message_data = bitstring.Bits(hex="2000000000000000")
     description = describer(message_data, message_id)
     assert "Engine Torque Mode" in description
