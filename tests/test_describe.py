@@ -434,6 +434,58 @@ def test_old_schema_no_bit_decodings():
     assert "Unknown" in description["Engine Torque Mode"]
 
 
+def test_bit_decodings_decode_spn_values():
+    """New schema: J1939BitDecodings entries are used to decode bit-encoded SPN values."""
+    db = {
+        "J1939SATabledb": {"0": "Engine #1"},
+        "J1939PGNdb": {
+            "61444": {
+                "Label": "EEC1",
+                "Name": "Electronic Engine Controller 1",
+                "PGNLength": "8",
+                "Rate": "engine speed dependent",
+                "SPNs": [899],
+                "SPNStartBits": [[0]],
+            }
+        },
+        "J1939SPNdb": {
+            "899": {
+                "Name": "Engine Torque Mode",
+                "Offset": 0.0,
+                "OperationalHigh": 15.0,
+                "OperationalLow": 0.0,
+                "Resolution": 1,
+                "SPNLength": 4,
+                "Units": "bit",
+            },
+        },
+        "J1939BitDecodings": {
+            "899": {
+                "0": "low idle governor/no request",
+                "1": "accelerator pedal/operator selection",
+                "2": "cruise control",
+                "3": "PTO governor",
+            },
+        },
+    }
+
+    describer = get_describer(da_json=db)
+    message_id = 0x0CF00400  # EEC1 from SA 0
+
+    # Test value 0 = low idle governor
+    message_data = bitstring.Bits(hex="0000000000000000")
+    description = describer(message_data, message_id)
+    assert "Engine Torque Mode" in description
+    assert "low idle governor" in description["Engine Torque Mode"]
+
+    # Test value 2 = cruise control
+    # SPN 899 is 4 bits at bit 0; 0x20 in first byte puts value 2 in MSB nibble
+    message_data = bitstring.Bits(hex="2000000000000000")
+    description = describer(message_data, message_id)
+    assert "Engine Torque Mode" in description
+    assert "cruise control" in description["Engine Torque Mode"]
+
+
 def test_old_schema_sa_table():
     """Old schema: J1939SATabledb still works for address resolution."""
     db = _make_old_schema_db()
