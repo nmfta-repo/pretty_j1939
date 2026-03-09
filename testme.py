@@ -169,6 +169,28 @@ def main():
     if not artifact_found:
         print("  All official JSONs are clean of _x000d_ artifacts.")
 
+    # Phase 1.6: Regression Sweep for missing J1939BitDecodings
+    print("\n--- Phase 1.6: Regression Sweep for J1939BitDecodings ---")
+    bit_decodings_missing = False
+    for json_file in official_jsons:
+        with open(json_file, "r", encoding="utf-8") as f:
+            da = json.load(f)
+            bit_decodings = da.get("J1939BitDecodings", {})
+            if len(bit_decodings) == 0:
+                print(
+                    f"  [FAIL] No J1939BitDecodings in {json_file.name}"
+                )
+                bit_decodings_missing = True
+            else:
+                print(
+                    f"  [PASS] {json_file.name} has {len(bit_decodings)} bit decodings"
+                )
+
+    if bit_decodings_missing:
+        die("  FAILED: Some official JSONs are missing J1939BitDecodings entries.")
+    elif official_jsons:
+        print("  All official JSONs have J1939BitDecodings entries.")
+
     # Find other JSON DAs in tmp/
     other_jsons = [f for f in tmp_dir.glob("*.json") if f.is_file()]
 
