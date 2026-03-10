@@ -435,15 +435,18 @@ def _make_old_schema_db():
 
 
 def test_old_schema_startbit_in_spn():
-    """Old schema: SPN start bit is in the SPN entry, not the PGN."""
+    """Old schema: SPN start bit is in the SPN entry, not the PGN.
+    Note: This test is intended to verify backward compatibility.
+    """
     db = _make_old_schema_db()
-    describer = get_describer(da_json=db)
+    with pytest.warns(DeprecationWarning, match="Database uses old schema"):
+        describer = get_describer(da_json=db)
 
-    message_id = 0x0CF00400  # EEC1 from SA 0
-    # Engine Speed at bits 24-39 (bytes 3-4): 0x20 0x48 => little-endian 0x4820 = 18464
-    # 18464 * 0.125 = 2308.0 rpm
-    message_data = bitstring.Bits(hex="0041FF20481400F0")
-    description = describer(message_data, message_id)
+        message_id = 0x0CF00400  # EEC1 from SA 0
+        # Engine Speed at bits 24-39 (bytes 3-4): 0x20 0x48 => little-endian 0x4820 = 18464
+        # 18464 * 0.125 = 2308.0 rpm
+        message_data = bitstring.Bits(hex="0041FF20481400F0")
+        description = describer(message_data, message_id)
 
     assert description["PGN"] == "EEC1(61444)"
     assert "Engine Speed" in description
@@ -451,31 +454,37 @@ def test_old_schema_startbit_in_spn():
 
 
 def test_old_schema_no_spnstartbits_in_pgn():
-    """Old schema: PGN entries have no 'SPNStartBits' key; start bits come from SPNs."""
+    """Old schema: PGN entries have no 'SPNStartBits' key; start bits come from SPNs.
+    Note: This test is intended to verify backward compatibility.
+    """
     db = _make_old_schema_db()
     # Verify our test db matches the old schema pattern
     assert "SPNStartBits" not in db["J1939PGNdb"]["61444"]
     assert "StartBit" in db["J1939SPNdb"]["190"]
 
-    describer = get_describer(da_json=db)
-    message_id = 0x0CF00400
-    message_data = bitstring.Bits(hex="0041FF20481400F0")
-    description = describer(message_data, message_id)
+    with pytest.warns(DeprecationWarning, match="Database uses old schema"):
+        describer = get_describer(da_json=db)
+        message_id = 0x0CF00400
+        message_data = bitstring.Bits(hex="0041FF20481400F0")
+        description = describer(message_data, message_id)
 
     assert description["PGN"] == "EEC1(61444)"
     assert description["SA"] == "Engine #1(  0)"
 
 
 def test_old_schema_no_bit_decodings():
-    """Old schema: no J1939BitDecodings key; bit-encoded SPNs show 'Unknown'."""
+    """Old schema: no J1939BitDecodings key; bit-encoded SPNs show 'Unknown'.
+    Note: This test is intended to verify backward compatibility.
+    """
     db = _make_old_schema_db()
     assert "J1939BitDecodings" not in db
 
-    describer = get_describer(da_json=db)
-    message_id = 0x0CF00400
-    # Byte 0 bits 0-3 = Engine Torque Mode = 0x01 => value 1
-    message_data = bitstring.Bits(hex="0100000000000000")
-    description = describer(message_data, message_id)
+    with pytest.warns(DeprecationWarning, match="Database uses old schema"):
+        describer = get_describer(da_json=db)
+        message_id = 0x0CF00400
+        # Byte 0 bits 0-3 = Engine Torque Mode = 0x01 => value 1
+        message_data = bitstring.Bits(hex="0100000000000000")
+        description = describer(message_data, message_id)
 
     # Without J1939BitDecodings, bit-encoded SPNs should show "Unknown"
     assert "Engine Torque Mode" in description
@@ -535,23 +544,31 @@ def test_bit_decodings_decode_spn_values():
 
 
 def test_old_schema_sa_table():
-    """Old schema: J1939SATabledb still works for address resolution."""
+    """Old schema: J1939SATabledb still works for address resolution.
+    Note: This test is intended to verify backward compatibility.
+    """
     db = _make_old_schema_db()
-    describer = get_describer(da_json=db)
+    with pytest.warns(DeprecationWarning, match="Database uses old schema"):
+        describer = get_describer(da_json=db)
 
-    message_id = 0x0CF00400  # SA = 0 = Engine #1
-    message_data = bitstring.Bits(hex="0000000000000000")
-    description = describer(message_data, message_id)
+        message_id = 0x0CF00400  # SA = 0 = Engine #1
+        message_data = bitstring.Bits(hex="0000000000000000")
+        description = describer(message_data, message_id)
 
     assert description["SA"] == "Engine #1(  0)"
 
 
-def test_old_schema_variable_spn_with_delimiter():
-    """Old schema: variable-length SPNs with delimiter work without SPNStartBits in PGN."""
+def test_variable_spn_with_delimiter():
+    """Verify variable-length SPNs with delimiter work with the new schema."""
     db = {
         "J1939SATabledb": {},
         "J1939PGNdb": {
-            "65282": {"Label": "DLM", "Name": "Delimited PGN", "SPNs": [9001, 9002]}
+            "65282": {
+                "Label": "DLM",
+                "Name": "Delimited PGN",
+                "SPNs": [9001, 9002],
+                "SPNStartBits": [0, -1],
+            }
         },
         "J1939SPNdb": {
             "9001": {
@@ -561,7 +578,6 @@ def test_old_schema_variable_spn_with_delimiter():
                 "OperationalLow": 0,
                 "Resolution": 1,
                 "SPNLength": "Variable",
-                "StartBit": 0,
                 "Units": "ASCII",
                 "Delimiter": "0x2A",
             },
@@ -572,7 +588,6 @@ def test_old_schema_variable_spn_with_delimiter():
                 "OperationalLow": 0,
                 "Resolution": 1,
                 "SPNLength": "Variable",
-                "StartBit": -1,
                 "Units": "ASCII",
                 "Delimiter": "0x2A",
             },
@@ -587,12 +602,17 @@ def test_old_schema_variable_spn_with_delimiter():
     assert description["Field2"] == "WORLD"
 
 
-def test_old_schema_single_variable_spn():
-    """Old schema: single variable-length SPN without delimiter works."""
+def test_single_variable_spn():
+    """Verify that a single variable-length SPN works with the new schema."""
     db = {
         "J1939SATabledb": {},
         "J1939PGNdb": {
-            "65259": {"Label": "VI", "Name": "Vehicle Identification", "SPNs": [237]}
+            "65259": {
+                "Label": "VI",
+                "Name": "Vehicle Identification",
+                "SPNs": [237],
+                "SPNStartBits": [0],
+            }
         },
         "J1939SPNdb": {
             "237": {
@@ -602,7 +622,6 @@ def test_old_schema_single_variable_spn():
                 "OperationalLow": 0,
                 "Resolution": 1,
                 "SPNLength": "Variable",
-                "StartBit": 0,
                 "Units": "ASCII",
             }
         },
@@ -616,8 +635,8 @@ def test_old_schema_single_variable_spn():
     assert description["Vehicle Identification Number"] == "1HGCM82633A123456"
 
 
-def test_old_schema_extra_fields_ignored():
-    """Old schema: extra fields like Acronym, DataRange, EndBit are gracefully ignored."""
+def test_extra_fields_ignored():
+    """Verify that extra fields like Acronym, DataRange, EndBit are gracefully ignored with the new schema."""
     db = {
         "J1939SATabledb": {},
         "J1939PGNdb": {
@@ -627,6 +646,7 @@ def test_old_schema_extra_fields_ignored():
                 "PGNLength": "8",
                 "Rate": "100 ms",
                 "SPNs": [84],
+                "SPNStartBits": [8],
             }
         },
         "J1939SPNdb": {
@@ -643,7 +663,6 @@ def test_old_schema_extra_fields_ignored():
                 "Resolution": 0.00390625,
                 "SPN": 84,
                 "SPNLength": 16,
-                "StartBit": 8,
                 "TransmissionRate": "100 ms",
                 "Units": "km/h",
             }
@@ -661,19 +680,22 @@ def test_old_schema_extra_fields_ignored():
 
 
 def test_old_schema_full_file(tmp_path):
-    """Old schema: can load and use an old-schema-style J1939db.json file from disk."""
+    """Old schema: can load and use an old-schema-style J1939db.json file from disk.
+    Note: This test is intended to verify backward compatibility and will trigger a warning.
+    """
     import json
 
     db = _make_old_schema_db()
     db_path = tmp_path / "old_J1939db.json"
     db_path.write_text(json.dumps(db))
 
-    describer = get_describer(da_json=str(db_path))
+    with pytest.warns(DeprecationWarning, match="Database uses old schema"):
+        describer = get_describer(da_json=str(db_path))
 
-    # EEC1 from Engine #1
-    message_id = 0x0CF00400
-    message_data = bitstring.Bits(hex="0041FF20481400F0")
-    description = describer(message_data, message_id)
+        # EEC1 from Engine #1
+        message_id = 0x0CF00400
+        message_data = bitstring.Bits(hex="0041FF20481400F0")
+        description = describer(message_data, message_id)
 
     assert description["PGN"] == "EEC1(61444)"
     assert description["SA"] == "Engine #1(  0)"
@@ -725,10 +747,17 @@ def test_pgn_spn_cache_uniqueness():
     assert desc2["Reused SPN"] == "22136.0 [rpm]"
 
 
-def test_old_schema_list_startbit():
-    """Verify support for old-style databases where StartBit in SPN is already a list."""
+def test_list_startbit():
+    """Verify support for databases where SPNStartBits is already a list."""
     db = {
-        "J1939PGNdb": {"61444": {"Label": "EEC1", "Name": "Engine 1", "SPNs": [190]}},
+        "J1939PGNdb": {
+            "61444": {
+                "Label": "EEC1",
+                "Name": "Engine 1",
+                "SPNs": [190],
+                "SPNStartBits": [24],
+            }
+        },
         "J1939SPNdb": {
             "190": {
                 "Name": "Engine Speed",
@@ -736,7 +765,6 @@ def test_old_schema_list_startbit():
                 "SPNLength": 16,
                 "Resolution": 0.125,
                 "Offset": 0,
-                "StartBit": [24],
                 "OperationalLow": 0,
                 "OperationalHigh": 8031.875,
             }
@@ -752,7 +780,14 @@ def test_old_schema_list_startbit():
 def test_lookup_spn_startbit_unknown():
     """Verify lookup_spn_startbit returns [-1] for unknown mappings instead of crashing."""
     db = {
-        "J1939PGNdb": {"61444": {"Label": "EEC1", "Name": "Engine 1", "SPNs": [190]}},
+        "J1939PGNdb": {
+            "61444": {
+                "Label": "EEC1",
+                "Name": "Engine 1",
+                "SPNs": [190],
+                "SPNStartBits": [24],
+            }
+        },
         "J1939SPNdb": {
             "190": {
                 "Name": "Engine Speed",
@@ -766,9 +801,9 @@ def test_lookup_spn_startbit_unknown():
         },
     }
     describer = get_describer(da_json=db)
-    # This SPN is in PGN list but has no StartBit in SPN and no SPNStartBits in PGN
+    # This SPN is NOT in the PGN list for PGN 61445
     start = describer.da_describer.lookup_spn_startbit(
-        describer.da_describer.spn_objects[190], 190, 61444
+        describer.da_describer.spn_objects[190], 190, 61445
     )
     assert start == [-1]
 
@@ -817,7 +852,12 @@ def test_missing_spn_in_db_fallback_to_bytes():
     """Verify that a PGN with SPNs missing from the DB falls back to showing Bytes."""
     db = {
         "J1939PGNdb": {
-            "65248": {"Label": "VD", "Name": "Vehicle Distance", "SPNs": [244, 245]}
+            "65248": {
+                "Label": "VD",
+                "Name": "Vehicle Distance",
+                "SPNs": [244, 245],
+                "SPNStartBits": [0, 32],
+            }
         },
         "J1939SPNdb": {},  # Missing both 244 and 245
     }

@@ -243,7 +243,12 @@ def test_cli_tp_vin_integration():
     # Custom DB for VIN
     db = {
         "J1939PGNdb": {
-            "65259": {"Label": "VI", "Name": "Vehicle Identification", "SPNs": [237]}
+            "65259": {
+                "Label": "VI",
+                "Name": "Vehicle Identification",
+                "SPNs": [237],
+                "SPNStartBits": [0],
+            }
         },
         "J1939SPNdb": {
             "237": {
@@ -252,7 +257,6 @@ def test_cli_tp_vin_integration():
                 "SPNLength": 136,
                 "Resolution": 1,
                 "Offset": 0,
-                "StartBit": 0,
             }
         },
     }
@@ -289,7 +293,12 @@ def test_cli_tp_commanded_address_integration():
     """Verify CLI reassembly and decoding of Commanded Address via BAM."""
     db = {
         "J1939PGNdb": {
-            "65240": {"Label": "CA", "Name": "Commanded Address", "SPNs": [2849, 2850]}
+            "65240": {
+                "Label": "CA",
+                "Name": "Commanded Address",
+                "SPNs": [2849, 2850],
+                "SPNStartBits": [0, 64],
+            }
         },
         "J1939SPNdb": {
             "2849": {
@@ -298,7 +307,6 @@ def test_cli_tp_commanded_address_integration():
                 "SPNLength": 64,
                 "Resolution": 1,
                 "Offset": 0,
-                "StartBit": 0,
             },
             "2850": {
                 "Name": "New Address",
@@ -306,7 +314,6 @@ def test_cli_tp_commanded_address_integration():
                 "SPNLength": 8,
                 "Resolution": 1,
                 "Offset": 0,
-                "StartBit": 64,
             },
         },
     }
