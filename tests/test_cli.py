@@ -187,24 +187,45 @@ def test_cli_invalid_filter():
     assert "Error: 'nonexistent_pgn_label' did not match any PGN" in stderr
 
 
-def test_cli_summary_order():
-    """Verify summary order (broadcast edges last)."""
-    # Create a temp log with PDU1 and PDU2
-    log_file = "test_summary_temp.log"
-    with open(log_file, "w") as f:
-        f.write(
-            "(1612543138.000000) vcan0 0CF00400#0041FF20481400F0\n"
-        )  # PDU2 (Broadcast)
-        f.write(
-            "(1612543138.001000) vcan0 18EF000B#0000001B000000B4\n"
-        )  # PDU1 (Point-to-point)
+def test_cli_summary_default_hide():
+    """Verify summary is hidden by default for <= 8 messages."""
+    stdin_data = "0CF00400#0041FF20481400F0\n" * 8
+    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    stdout, stderr, code = run_cli(
+        ["-", "--da-json", db_path], stdin_content=stdin_data
+    )
+    assert code == 0
+    assert '"Summary"' not in stdout
 
-    try:
-        stdout, stderr, code = run_cli([log_file, "--summary"])
-        assert code == 0
-        summary_line = [line for line in stdout.splitlines() if '"Summary"' in line][0]
-        # PropA (PDU1) should come before EEC1 (PDU2/Broadcast)
-        assert summary_line.find("PropA") < summary_line.find("EEC1")
-    finally:
-        if os.path.exists(log_file):
-            os.remove(log_file)
+
+def test_cli_summary_default_show():
+    """Verify summary is shown by default for > 8 messages."""
+    stdin_data = "0CF00400#0041FF20481400F0\n" * 9
+    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    stdout, stderr, code = run_cli(
+        ["-", "--da-json", db_path], stdin_content=stdin_data
+    )
+    assert code == 0
+    assert '"Summary"' in stdout
+
+
+def test_cli_summary_override_show():
+    """Verify --summary override always shows summary."""
+    stdin_data = "0CF00400#0041FF20481400F0\n"
+    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    stdout, stderr, code = run_cli(
+        ["-", "--summary", "--da-json", db_path], stdin_content=stdin_data
+    )
+    assert code == 0
+    assert '"Summary"' in stdout
+
+
+def test_cli_summary_override_hide():
+    """Verify --no-summary override always hides summary."""
+    stdin_data = "0CF00400#0041FF20481400F0\n" * 10
+    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    stdout, stderr, code = run_cli(
+        ["-", "--no-summary", "--da-json", db_path], stdin_content=stdin_data
+    )
+    assert code == 0
+    assert '"Summary"' not in stdout

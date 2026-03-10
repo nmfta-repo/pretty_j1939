@@ -57,6 +57,7 @@ class J1939Runner:
         self.highlight_cas = highlight_cas or []
 
         self.summary_data = {}
+        self.message_count = 0
 
         self.theme_dict = HighPerformanceRenderer.load_theme(args.theme)
 
@@ -406,6 +407,8 @@ class J1939Runner:
             if not description:
                 continue
 
+            self.message_count += 1
+
             if self.pgn_list or self.sa_list or self.da_list or self.ca_list:
                 msg_pgn = description.get("_pgn")
                 msg_sa = description.get("_sa")
@@ -485,8 +488,17 @@ class J1939Runner:
                     self.write_f.flush()
 
     def print_summary(self):
+        # Default behavior: if <= 8 lines of input were given, do not print a summary.
+        # Treat command-line presence of --summary or --no-summary as an override.
+        should_show = self.args.summary
+        if should_show is None:
+            should_show = self.message_count > 8
+
+        if not should_show:
+            return
+
         summary_data = self.describe_obj.get_summary()
-        if not self.args.summary or not summary_data:
+        if not summary_data:
             return
 
         res = self.renderer.render_summary(summary_data, indent=self.args.format)
@@ -727,10 +739,10 @@ def get_parser():
     display_group.add_argument(
         "--summary",
         action="store_true",
-        help="(default) Print summary at end",
+        default=None,
+        help="(default) Print summary at end if more than 8 lines of input",
     )
     display_group.add_argument("--no-summary", dest="summary", action="store_false")
-    parser.set_defaults(summary=True)
 
     display_group.add_argument(
         "--real-time",
