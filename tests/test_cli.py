@@ -336,3 +336,63 @@ def test_cli_tp_commanded_address_integration():
     finally:
         if os.path.exists(db_filename):
             os.remove(db_filename)
+
+
+def test_cli_uds_isotp_reassembly():
+    """Verify CLI reassembly of a 55-byte UDS response via ISO-TP (PGN 0xDA00)."""
+    # 55-byte De Bruijn sequence (k=10, n=2)
+    debruijn_55 = "00102030405060708091121314151617181922324252627282933435363738394454647484955657585966768697787988990"[
+        :55
+    ]
+    # UDS Response PDU: 62 00 77 <55 bytes>
+    # Total UDS length = 3 + 55 = 58 (0x3A)
+    # ISO-TP First Frame: 10 3A 62 00 77 ... (3 bytes of data)
+    # 10 3A 62 00 77 30 30 31 (First 3 bytes of debruijn are "001")
+
+    # Request: 18DA00F1 (Target 00, Source F1)
+    # Response: 18DAF100 (Target F1, Source 00)
+
+    # debruijn_hex: '3030313032303330343035303630373038303931313231333134313531363137313831393232333234323532363237323832393333343335333633373338333934343534363437343834393535363537353835393636373638363937373837393838393930'
+    debruijn_hex = debruijn_55.encode("ascii").hex().upper()
+
+    # PDU: 62 00 77 + debruijn
+    pdu_hex = "620077" + debruijn_hex
+    # pdu_hex length = 6 + 110 = 116 chars = 58 bytes. 58 = 0x3A.
+
+    # ISO-TP Frames:
+    # FF: 10 3A [62 00 77 30 30 31]
+    # CF1: 21 [30 32 30 33 30 34 30]
+    # ...
+
+    def get_cf(sn, start_byte, length):
+        data = pdu_hex[start_byte * 2 : (start_byte + length) * 2]
+        # Pad with 00 to 7 bytes (14 hex chars)
+        data = data.ljust(14, "0")
+        return f"18DAF100#{ (0x20 | (sn & 0x0F)):02X}{data}\n"
+
+    stdin_data = (
+        "18DA00F1#0322007700000000\n"  # Request RDID 0x0077
+        f"18DAF100#103A{pdu_hex[0:12]}\n"  # First Frame (6 bytes of PDU)
+    )
+    # Remaining 52 bytes in CFs (7 bytes each -> 8 frames total)
+    # CF1 to CF7: 7 bytes each = 49 bytes
+    # CF8: remaining 3 bytes
+    for i in range(1, 8):
+        stdin_data += get_cf(i, 6 + (i - 1) * 7, 7)
+    stdin_data += get_cf(8, 6 + 7 * 7, 3)
+
+    # Add filler messages to ensure we exceed any threshold and have enough activity
+    filler = "0CF00400#0000000000000000\n"
+    stdin_data += filler * 10
+
+    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    stdout, stderr, code = run_cli(
+        ["-", "--no-summary", "--da-json", db_path], stdin_content=stdin_data
+    )
+
+    if pdu_hex not in stdout.upper():
+        print(f"DEBUG: stdout={stdout}")
+
+    assert code == 0
+    # The reassembled payload hex should be present (case insensitive)
+    assert pdu_hex in stdout.upper()

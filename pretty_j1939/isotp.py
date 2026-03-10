@@ -35,6 +35,7 @@ class IsoTpTracker:
             # Single Frame
             length = pci_byte & 0x0F
             if length == 0:
+                # CAN FD: byte 1 contains the length
                 if len(message_bytes) > 1:
                     length = message_bytes[1]
                     data_start = 2
@@ -54,9 +55,23 @@ class IsoTpTracker:
                 return
 
             total_length = ((pci_byte & 0x0F) << 8) + message_bytes[1]
+            data_start = 2
+
+            if total_length == 0:
+                # 32-bit length follows in bytes 2-5 (ISO 15765-2:2016)
+                if len(message_bytes) >= 6:
+                    total_length = (
+                        (message_bytes[2] << 24)
+                        + (message_bytes[3] << 16)
+                        + (message_bytes[4] << 8)
+                        + message_bytes[5]
+                    )
+                    data_start = 6
+                else:
+                    return
 
             # Start new session
-            current_payload = message_bytes[2:]
+            current_payload = message_bytes[data_start:]
 
             self.sessions[(da, sa)] = {
                 "total_length": total_length,
