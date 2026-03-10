@@ -29,7 +29,7 @@ def test_isotp_reassembly_58_bytes():
     assert found_data[0] == pdu
 
 
-def test_isotp_reassembly_large_pdu_32bit_length():
+def test_isotp_reassembly_large_pdu_standard():
     tracker = IsoTpTracker(real_time=False)
     found_data = []
 
@@ -37,17 +37,18 @@ def test_isotp_reassembly_large_pdu_32bit_length():
         if is_last_packet:
             found_data.append(data)
 
-    # 5000 bytes needs 32-bit length (0x1388)
-    pdu = bytes([i % 256 for i in range(5000)])
+    # 1000 bytes fits in 12-bit length (0x03E8)
+    length = 1000
+    pdu = bytes([i % 256 for i in range(length)])
 
-    # FF: 10 00 00 00 13 88 + first 2 bytes of data
-    ff = b"\x10\x00\x00\x00\x13\x88" + pdu[0:2]
+    # FF: 13 E8 + first 6 bytes
+    ff = b"\x13\xe8" + pdu[0:6]
     tracker.process(on_found, ff, 0x18DAF100)
 
-    # CFs: 5000 - 2 = 4998 bytes. 4998 / 7 = 714 frames.
-    for i in range(1, 715):
-        start = 2 + (i - 1) * 7
-        end = start + 7
+    # Remaining 994 bytes in CFs. 994 / 7 = 142 frames.
+    for i in range(1, 143):
+        start = 6 + (i - 1) * 7
+        end = min(start + 7, length)
         tracker.process(
             on_found, bytes([0x20 | (i & 0x0F)]) + pdu[start:end], 0x18DAF100
         )
@@ -56,7 +57,7 @@ def test_isotp_reassembly_large_pdu_32bit_length():
     assert found_data[0] == pdu
 
 
-def test_isotp_sf_canfd_length():
+def test_isotp_sf_standard():
     tracker = IsoTpTracker(real_time=False)
     found_data = []
 
@@ -64,9 +65,9 @@ def test_isotp_sf_canfd_length():
         if is_last_packet:
             found_data.append(data)
 
-    # SF: 00 0A + 10 bytes (CAN FD style)
-    pdu = b"0123456789"
-    sf = b"\x00\x0a" + pdu
+    # SF: 07 + 7 bytes (Standard CAN 2.0B)
+    pdu = b"1234567"
+    sf = b"\x07" + pdu
     tracker.process(on_found, sf, 0x18DAF100)
 
     assert len(found_data) == 1

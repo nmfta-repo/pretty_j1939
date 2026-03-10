@@ -463,6 +463,7 @@ class DADescriber:
                 if raw:
                     return value
 
+                # Check for special J1939 indicators BEFORE scaling
                 if is_spn_na(value, spn_length):
                     return NA_NAN
                 if is_spn_error(value, spn_length):
@@ -678,8 +679,26 @@ class DADescriber:
                     )
                     if spn_bytes.length == 0 and not is_complete_message:
                         continue
+
+                    # NEW: Implement ASCII indicator rules from J1939/71 Table 7.5.
+                    # Not available or not requested: 255 (0xFF)
+                    # Error indicator: 0 (0x00)
+                    # Valid Signal: 1 to 254 (0x01 to 0xFE)
+
+                    raw_bytes = spn_bytes.bytes
+                    if len(raw_bytes) > 0:
+                        if all(b == 0xFF for b in raw_bytes):
+                            if self.include_na:
+                                add_spn_description(spn, spn_name, "N/A")
+                            else:
+                                mark_spn_covered(spn, spn_name, "N/A")
+                            continue
+                        elif all(b == 0x00 for b in raw_bytes):
+                            add_spn_description(spn, spn_name, "Error")
+                            continue
+
                     # Use latin-1 to safely decode any byte sequence
-                    ascii_str = spn_bytes.bytes.decode(encoding="latin-1")
+                    ascii_str = raw_bytes.decode(encoding="latin-1")
                     add_spn_description(spn, spn_name, ascii_str)
                     continue
 

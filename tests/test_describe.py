@@ -834,15 +834,17 @@ def test_missing_spn_in_db_fallback_to_bytes():
 
 
 def test_large_field_ignores_indicators():
-    """Verify that SPNs >= 64 bits ignore J1939 indicators (NA/Error)."""
+    """Verify that SPNs >= 64 bits ignore J1939 indicators (NA/Error) UNLESS they are ASCII.
+    Clarification: J1939/71 Table 7.5 specifies indicators for ASCII data regardless of length.
+    """
     pgn_id = 65259  # VI
     db = {
         "J1939PGNdb": {
             pgn_id: {
                 "Label": "VI",
                 "Name": "Vehicle Identification",
-                "SPNs": [237],
-                "SPNStartBits": [0],
+                "SPNs": [237, 238],
+                "SPNStartBits": [0, 80],
             }
         },
         "J1939SPNdb": {
@@ -852,27 +854,34 @@ def test_large_field_ignores_indicators():
                 "SPNLength": 80,  # 10 bytes
                 "Resolution": 1.0,
                 "Offset": 0,
-            }
+            },
+            "238": {
+                "Name": "Numeric 64",
+                "Units": "rpm",
+                "SPNLength": 64,
+                "Resolution": 1.0,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 1e18,
+            },
         },
         "J1939SATabledb": {},
         "J1939BitDecodings": {},
     }
     describer = get_describer(da_json=db, include_na=True)
 
-    # VIN filled with 0xFF. If indicator check was active, this might show "N/A"
-    # But for >= 64 bits, it should be treated as raw data (ASCII in this case).
-    message_data = bitstring.Bits(hex="FFFFFFFFFFFFFFFFFFFF")
+    # VIN (ASCII) filled with 0xFF. Should be "N/A" as per Table 7.5.
+    message_data = bitstring.Bits(hex="FFFFFFFFFFFFFFFFFFFF" + "FFFFFFFFFFFFFFFF")
     description = describer(message_data, 0x18FEEB00)
 
-    # ASCII 0xFF is not a standard printable char, but it shouldn't be "N/A"
-    assert description["VIN"] != "N/A"
-    # Depending on decoding, it might be a string of \xff or empty if it tries to be clever
-    # Main point: it's not the "N/A" indicator.
-    assert "N/A" not in description["VIN"]
+    assert description["VIN"] == "N/A"
+
+    # Numeric 64-bit field filled with 0xFF. Should NOT be "N/A" (standard rule for >= 64 bits).
+    assert description["Numeric 64"] != "N/A"
 
 
-def test_ascii_skips_indicators():
-    """Verify that SPNs with ASCII units skip indicator logic even for small lengths."""
+def test_ascii_rules_indicators():
+    """Verify that SPNs with ASCII units follow Table 7.5 rules: 0xFF=N/A, 0x00=Error."""
     pgn_id = 65289
     db = {
         "J1939PGNdb": {
@@ -897,19 +906,18 @@ def test_ascii_skips_indicators():
     }
     describer = get_describer(da_json=db, include_na=True)
 
-    # 0xFFFF in 16 bits is normally "N/A".
-    # For ASCII, it should be decoded as the characters '\xff\xff'.
-    message_data = bitstring.Bits(hex="FFFF000000000000")
-    description = describer(message_data, 0x18FF0939)
+    # 0xFFFF -> N/A
+    message_data_na = bitstring.Bits(hex="FFFF000000000000")
+    description_na = describer(message_data_na, 0x18FF0939)
+    assert description_na["Short ASCII"] == "N/A"
 
-    assert "Short ASCII" in description
-    assert description["Short ASCII"] != "N/A"
-    # It should be the decoded bytes.
-    assert description["Short ASCII"] == "\xff\xff"
+    # 0x0000 -> Error
+    message_data_err = bitstring.Bits(hex="0000000000000000")
+    description_err = describer(message_data_err, 0x18FF0939)
+    assert description_err["Short ASCII"] == "Error"
 
 
 def test_old_schema_deprecation_warning():
-    """Verify that using the old schema triggers a DeprecationWarning."""
     db = {
         "J1939PGNdb": {
             "61444": {

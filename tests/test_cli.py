@@ -7,8 +7,6 @@ import sys
 import os
 from io import StringIO
 from pretty_j1939.__main__ import main
-
-
 from unittest.mock import patch
 
 
@@ -46,7 +44,7 @@ def test_cli_stdin():
     db_path = os.path.join("pretty_j1939", "J1939db.json")
 
     stdout, stderr, code = run_cli(
-        ["-", "--da-json", db_path], stdin_content=stdin_data
+        ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
 
     assert code == 0
@@ -60,7 +58,7 @@ def test_cli_short_format():
     db_path = os.path.join("pretty_j1939", "J1939db.json")
 
     stdout, stderr, code = run_cli(
-        ["-", "--da-json", db_path], stdin_content=stdin_data
+        ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
 
     assert code == 0
@@ -75,7 +73,7 @@ def test_cli_timestamp_format():
     db_path = os.path.join("pretty_j1939", "J1939db.json")
 
     stdout, stderr, code = run_cli(
-        ["-", "--da-json", db_path], stdin_content=stdin_data
+        ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
 
     assert code == 0
@@ -88,7 +86,7 @@ def test_cli_indexed_format():
     db_path = os.path.join("pretty_j1939", "J1939db.json")
 
     stdout, stderr, code = run_cli(
-        ["-", "--da-json", db_path], stdin_content=stdin_data
+        ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
 
     assert code == 0
@@ -101,7 +99,7 @@ def test_cli_interface_format():
     db_path = os.path.join("pretty_j1939", "J1939db.json")
 
     stdout, stderr, code = run_cli(
-        ["-", "--da-json", db_path], stdin_content=stdin_data
+        ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
 
     assert code == 0
@@ -119,7 +117,7 @@ def test_cli_filter_pgn():
     db_path = os.path.join("pretty_j1939", "J1939db.json")
     try:
         stdout, stderr, code = run_cli(
-            [log_file, "--filter-pgn", "61444", "--da-json", db_path]
+            [log_file, "--filter-pgn", "61444", "--da-json", db_path, "--json"]
         )
         assert code == 0
         assert '"PGN":"EEC1(61444)"' in stdout
@@ -140,7 +138,7 @@ def test_cli_filter_sa_string():
     # "engine" resolves to 0 and 1 in the standard database
     try:
         stdout, stderr, code = run_cli(
-            [log_file, "--filter-sa", "engine", "--da-json", db_path]
+            [log_file, "--filter-sa", "engine", "--da-json", db_path, "--json"]
         )
         assert code == 0
         assert "Resolving Source Address filter 'engine' to addresses: 0, 1" in stderr
@@ -201,7 +199,7 @@ def test_cli_summary_default_hide():
     stdin_data = "0CF00400#0041FF20481400F0\n" * 8
     db_path = os.path.join("pretty_j1939", "J1939db.json")
     stdout, stderr, code = run_cli(
-        ["-", "--da-json", db_path], stdin_content=stdin_data
+        ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
     assert code == 0
     assert '"Summary"' not in stdout
@@ -212,7 +210,7 @@ def test_cli_summary_default_show():
     stdin_data = "0CF00400#0041FF20481400F0\n" * 9
     db_path = os.path.join("pretty_j1939", "J1939db.json")
     stdout, stderr, code = run_cli(
-        ["-", "--da-json", db_path], stdin_content=stdin_data
+        ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
     assert code == 0
     assert '"Summary"' in stdout
@@ -223,7 +221,7 @@ def test_cli_summary_override_show():
     stdin_data = "0CF00400#0041FF20481400F0\n"
     db_path = os.path.join("pretty_j1939", "J1939db.json")
     stdout, stderr, code = run_cli(
-        ["-", "--summary", "--da-json", db_path], stdin_content=stdin_data
+        ["-", "--summary", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
     assert code == 0
     assert '"Summary"' in stdout
@@ -234,7 +232,7 @@ def test_cli_summary_override_hide():
     stdin_data = "0CF00400#0041FF20481400F0\n" * 10
     db_path = os.path.join("pretty_j1939", "J1939db.json")
     stdout, stderr, code = run_cli(
-        ["-", "--no-summary", "--da-json", db_path], stdin_content=stdin_data
+        ["-", "--no-summary", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
     assert code == 0
     assert '"Summary"' not in stdout
@@ -277,10 +275,10 @@ def test_cli_tp_vin_integration():
 
     try:
         stdout, stderr, code = run_cli(
-            ["-", "--da-json", db_filename], stdin_content=stdin_data
+            ["-", "--da-json", db_filename, "--json"], stdin_content=stdin_data
         )
         assert code == 0
-        # Check if the VIN is decoded. If there's reversal, we'll see it here.
+        # Check if the VIN is decoded.
         assert f'"VIN":"{vin_str}"' in stdout
     finally:
         if os.path.exists(db_filename):
@@ -329,7 +327,7 @@ def test_cli_tp_commanded_address_integration():
 
     try:
         stdout, stderr, code = run_cli(
-            ["-", "--da-json", db_filename], stdin_content=stdin_data
+            ["-", "--da-json", db_filename, "--json"], stdin_content=stdin_data
         )
         assert code == 0
         assert '"New Address":"0x30"' in stdout
@@ -344,25 +342,10 @@ def test_cli_uds_isotp_reassembly():
     debruijn_55 = "00102030405060708091121314151617181922324252627282933435363738394454647484955657585966768697787988990"[
         :55
     ]
-    # UDS Response PDU: 62 00 77 <55 bytes>
-    # Total UDS length = 3 + 55 = 58 (0x3A)
-    # ISO-TP First Frame: 10 3A 62 00 77 ... (3 bytes of data)
-    # 10 3A 62 00 77 30 30 31 (First 3 bytes of debruijn are "001")
-
-    # Request: 18DA00F1 (Target 00, Source F1)
-    # Response: 18DAF100 (Target F1, Source 00)
-
-    # debruijn_hex: '3030313032303330343035303630373038303931313231333134313531363137313831393232333234323532363237323832393333343335333633373338333934343534363437343834393535363537353835393636373638363937373837393838393930'
     debruijn_hex = debruijn_55.encode("ascii").hex().upper()
 
     # PDU: 62 00 77 + debruijn
     pdu_hex = "620077" + debruijn_hex
-    # pdu_hex length = 6 + 110 = 116 chars = 58 bytes. 58 = 0x3A.
-
-    # ISO-TP Frames:
-    # FF: 10 3A [62 00 77 30 30 31]
-    # CF1: 21 [30 32 30 33 30 34 30]
-    # ...
 
     def get_cf(sn, start_byte, length):
         data = pdu_hex[start_byte * 2 : (start_byte + length) * 2]
@@ -374,9 +357,6 @@ def test_cli_uds_isotp_reassembly():
         "18DA00F1#0322007700000000\n"  # Request RDID 0x0077
         f"18DAF100#103A{pdu_hex[0:12]}\n"  # First Frame (6 bytes of PDU)
     )
-    # Remaining 52 bytes in CFs (7 bytes each -> 8 frames total)
-    # CF1 to CF7: 7 bytes each = 49 bytes
-    # CF8: remaining 3 bytes
     for i in range(1, 8):
         stdin_data += get_cf(i, 6 + (i - 1) * 7, 7)
     stdin_data += get_cf(8, 6 + 7 * 7, 3)
@@ -387,12 +367,104 @@ def test_cli_uds_isotp_reassembly():
 
     db_path = os.path.join("pretty_j1939", "J1939db.json")
     stdout, stderr, code = run_cli(
-        ["-", "--no-summary", "--da-json", db_path], stdin_content=stdin_data
+        ["-", "--no-summary", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
-
-    if pdu_hex not in stdout.upper():
-        print(f"DEBUG: stdout={stdout}")
 
     assert code == 0
     # The reassembled payload hex should be present (case insensitive)
     assert pdu_hex in stdout.upper()
+
+
+def test_cli_help_content():
+    """Verify that the CLI help command works."""
+    stdout, stderr, code = run_cli(["--help"])
+    assert code == 0
+    assert "usage:" in stdout.lower()
+    assert "pretty_j1939" in stdout.lower()
+
+
+def test_cli_filter_sa_sa0():
+    """Verify that Source Address filtering works."""
+    candump_data = (
+        " (1615397400.1) can0 0CF00400#0000002048000000\n"  # SA 0
+        " (1615397400.2) can0 0CF00401#0000002048000000\n"  # SA 1
+    )
+    # Filter only for SA 0
+    stdout, stderr, code = run_cli(
+        ["-", "--filter-sa", "0", "--no-summary", "--json"], stdin_content=candump_data
+    )
+    assert code == 0
+    assert '"SA":"Engine #1(  0)"' in stdout
+    assert '"SA":"???(  1)"' not in stdout
+
+
+def test_cli_custom_da_json_wellknown(tmp_path):
+    """Verify that a custom DA JSON file can be used."""
+    import json
+
+    db = {
+        "J1939SATabledb": {"123": "Custom Controller"},
+        "J1939PGNdb": {
+            "61444": {  # Use a well-known PDU2 PGN to avoid any parsing surprises
+                "Label": "CST",
+                "Name": "Custom PGN",
+                "SPNs": [54321],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "54321": {
+                "Name": "Custom SPN",
+                "Units": "units",
+                "SPNLength": 8,
+                "Resolution": 1,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 250,
+            }
+        },
+        "J1939BitDecodings": {},
+    }
+    db_path = tmp_path / "custom_db.json"
+    db_path.write_text(json.dumps(db))
+
+    # EEC1: PGN 61444 (0xF004). SA 123 (0x7B).
+    # can_id = 0x0CF0047B (Priority 3)
+    can_id_hex = "0CF0047B"
+    candump_line = f" (1615397400.1) can0 {can_id_hex}#2A00000000000000\n"
+
+    stdout, stderr, code = run_cli(
+        ["-", "--da-json", str(db_path), "--no-summary", "--json"],
+        stdin_content=candump_line,
+    )
+    assert code == 0
+    assert '"SA":"Custom Controller(123)"' in stdout
+    assert "Custom PGN" in stdout or "CST" in stdout
+
+
+def test_cli_interleaved_tp_sessions():
+    """Verify CLI reassembly when J1939-TP and ISO-TP sessions are interleaved."""
+    # 1. J1939-TP (BAM) - PGN 65226 (DM1), 10 bytes
+
+    # 2. ISO-TP - PGN 0xDA00 (DIAG3), 10 bytes
+    isotp_data = "62007701020304050607"
+
+    stdin_lines = [
+        "18ECFF00#200A0002FFCAFE00",  # TP.CM_BAM (DM1)
+        "18DAF100#100A620077010203",  # ISO-TP FF
+        "18EBFF00#0140FF5B000301FF",  # TP.DT 1
+        "18DAF100#2104050607000000",  # ISO-TP CF
+        "18EBFF00#02FF0000FFFFFFFF",  # TP.DT 2
+    ]
+    stdin_data = "\n".join(stdin_lines) + "\n"
+
+    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    stdout, stderr, code = run_cli(
+        ["-", "--no-summary", "--da-json", db_path, "--json"], stdin_content=stdin_data
+    )
+
+    assert code == 0
+    # Both reassembled payloads should be described
+    assert isotp_data.upper() in stdout.upper()
+    assert '"PGN":"DM1(65226)"' in stdout
+    assert '"Malfunction Indicator Lamp Status"' in stdout
