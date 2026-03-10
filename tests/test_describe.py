@@ -869,3 +869,81 @@ def test_large_field_ignores_indicators():
     # Depending on decoding, it might be a string of \xff or empty if it tries to be clever
     # Main point: it's not the "N/A" indicator.
     assert "N/A" not in description["VIN"]
+
+
+def test_ascii_skips_indicators():
+    """Verify that SPNs with ASCII units skip indicator logic even for small lengths."""
+    pgn_id = 65289
+    db = {
+        "J1939PGNdb": {
+            pgn_id: {
+                "Label": "TST",
+                "Name": "Test PGN",
+                "SPNs": [9999],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "9999": {
+                "Name": "Short ASCII",
+                "Units": "ASCII",
+                "SPNLength": 16,  # 2 bytes
+                "Resolution": 1.0,
+                "Offset": 0,
+            }
+        },
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
+    }
+    describer = get_describer(da_json=db, include_na=True)
+
+    # 0xFFFF in 16 bits is normally "N/A".
+    # For ASCII, it should be decoded as the characters '\xff\xff'.
+    message_data = bitstring.Bits(hex="FFFF000000000000")
+    description = describer(message_data, 0x18FF0939)
+
+    assert "Short ASCII" in description
+    assert description["Short ASCII"] != "N/A"
+    # It should be the decoded bytes.
+    assert description["Short ASCII"] == "\xff\xff"
+
+
+def test_numerical_validation_regression_prevention():
+    """Explicitly verify that numerical SPNs raise Out of range if beyond limits.
+
+    This protects against accidentally setting validate=False in describe_message_data.
+    """
+    pgn_id = 65290
+    db = {
+        "J1939PGNdb": {
+            pgn_id: {
+                "Label": "REG",
+                "Name": "Regression PGN",
+                "SPNs": [5555],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "5555": {
+                "Name": "Strict SPN",
+                "Units": "deg",
+                "SPNLength": 8,
+                "Resolution": 1.0,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 200,  # 0xC8
+            }
+        },
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
+    }
+    describer = get_describer(da_json=db)
+
+    # 201 (0xC9) is just above 200.
+    message_data = bitstring.Bits(hex="C900000000000000")
+    description = describer(message_data, 0x18FF0A39)
+
+    assert "Strict SPN" in description
+    assert "Out of range" in description["Strict SPN"]
+    # If validation was disabled, it would show "201.0 [deg]"
+    assert "201.0" not in description["Strict SPN"]

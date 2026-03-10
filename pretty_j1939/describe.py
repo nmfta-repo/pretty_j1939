@@ -655,6 +655,20 @@ class DADescriber:
                 mark_spn_covered(new_spn, new_spn_name, new_spn_description)
 
             try:
+                # ASCII consolidated logic
+                is_ascii = spn_units.lower() == "ascii"
+
+                if is_ascii:
+                    spn_bytes = self.get_spn_bytes(
+                        message_data_bitstring, spn, pgn, is_complete_message
+                    )
+                    if spn_bytes.length == 0 and not is_complete_message:
+                        continue
+                    # Use latin-1 to safely decode any byte sequence
+                    ascii_str = spn_bytes.bytes.decode(encoding="latin-1")
+                    add_spn_description(spn, spn_name, ascii_str)
+                    continue
+
                 if is_num:
                     raw_spn_value = self.get_spn_value(
                         message_data_bitstring,
@@ -670,7 +684,9 @@ class DADescriber:
 
                     # Standard J1939 N/A check is decoupled from formatting and takes precedence.
                     # Even if J1939BitDecodings has a mapping, we flag it as N/A if it matches the mask.
-                    if is_spn_na(raw_spn_value, spn_length):
+                    # NEW: Skip indicator checks for ASCII units as per J1939-71.
+                    is_ascii = spn_units.lower() == "ascii"
+                    if not is_ascii and is_spn_na(raw_spn_value, spn_length):
                         if self.include_na:
                             add_spn_description(spn, spn_name, "N/A")
                         else:
@@ -689,7 +705,7 @@ class DADescriber:
                             )
 
                     # Priority 2: If no explicit DA mapping, check remaining standard J1939 Indicators
-                    if spn_value_description is None:
+                    if not is_ascii and spn_value_description is None:
                         if is_spn_error(raw_spn_value, spn_length):
                             add_spn_description(spn, spn_name, "Error")
                             continue
@@ -718,16 +734,23 @@ class DADescriber:
                                     spn_value_description = "N/A"
 
                         if spn_value_description:
-                            add_spn_description(
-                                spn,
-                                spn_name,
-                                "%d (%s)"
-                                % (raw_spn_value, spn_value_description.strip()),
+                            val_desc = "%d (%s)" % (
+                                raw_spn_value,
+                                spn_value_description.strip(),
                             )
+                            add_spn_description(spn, spn_name, val_desc)
                         else:
                             add_spn_description(
                                 spn, spn_name, "%d (Unknown)" % raw_spn_value
                             )
+                    elif is_ascii:
+                        # NEW: Handle ASCII SPNs correctly if they were categorized as is_num
+                        # (e.g. if is_spn_numerical_values didn't catch it)
+                        spn_bytes = self.get_spn_bytes(
+                            message_data_bitstring, spn, pgn, is_complete_message
+                        )
+                        ascii_str = spn_bytes.bytes.decode(encoding="utf-8")
+                        add_spn_description(spn, spn_name, ascii_str)
                     else:
                         # Numerical scaling
                         spn_value = self.get_spn_value(
@@ -746,8 +769,10 @@ class DADescriber:
                         continue
                     else:
                         # NEW: check for NA/Error even if not numerical
+                        # SKIP if ASCII as per J1939-71
+                        is_ascii = spn_units.lower() == "ascii"
                         raw_val = None
-                        if 0 < spn_bytes.length <= 64:
+                        if not is_ascii and 0 < spn_bytes.length <= 64:
                             if spn_bytes.length % 8 == 0 and spn_bytes.length > 8:
                                 raw_val = spn_bytes.uintle
                             else:

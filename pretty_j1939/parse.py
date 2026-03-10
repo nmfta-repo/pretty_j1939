@@ -84,6 +84,8 @@ def is_spn_bitencoded(spn_units):
 
 
 def is_spn_numerical_values(spn_units):
+    if spn_units is None:
+        return False
     norm_units = spn_units.lower()
     return norm_units not in (
         "manufacturer determined",
