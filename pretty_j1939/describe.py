@@ -252,16 +252,30 @@ class DADescriber:
         return name, offset, scale, spn_end, spn_length, spn_start, units
 
     def lookup_spn_startbit(self, spn_object, spn, pgn):
-        # support earlier versions of J1939db.json which did not include PGN-to-SPN mappings at the PGN
-        spn_start = spn_object.get("StartBit")
-        if (
-            spn_start is None
-        ):  # otherwise, try to use the SPN bit position information at the PGN
-            pgn_object = self.pgn_objects.get(pgn, {})
-            spns_in_pgn = pgn_object.get("SPNs", [])
-            startbits_in_pgn = pgn_object.get("SPNStartBits", [])
-            if spn in spns_in_pgn and len(startbits_in_pgn) > spns_in_pgn.index(spn):
-                spn_start = startbits_in_pgn[spns_in_pgn.index(spn)]
+        pgn_object = self.pgn_objects.get(pgn, {})
+        spns_in_pgn = pgn_object.get("SPNs", [])
+        startbits_in_pgn = pgn_object.get("SPNStartBits")
+
+        if startbits_in_pgn is not None:
+            if spn in spns_in_pgn:
+                idx = spns_in_pgn.index(spn)
+                if idx < len(startbits_in_pgn):
+                    spn_start = startbits_in_pgn[idx]
+                else:
+                    spn_start = -1
+            else:
+                spn_start = -1
+        else:
+            # support earlier versions of J1939db.json which did not include PGN-to-SPN mappings at the PGN
+            spn_start = spn_object.get("StartBit")
+            if spn_start is not None:
+                import warnings
+
+                warnings.warn(
+                    "Database uses old schema (StartBit in SPN). Please update to new schema (SPNStartBits in PGN).",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
             else:
                 spn_start = -1  # Unknown start bit
 
