@@ -917,72 +917,81 @@ def decode_j1939_name(payload):
 
 
 class J1939TransportTracker:
-
     def __init__(self, real_time):
         self.is_real_time = real_time
-        self.new_pgn = {}
-        self.new_data = {}
-        self.new_count = {}
-        self.new_length = {}
-        self.spn_coverage = {}
+        self.sessions = {}  # (da, sa) -> session_info
 
     def process(self, transport_found_processor, message_bytes, message_id):
         _, da, sa = parse_j1939_id(message_id)
-        if is_connection_management_message(message_id) and is_bam_rts_cts_message(
-            message_bytes
-        ):  # track new conn
-            self.new_pgn[(da, sa)] = (
-                (message_bytes[7] << 16) + (message_bytes[6] << 8) + message_bytes[5]
-            )
-            self.new_length[(da, sa)] = (message_bytes[2] << 8) + message_bytes[1]
-            self.new_count[(da, sa)] = message_bytes[3]
-            self.new_data[(da, sa)] = [
-                None for _ in range(7 * self.new_count[(da, sa)])
-            ]
+
+        if is_connection_management_message(message_id):
+            control = message_bytes[0]
+            if control == 32 or control == 16:  # BAM or RTS
+                pgn = (
+                    (message_bytes[7] << 16)
+                    + (message_bytes[6] << 8)
+                    + message_bytes[5]
+                )
+                length = (message_bytes[2] << 8) + message_bytes[1]
+                count = message_bytes[3]
+                self.sessions[(da, sa)] = {
+                    "pgn": pgn,
+                    "length": length,
+                    "count": count,
+                    "data": [None] * (count * 7),
+                    "type": "BAM" if control == 32 else "RTS",
+                    "packets_received": 0,
+                }
+            elif control == 19:  # EOM (End of Message ACK)
+                if (da, sa) in self.sessions:
+                    session = self.sessions[(da, sa)]
+                    if not self.is_real_time:
+                        full_data = session["data"][: session["length"]]
+                        if None not in full_data:
+                            data_bytes = bytes(full_data)
+                            transport_found_processor(
+                                data_bytes, sa, session["pgn"], is_last_packet=True
+                            )
+                    del self.sessions[(da, sa)]
+            elif control == 255:  # Connection Abort
+                if (da, sa) in self.sessions:
+                    del self.sessions[(da, sa)]
+
         elif is_data_transfer_message(message_id):
-            if (da, sa) in self.new_data.keys():
+            if (da, sa) in self.sessions:
+                session = self.sessions[(da, sa)]
                 packet_number = message_bytes[0]
 
-                # Bounds check
-                if packet_number > self.new_count[(da, sa)] or packet_number < 1:
+                if packet_number > session["count"] or packet_number < 1:
                     return
 
-                for b, i in zip(message_bytes[1:], range(7)):
-                    idx = 7 * (packet_number - 1) + i
-                    if idx < len(self.new_data[(da, sa)]):
-                        self.new_data[(da, sa)][idx] = b
+                for i in range(7):
+                    idx = (packet_number - 1) * 7 + i
+                    if idx < len(session["data"]) and i + 1 < len(message_bytes):
+                        session["data"][idx] = message_bytes[i + 1]
 
-                is_last_packet = packet_number == self.new_count[(da, sa)]
+                session["packets_received"] += 1
+                is_last_packet = packet_number == session["count"]
 
                 if self.is_real_time:
-                    data_bytes = self.new_data[(da, sa)][0 : packet_number * 7]
-                    if None not in data_bytes:
-                        data_bytes = bytes(data_bytes)
-                        transport_found_processor(
-                            data_bytes,
-                            sa,
-                            self.new_pgn[(da, sa)],
-                            spn_coverage=self.spn_coverage,
-                            is_last_packet=is_last_packet,
-                        )
-                    if is_last_packet:
-                        # Clear session
-                        del self.new_data[(da, sa)]
-                        del self.new_pgn[(da, sa)]
-                        del self.new_length[(da, sa)]
-                        del self.new_count[(da, sa)]
-                elif is_last_packet:
-                    data_bytes = self.new_data[(da, sa)][0 : self.new_length[(da, sa)]]
-                    if None not in data_bytes:
-                        data_bytes = bytes(data_bytes)
-                        transport_found_processor(
-                            data_bytes, sa, self.new_pgn[(da, sa)], is_last_packet=True
-                        )
-                    # Clear session
-                    del self.new_data[(da, sa)]
-                    del self.new_pgn[(da, sa)]
-                    del self.new_length[(da, sa)]
-                    del self.new_count[(da, sa)]
+                    # In real-time mode, we emit data as it arrives
+                    payload = message_bytes[1:]
+                    transport_found_processor(
+                        bytes(payload),
+                        sa,
+                        session["pgn"],
+                        is_last_packet=(is_last_packet and session["type"] == "BAM"),
+                    )
+
+                if is_last_packet and session["type"] == "BAM":
+                    if not self.is_real_time:
+                        full_data = session["data"][: session["length"]]
+                        if None not in full_data:
+                            data_bytes = bytes(full_data)
+                            transport_found_processor(
+                                data_bytes, sa, session["pgn"], is_last_packet=True
+                            )
+                    del self.sessions[(da, sa)]
 
 
 class J1939Describer:

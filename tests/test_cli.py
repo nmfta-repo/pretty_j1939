@@ -130,15 +130,24 @@ def test_cli_filter_pgn():
 
 def test_cli_filter_sa_string():
     """Verify CLI Source Address filtering using string lookup."""
+    # Create a temp log with SA 0
+    log_file = "test_filter_sa_temp.log"
+    with open(log_file, "w") as f:
+        f.write("(1612543138.000000) vcan0 0CF00400#0041FF20481400F0\n")
+
     # Explicitly use the project's database to avoid environment-specific failures
     db_path = os.path.join("pretty_j1939", "J1939db.json")
-    # "engine" resolves to 0 and 1. test_tp_frames.txt has SA 0.
-    stdout, stderr, code = run_cli(
-        ["tests/test_tp_frames.txt", "--filter-sa", "engine", "--da-json", db_path]
-    )
-    assert code == 0
-    assert "Resolving Source Address filter 'engine' to addresses: 0, 1" in stderr
-    assert '"SA":"Engine #1(  0)"' in stdout
+    # "engine" resolves to 0 and 1 in the standard database
+    try:
+        stdout, stderr, code = run_cli(
+            [log_file, "--filter-sa", "engine", "--da-json", db_path]
+        )
+        assert code == 0
+        assert "Resolving Source Address filter 'engine' to addresses: 0, 1" in stderr
+        assert '"SA":"Engine #1(  0)"' in stdout
+    finally:
+        if os.path.exists(log_file):
+            os.remove(log_file)
 
 
 def test_cli_highlight_pgn():
@@ -229,3 +238,101 @@ def test_cli_summary_override_hide():
     )
     assert code == 0
     assert '"Summary"' not in stdout
+
+
+def test_cli_tp_vin_integration():
+    """Verify CLI reassembly and decoding of a 17-byte VIN via BAM."""
+    # Custom DB for VIN
+    db = {
+        "J1939PGNdb": {
+            "65259": {"Label": "VI", "Name": "Vehicle Identification", "SPNs": [237]}
+        },
+        "J1939SPNdb": {
+            "237": {
+                "Name": "VIN",
+                "Units": "ASCII",
+                "SPNLength": 136,
+                "Resolution": 1,
+                "Offset": 0,
+                "StartBit": 0,
+            }
+        },
+    }
+    import json
+
+    db_filename = "tmp_tp_db.json"
+    with open(db_filename, "w") as f:
+        json.dump(db, f)
+
+    vin_str = "12345678901234567"
+    vin_hex = vin_str.encode("ascii").hex().upper()
+
+    # BAM Setup
+    stdin_data = (
+        "18ECFF00#20110003FFEBFE00\n"
+        f"18EBFF00#01{vin_hex[0:14]}\n"
+        f"18EBFF00#02{vin_hex[14:28]}\n"
+        f"18EBFF00#03{vin_hex[28:34]}FFFFFFFF\n"
+    )
+
+    try:
+        stdout, stderr, code = run_cli(
+            ["-", "--da-json", db_filename], stdin_content=stdin_data
+        )
+        assert code == 0
+        # Check if the VIN is decoded. If there's reversal, we'll see it here.
+        assert f'"VIN":"{vin_str}"' in stdout
+    finally:
+        if os.path.exists(db_filename):
+            os.remove(db_filename)
+
+
+def test_cli_tp_commanded_address_integration():
+    """Verify CLI reassembly and decoding of Commanded Address via BAM."""
+    db = {
+        "J1939PGNdb": {
+            "65240": {"Label": "CA", "Name": "Commanded Address", "SPNs": [2849, 2850]}
+        },
+        "J1939SPNdb": {
+            "2849": {
+                "Name": "NAME",
+                "Units": "byte",
+                "SPNLength": 64,
+                "Resolution": 1,
+                "Offset": 0,
+                "StartBit": 0,
+            },
+            "2850": {
+                "Name": "New Address",
+                "Units": "byte",
+                "SPNLength": 8,
+                "Resolution": 1,
+                "Offset": 0,
+                "StartBit": 64,
+            },
+        },
+    }
+    import json
+
+    db_filename = "tmp_ca_db.json"
+    with open(db_filename, "w") as f:
+        json.dump(db, f)
+
+    # NAME (8 bytes) + New Address (1 byte)
+    ca_payload_hex = "010203040506070830"
+
+    stdin_data = (
+        "18ECFF00#20090002FFD8FE00\n"  # BAM: Len=9, Pkts=2, PGN=65240
+        f"18EBFF00#01{ca_payload_hex[0:14]}\n"
+        f"18EBFF00#02{ca_payload_hex[14:18]}FFFFFFFFFF\n"
+    )
+
+    try:
+        stdout, stderr, code = run_cli(
+            ["-", "--da-json", db_filename], stdin_content=stdin_data
+        )
+        assert code == 0
+        assert '"New Address":"0x30"' in stdout
+    finally:
+        if os.path.exists(db_filename):
+            os.remove(db_filename)
