@@ -23,23 +23,18 @@ def test_isotp_reassembly():
     # Process FF
     res = describer(bitstring.Bits(bytes=ff_data), msg_id)
     # Expect empty description (incomplete)
-    if res:
-        print("FAIL: FF produced output prematurely:", res)
+    assert not res, f"FAIL: FF produced output prematurely: {res}"
 
     # Process CF
     res = describer(bitstring.Bits(bytes=cf_data), msg_id)
 
     # Verify reassembly
-    if not res:
-        print("FAIL: No output after CF")
-
-    print("Result:", res)
+    assert res, "FAIL: No output after CF"
 
     expected_pgn = 55808
     expected_data = "48656C6C6F20576F726C64"  # "Hello World" in hex
 
-    if res.get("_pgn") != expected_pgn:
-        print(f"FAIL: PGN mismatch. Expected {expected_pgn}, got {res.get('_pgn')}")
+    assert res.get("_pgn") == expected_pgn, f"FAIL: PGN mismatch. Expected {expected_pgn}, got {res.get('_pgn')}"
 
     # Check if raw bytes are present (describer might output them if no SPNs found)
     # Since DIAG3 likely has no SPNs in the default DB, we expect raw bytes if configured
@@ -47,19 +42,8 @@ def test_isotp_reassembly():
     # However, if no SPNs are found, it might default to printing bytes.
     # Let's check Bytes field.
 
-    if "Bytes" in res:
-        if res["Bytes"] != expected_data:
-            print(f"FAIL: Data mismatch. Expected {expected_data}, got {res['Bytes']}")
-
-    else:
-        # If no SPNs and no Bytes, maybe it's empty?
-        # J1939Describer logic: if len(description) == 0 and not is_transport_pgn(pgn)...
-        # But 0xDA00 is NOT is_transport_pgn (J1939 TP).
-        # So it should print Bytes.
-        print("FAIL: 'Bytes' field missing")
-
-    print("PASS: ISO-TP reassembly successful")
-
+    assert "Bytes" in res, "FAIL: 'Bytes' field missing"
+    assert res["Bytes"] == expected_data, f"FAIL: Data mismatch. Expected {expected_data}, got {res['Bytes']}"
 
 if __name__ == "__main__":
     if test_isotp_reassembly():

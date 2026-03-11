@@ -1348,43 +1348,31 @@ DEFAULT_REAL_TIME = False
 DEFAULT_INCLUDE_RAW_DATA = False
 
 
-def get_describer(
-    da_json=None,
-    describe_pgns=DEFAULT_PGN,
-    describe_spns=DEFAULT_SPN,
-    describe_link_layer=DEFAULT_LINK,
-    describe_transport_layer=DEFAULT_TRANSPORT,
-    real_time=DEFAULT_REAL_TIME,
-    include_transport_rawdata=DEFAULT_CANDATA,  # TODO: separate show transport data from candata
-    include_na=DEFAULT_INCLUDE_NA,
-    include_raw_data=DEFAULT_INCLUDE_RAW_DATA,
-    enable_isotp=True,
-):
+def get_describer(da_json=None, **kwargs):
     if da_json is None or da_json == DEFAULT_DA_JSON:
         da_json = get_default_da_json()
 
+    # Apply default configuration values to kwargs
+    kwargs.setdefault("describe_pgns", DEFAULT_PGN)
+    kwargs.setdefault("describe_spns", DEFAULT_SPN)
+    kwargs.setdefault("describe_link_layer", DEFAULT_LINK)
+    kwargs.setdefault("describe_transport_layer", DEFAULT_TRANSPORT)
+    kwargs.setdefault("real_time", DEFAULT_REAL_TIME)
+    kwargs.setdefault("include_transport_rawdata", DEFAULT_CANDATA)
+    kwargs.setdefault("include_na", DEFAULT_INCLUDE_NA)
+    kwargs.setdefault("include_raw_data", DEFAULT_INCLUDE_RAW_DATA)
+
+    # enable_isotp is only used by J1939Describer
+    enable_isotp = kwargs.pop("enable_isotp", True)
+
     describer = J1939Describer(
-        describe_pgns=describe_pgns,
-        describe_spns=describe_spns,
-        describe_link_layer=describe_link_layer,
-        describe_transport_layer=describe_transport_layer,
-        include_transport_rawdata=include_transport_rawdata,
-        include_na=include_na,
-        include_raw_data=include_raw_data,
         enable_isotp=enable_isotp,
-        real_time=real_time,
+        **kwargs
     )
 
     da_describer = DADescriber(
         da_json=da_json,
-        describe_pgns=describe_pgns,
-        describe_spns=describe_spns,
-        describe_link_layer=describe_link_layer,
-        describe_transport_layer=describe_transport_layer,
-        real_time=real_time,
-        include_transport_rawdata=include_transport_rawdata,
-        include_na=include_na,
-        include_raw_data=include_raw_data,
+        **kwargs
     )
     describer.set_da_describer(da_describer)
 
