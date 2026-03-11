@@ -316,8 +316,8 @@ class J1939Viewer:
                     b_int = int(byte_str, 16)
                     if 32 <= b_int <= 126:
                         return curses.color_pair(12)
-                except ValueError:
-                    pass
+                except ValueError as e:
+                    logger.debug(f"Byte {byte_str} is not valid hex: {e}")
                 return curses.color_pair(13)
 
             prev_data_hex = ""
@@ -725,7 +725,7 @@ def main():
             theme_name=args.theme,
         )
     except KeyboardInterrupt:
-        pass
+        logger.info("Viewer terminated by user")
 
 
 if __name__ == "__main__":

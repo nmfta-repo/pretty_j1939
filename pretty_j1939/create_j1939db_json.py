@@ -466,7 +466,8 @@ class J1939daConverter:
                         val_str = str(i)
                         if val_str not in bit_object:
                             bit_object.update(({val_str: enum_description}))
-                except ValueError:
+                except ValueError as e:
+                    print(f"Skipping enum value due to error: {e}")
                     continue
             else:
                 match = re.match(r"[ ]*([0-9bxXA-F]+)", line)
@@ -487,7 +488,8 @@ class J1939daConverter:
 
                     if val not in bit_object:
                         bit_object.update(({val: enum_description}))
-                except ValueError:
+                except ValueError as e:
+                    print(f"Skipping enum value due to error: {e}")
                     continue
 
     @staticmethod
@@ -709,7 +711,8 @@ class J1939daConverter:
                         spn_order_inpgn = spn_position_contents.strip()
                     else:
                         spn_order_inpgn = spn_startbit_inpgn
-                except ValueError:
+                except ValueError as e:
+                    print(f"Skipping enum value due to error: {e}")
                     continue
 
                 if (
@@ -779,8 +782,8 @@ class J1939daConverter:
         for t in header_texts:
             try:
                 return header_row.index(t)
-            except ValueError:
-                continue
+            except ValueError as e:
+                pass
         return -1
 
     def get_header_row(self, sheet):
@@ -1057,7 +1060,8 @@ class J1939daConverter:
                     description = description.strip()
                     for val in range(start_range, end_range + 1):
                         j1939_sa_tabledb.update({str(val): description})
-                except (ValueError, TypeError, IndexError):
+                except (ValueError, TypeError, IndexError) as e:
+                    print(f"Skipping SA range due to error: {e}")
                     continue
             elif (
                 source_address_id_col != -1
@@ -1068,7 +1072,8 @@ class J1939daConverter:
                     val = str(int(row[source_address_id_col]))
                     name = name.strip()
                     j1939_sa_tabledb.update({val: name})
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    print(f"Skipping row due to error: {e}")
                     continue
         return
 
@@ -1099,7 +1104,8 @@ class J1939daConverter:
                     val = str(int(row[id_col]))
                     name = unidecode.unidecode(str(row[name_col])).strip()
                     mfr_db.update({val: name})
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    print(f"Skipping row due to error: {e}")
                     continue
 
     def process_industry_groups_sheet(self, sheet):
@@ -1129,7 +1135,8 @@ class J1939daConverter:
                     val = str(int(row[id_col]))
                     name = unidecode.unidecode(str(row[name_col])).strip()
                     ig_db.update({val: name})
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    print(f"Skipping row due to error: {e}")
                     continue
 
     def process_vehicle_systems_sheet(self, sheet, ig_val=None):
@@ -1163,7 +1170,8 @@ class J1939daConverter:
                         vs_db.update({key: name})
                     else:
                         vs_db.update({val: name})
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    print(f"Skipping row due to error: {e}")
                     continue
 
     def process_functions_sheet(self, sheet, ig_val=None, vs_val=None):
@@ -1230,7 +1238,8 @@ class J1939daConverter:
                             {f"{row_ig_val}_{vs_id}": vs_name}
                         )
 
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as e:
+                    print(f"Skipping row due to error: {e}")
                     continue
 
     def convert(self, output_file):

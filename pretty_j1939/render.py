@@ -86,8 +86,8 @@ class HighPerformanceRenderer:
                         ) as f:
                             theme_dict.update(json.load(f))
                             theme_path = None
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to load built-in theme {theme_path}: {e}")
 
         if theme_path and os.path.exists(theme_path):
             try:

@@ -1331,8 +1331,8 @@ def get_default_da_json():
             if importlib.resources.is_resource("pretty_j1939", filename):
                 with importlib.resources.path("pretty_j1939", filename) as p:
                     return str(p)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to resolve built-in database path: {e}")
 
     return filename  # Final fallback to just the name
 

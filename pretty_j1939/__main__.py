@@ -338,7 +338,8 @@ class J1939Runner:
                             data_hex_str = "0x" + "".join(data_hex_list)
                             message_id = bitstring.Bits(hex=msg_id_str)
                             message_data = bitstring.Bits(hex=data_hex_str)
-                        except (ValueError, IndexError):
+                        except (ValueError, IndexError) as e:
+                            logger.debug(f"Skipping malformed message due to decoding error: {e}")
                             continue
                     else:
                         parts = candump_line.split()
@@ -375,7 +376,8 @@ class J1939Runner:
                             msg_id_str, msg_data_str = message.split("#", 1)
                             message_id = bitstring.Bits(hex=msg_id_str)
                             message_data = bitstring.Bits(hex=msg_data_str)
-                        except (ValueError, IndexError):
+                        except (ValueError, IndexError) as e:
+                            logger.debug(f"Skipping candump line due to decoding error: {e}")
                             continue
                 elif can and isinstance(item, can.Message):
                     message_id = bitstring.Bits(uint=item.arbitration_id, length=32)
@@ -586,8 +588,8 @@ class J1939Runner:
             if bus:
                 try:
                     bus.shutdown()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to shutdown bus cleanly: {e}")
             self.print_summary()
             if self.write_f:
                 self.write_f.close()
