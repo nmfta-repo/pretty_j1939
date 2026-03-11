@@ -765,5 +765,9 @@
       "OperationalHigh": 1e12
     }
   },
-  "J1939BitDecodings": {}
+  "J1939BitDecodings": {},
+  "J1939Manufacturerdb": {},
+  "J1939IndustryGroupdb": {},
+  "J1939Functiondb": {},
+  "J1939VehicleSystemdb": {}
 }

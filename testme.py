@@ -200,6 +200,43 @@ def main():
     elif official_jsons:
         print("  All official JSONs have J1939BitDecodings entries.")
 
+    # Phase 1.7: Regression Sweep for NAME mapping dictionaries
+    print("\n--- Phase 1.7: Regression Sweep for NAME mapping dictionaries ---")
+    name_maps_missing = False
+    for json_file in official_jsons:
+        with open(json_file, "r", encoding="utf-8") as f:
+            da = json.load(f)
+            missing_in_this_file = []
+            for map_key in [
+                "J1939Manufacturerdb",
+                "J1939IndustryGroupdb",
+                "J1939Functiondb",
+                "J1939VehicleSystemdb",
+            ]:
+                if len(da.get(map_key, {})) == 0:
+                    missing_in_this_file.append(map_key)
+            
+            if missing_in_this_file:
+                print(
+                    f"  [FAIL] {json_file.name} is missing populated maps: {', '.join(missing_in_this_file)}"
+                )
+                name_maps_missing = True
+            else:
+                mfr_count = len(da.get("J1939Manufacturerdb"))
+                ig_count = len(da.get("J1939IndustryGroupdb"))
+                func_count = len(da.get("J1939Functiondb"))
+                vs_count = len(da.get("J1939VehicleSystemdb"))
+                print(
+                    f"  [PASS] {json_file.name} has NAME maps: Mfr={mfr_count}, IG={ig_count}, Func={func_count}, VS={vs_count}"
+                )
+
+    if name_maps_missing:
+        # Note: older DAs might genuinely not have all these sheets, but we expect modern ones to.
+        # For now, let's treat it as a warning unless we want to strictly enforce it for all.
+        print("  WARNING: Some official JSONs are missing some NAME mapping dictionaries.")
+    elif official_jsons:
+        print("  All official JSONs have populated NAME mapping dictionaries.")
+
     # Find other JSON DAs in tmp/
     other_jsons = [f for f in tmp_dir.glob("*.json") if f.is_file()]
 

@@ -71,6 +71,40 @@ NA_NAN = float("nan")
 EMPTY_BITS = bitstring.Bits(bytes=b"")
 
 
+class NameTracker:
+    """Tracks J1939 ECU names dynamically from Address Claimed (PGN 60928) messages."""
+
+    def __init__(
+        self, manufacturer_db=None, industry_db=None, function_db=None, vehicle_db=None
+    ):
+        self.dynamic_names = {}  # SA -> Decoded NAME dict
+        self.manufacturer_db = manufacturer_db
+        self.industry_db = industry_db
+        self.function_db = function_db
+        self.vehicle_db = vehicle_db
+
+    def update(self, sa, decoded_name):
+        self.dynamic_names[sa] = decoded_name
+
+    def get_name(self, sa):
+        decoded = self.dynamic_names.get(sa)
+        if decoded:
+            # The decoded name already contains the translated strings if the databases were provided.
+            # Manufacturer Code: "4 (Dearborn Group Inc.)"
+            # Function ID: "3 (Unknown Function)" or "129 (On-Highway Engine)"
+            # Let's extract the translated part or fall back to the raw value.
+            def get_pretty(val):
+                if "(" in str(val) and ")" in str(val):
+                    return str(val).split("(")[1].split(")")[0]
+                return str(val)
+
+            mfr = get_pretty(decoded.get("Manufacturer Code", "???"))
+            func = get_pretty(decoded.get("Function ID", "???"))
+            ident = decoded.get("Identity Number", "???")
+            return f"{mfr} {func} ID:{ident}"
+        return None
+
+
 class DADescriber:
     def __init__(
         self,
@@ -88,6 +122,10 @@ class DADescriber:
         self.spn_objects = {}
         self.address_names = {}
         self.bit_encodings = {}
+        self.manufacturer_db = {}
+        self.industry_db = {}
+        self.function_db = {}
+        self.vehicle_db = {}
 
         if isinstance(da_json, dict):
             j1939db = da_json
@@ -110,6 +148,15 @@ class DADescriber:
         for spn_label, bit_encoding in j1939db.get("J1939BitDecodings", {}).items():
             # TODO check for all expected fields on each object
             self.bit_encodings.update({int(spn_label): bit_encoding})
+
+        self.manufacturer_db = j1939db.get("J1939Manufacturerdb", {})
+        self.industry_db = j1939db.get("J1939IndustryGroupdb", {})
+        self.function_db = j1939db.get("J1939Functiondb", {})
+        self.vehicle_db = j1939db.get("J1939VehicleSystemdb", {})
+
+        self.name_tracker = NameTracker(
+            self.manufacturer_db, self.industry_db, self.function_db, self.vehicle_db
+        )
 
         self.da_json = da_json if isinstance(da_json, str) else "in-memory"
         self.describe_pgns = describe_pgns
@@ -161,7 +208,10 @@ class DADescriber:
             address_name = "All"
         else:
             formatted_address = "({:3d})".format(address)
-            address_name = self.address_names.get(address)
+            # Try dynamic name tracker first for dynamic range or if not in static DB
+            address_name = self.name_tracker.get_name(address)
+            if address_name is None:
+                address_name = self.address_names.get(address)
             if address_name is None:
                 address_name = "???"
         return formatted_address, address_name
@@ -515,7 +565,12 @@ class DADescriber:
         return value
 
     def describe_message_data(
-        self, pgn, message_data_bitstring, is_complete_message=True, skip_spns=None
+        self,
+        pgn,
+        message_data_bitstring,
+        is_complete_message=True,
+        skip_spns=None,
+        sa=None,
     ):
         if skip_spns is None:  # TODO have one default for skip_spns
             skip_spns = {}
@@ -539,9 +594,17 @@ class DADescriber:
                 return description
 
         if pgn == 60928:  # Address Claimed
-            name_decoded = decode_j1939_name(message_data_bitstring.bytes)
+            name_decoded = decode_j1939_name(
+                message_data_bitstring.bytes,
+                manufacturer_db=self.manufacturer_db,
+                industry_db=self.industry_db,
+                function_db=self.function_db,
+                vehicle_db=self.vehicle_db,
+            )
             if name_decoded:
                 description.update(name_decoded)
+                if sa is not None:
+                    self.name_tracker.update(sa, name_decoded)
 
             if not self.include_raw_data:
                 return description
@@ -936,38 +999,54 @@ def get_spn_cut_bytes(
     return b
 
 
-def decode_j1939_name(payload):
+def decode_j1939_name(
+    payload, manufacturer_db=None, industry_db=None, function_db=None, vehicle_db=None
+):
     if len(payload) != 8:
         return None
 
     # Convert bytes to a single 64-bit integer (Little Endian)
     name_value = int.from_bytes(payload, byteorder="little")
 
-    industry_groups = {
-        0: "Global",
-        1: "On-Highway Equipment",
-        2: "Agricultural and Forestry Equipment",
-        3: "Construction Equipment",
-        4: "Marine Equipment",
-        5: "Industrial - Process Control - Stationary (Gen-Sets)",
-    }
-
-    # Simplified Vehicle System mapping for common ones
-    vehicle_systems = {0: "Non-specific System", 1: "Tractor", 2: "Trailer"}
-
     ig_val = (name_value >> 60) & 0x07
     vs_val = (name_value >> 49) & 0x7F
+    func_val = (name_value >> 40) & 0xFF
+    mfr_val = (name_value >> 21) & 0x7FF
+    ident_val = (name_value >> 0) & 0x1FFFFF
+
+    def lookup(db, key, default):
+        if db is None:
+            return default
+        return db.get(str(key), default)
+
+    # Industry Group Lookup
+    ig_name = lookup(industry_db, ig_val, "Unknown Industry Group")
+
+    # Vehicle System Lookup
+    vs_name = lookup(vehicle_db, vs_val, "Unknown Vehicle System")
+
+    # Function Lookup
+    if func_val <= 127:
+        # Independent lookup
+        func_name = lookup(function_db, func_val, "Unknown Function")
+    else:
+        # Dependent lookup: f"{industry_group}_{vehicle_system}_{function}"
+        dep_key = f"{ig_val}_{vs_val}_{func_val}"
+        func_name = lookup(function_db, dep_key, "Unknown Function")
+
+    # Manufacturer Lookup
+    mfr_name = lookup(manufacturer_db, mfr_val, "Unknown Manufacturer")
 
     decoded = {
-        "Identity Number": (name_value >> 0) & 0x1FFFFF,
-        "Manufacturer Code": (name_value >> 21) & 0x7FF,
+        "Identity Number": ident_val,
+        "Manufacturer Code": f"{mfr_val} ({mfr_name})",
         "ECU Instance": (name_value >> 32) & 0x07,
         "Function Instance": (name_value >> 35) & 0x1F,
-        "Function ID": (name_value >> 40) & 0xFF,
+        "Function ID": f"{func_val} ({func_name})",
         "Reserved": (name_value >> 48) & 0x01,
-        "Vehicle System": f"{vs_val} ({vehicle_systems.get(vs_val, 'Unknown')})",
+        "Vehicle System": f"{vs_val} ({vs_name})",
         "Vehicle System Instance": (name_value >> 56) & 0x0F,
-        "Industry Group": f"{ig_val} ({industry_groups.get(ig_val, 'Unknown')})",
+        "Industry Group": f"{ig_val} ({ig_name})",
         "Arbitrary Address Capable": (name_value >> 63) & 0x01,
     }
 
@@ -1168,6 +1247,7 @@ class J1939Describer:
                     pgn,
                     message_data,
                     is_complete_message=True,
+                    sa=sa,
                 )
                 description.update(message_description)
 
@@ -1200,6 +1280,7 @@ class J1939Describer:
                     transport_bits,
                     is_complete_message=is_complete_message,
                     skip_spns=transport_message["spn_coverage"],
+                    sa=transport_message["SA"],
                 )
                 description.update(message_description)
 

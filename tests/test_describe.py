@@ -54,13 +54,39 @@ def test_dm1_cm_bit():
 
 
 def test_address_claim_decoding():
-    """Verify Address Claim (PGN 60928) NAME decoding."""
-    describer = get_describer()
+    """Verify Address Claim (PGN 60928) NAME decoding with human-readable strings."""
+    mock_db = {
+        "J1939Manufacturerdb": {"21": "Dearborn Group Inc."},
+        "J1939IndustryGroupdb": {"2": "Global Sector"},
+        "J1939Functiondb": {
+            "3": "Transmission",  # Independent (0-127)
+            "2_1_135": "Specialized Function",  # Dependent (128-255)
+        },
+        "J1939VehicleSystemdb": {"1": "Tractor"},
+        "J1939PGNdb": {},
+        "J1939SPNdb": {},
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
+    }
+
+    describer = get_describer(da_json=mock_db)
     message_id = 0x18EEFF80
+    # NAME: 3930A002000302A0
+    # Decoded values:
+    # Identity Number: 12345
+    # Manufacturer Code: 21
+    # Function ID: 3
+    # Vehicle System: 1
+    # Industry Group: 2
     message_data = bitstring.Bits(hex="3930A002000302A0")
     description = describer(message_data, message_id)
+
     assert description["PGN"] == "Address Claimed(60928)"
-    assert description["Identity Number"] == 12345
+    assert "12345" in str(description["Identity Number"])
+    assert "Dearborn Group Inc." in str(description["Manufacturer Code"])
+    assert "Global Sector" in str(description["Industry Group"])
+    assert "Tractor" in str(description["Vehicle System"])
+    assert "Transmission" in str(description["Function ID"])
 
 
 def test_isotp_reassembly():

@@ -475,3 +475,26 @@ def test_cli_interleaved_tp_sessions():
     assert isotp_data.upper() in stdout.upper()
     assert '"PGN":"DM1(65226)"' in stdout
     assert '"Malfunction Indicator Lamp Status"' in stdout
+
+
+def test_cli_dynamic_name_tracking():
+    """Verify CLI dynamic name tracking from candump input."""
+    # 1. Address Claimed from SA 128 (0x80)
+    # 2. EEC1 message from SA 128
+    candump_data = (
+        " (1) can0 18EEFF80#3930A002000302A0\n" " (2) can0 0CF00480#0000002048000000\n"
+    )
+
+    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    stdout, stderr, code = run_cli(
+        ["-", "--no-summary", "--da-json", db_path, "--json"],
+        stdin_content=candump_data,
+    )
+
+    assert code == 0
+    # The EEC1 message (second line) should have the dynamic name.
+    # decoded Identity Number 12345, Function ID 3
+    # Our NameTracker.get_name returns "Unknown Manufacturer Unknown Function ID:12345"
+    assert "ID:12345" in stdout
+    assert "Unknown Function" in stdout
+    assert "(128)" in stdout
