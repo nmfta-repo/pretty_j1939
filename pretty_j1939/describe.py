@@ -10,7 +10,17 @@ import math
 import os
 import importlib.resources
 from collections import OrderedDict
-from .parse import *
+from .parse import (
+    parse_j1939_id,
+    is_connection_management_message,
+    is_data_transfer_message,
+    is_spn_bitencoded,
+    is_spn_numerical_values,
+    is_transport_message,
+    is_transport_pgn,
+    DIAG3_MASK,
+    PF_MASK,
+)
 from .isotp import IsoTpTracker
 
 

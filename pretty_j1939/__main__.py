@@ -24,9 +24,7 @@ except ImportError:
 
 from . import describe
 from .parse import parse_j1939_id
-from .render import HighPerformanceRenderer
-
-NUM_IN_PARENS_RE = re.compile(r"(\()([^)]*[0-9/x][^)]*)(\))")
+from .render import HighPerformanceRenderer, NUM_IN_PARENS_RE
 
 
 class J1939Runner:
