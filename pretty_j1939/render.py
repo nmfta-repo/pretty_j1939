@@ -47,6 +47,8 @@ class HighPerformanceRenderer:
             # Pre-calculate ANSI sequences for high-performance manual string building
             self.ansi_esc = {}
             for style_name in self.theme_dict.keys():
+                if style_name in ("default", "reset"):
+                    continue
                 style = console.get_style(style_name)
                 codes = style._make_ansi_codes(console.color_system)
                 self.ansi_esc[style_name] = f"\x1b[{codes}m" if codes else ""
@@ -54,7 +56,9 @@ class HighPerformanceRenderer:
             self.ansi_esc["default"] = "\x1b[0m"
             self.ansi_esc["reset"] = "\x1b[0m"
         else:
-            self.ansi_esc = {k: "" for k in self.theme_dict.keys()}
+            self.ansi_esc = {
+                k: "" for k in self.theme_dict.keys() if k not in ("default", "reset")
+            }
             self.ansi_esc["default"] = ""
             self.ansi_esc["reset"] = ""
 

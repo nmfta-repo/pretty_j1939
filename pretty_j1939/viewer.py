@@ -692,11 +692,9 @@ class J1939Viewer:
 
 def main():
     if can is None:
-        print(
-            "Error: 'python-can' is not installed. Curses viewer requires 'python-can'.",
-            file=sys.stderr,
+        raise ImportError(
+            "Error: 'python-can' is not installed. Curses viewer requires 'python-can'."
         )
-        sys.exit(1)
 
     from .__main__ import get_parser
 

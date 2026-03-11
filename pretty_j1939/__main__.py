@@ -802,7 +802,11 @@ def main():
         from .viewer import main as viewer_main
 
         sys.argv.pop(1)
-        viewer_main()
+        try:
+            viewer_main()
+        except ImportError as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
         return
 
     parser = get_parser()
