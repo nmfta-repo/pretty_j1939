@@ -393,16 +393,78 @@ def test_in_memory_db_usage():
     assert description["SA"] == "Engine #1(  0)"
 
 
+def test_pgn_acronym_fallbacks():
+    """Priority 15: Verify PGN acronym fallbacks (PropA2, PropB2)."""
+    describer = get_describer()
+    da = describer.da_describer
+
+    # DM1
+    assert da.get_pgn_acronym(65226) == "DM1"
+    # PropA2 (126720)
+    assert da.get_pgn_acronym(126720) == "PropA2"
+    # PropB2 (130816 to 131071)
+    assert da.get_pgn_acronym(130816) == "PropB2"
+    assert da.get_pgn_acronym(131071) == "PropB2"
+    # PropB (65280 to 65535)
+    assert da.get_pgn_acronym(65280) == "PropB"
+    assert da.get_pgn_acronym(65535) == "PropB"
+
+
+def test_pgn_acronym_fallbacks():
+    """Priority 15: Verify PGN acronym fallbacks (PropA2, PropB2)."""
+    describer = get_describer()
+    da = describer.da_describer
+
+    # DM1
+    assert da.get_pgn_acronym(65226) == "DM1"
+    # PropA2 (126720)
+    assert da.get_pgn_acronym(126720) == "PropA2"
+    # PropB2 (130816 to 131071)
+    assert da.get_pgn_acronym(130816) == "PropB2"
+    assert da.get_pgn_acronym(131071) == "PropB2"
+    # PropB (65280 to 65535)
+    assert da.get_pgn_acronym(65280) == "PropB"
+    assert da.get_pgn_acronym(65535) == "PropB"
+
+
+def test_pgn_acronym_fallbacks():
+    """Priority 15: Verify PGN acronym fallbacks (PropA2, PropB2)."""
+    describer = get_describer()
+    da = describer.da_describer
+
+    # DM1
+    assert da.get_pgn_acronym(65226) == "DM1"
+    # PropA2 (126720)
+    assert da.get_pgn_acronym(126720) == "PropA2"
+    # PropB2 (130816 to 131071)
+    assert da.get_pgn_acronym(130816) == "PropB2"
+    assert da.get_pgn_acronym(131071) == "PropB2"
+    # PropB (65280 to 65535)
+    assert da.get_pgn_acronym(65280) == "PropB"
+    assert da.get_pgn_acronym(65535) == "PropB"
+
+
 def test_resolve_pgn_engine():
     describer = get_describer()
     pgns = describer.da_describer.resolve_pgn("eec1")
     assert 61444 in pgns
 
 
-def test_resolve_address_engine():
+def test_pgn_acronym_fallbacks():
+    """Priority 15: Verify PGN acronym fallbacks (PropA2, PropB2)."""
     describer = get_describer()
-    addrs = describer.da_describer.resolve_address("engine")
-    assert 0 in addrs
+    da = describer.da_describer
+
+    # DM1
+    assert da.get_pgn_acronym(65226) == "DM1"
+    # PropA2 (126720)
+    assert da.get_pgn_acronym(126720) == "PropA2"
+    # PropB2 (130816 to 131071)
+    assert da.get_pgn_acronym(130816) == "PropB2"
+    assert da.get_pgn_acronym(131071) == "PropB2"
+    # PropB (65280 to 65535)
+    assert da.get_pgn_acronym(65280) == "PropB"
+    assert da.get_pgn_acronym(65535) == "PropB"
 
 
 # --------------------------------------------------------------------------- #
@@ -1058,3 +1120,185 @@ def test_indicator_string_returns():
     msg_res = bitstring.Bits(hex="FC00000000000000")
     val_res = da.get_spn_value(msg_res, 7777, 61184, True)
     assert val_res == RESERVED_VAL
+
+
+def test_multi_startbit_intel_decoding():
+    """Priority 6: Verify multi-startbit Intel (LE) SPN decoding."""
+    # Custom DB with a multi-startbit SPN
+    # Let's say SPN 12345 is 16 bits total, split into 8 bits at bit 0 and 8 bits at bit 16.
+    db = {
+        "J1939PGNdb": {
+            "65280": {
+                "Label": "PROP",
+                "Name": "Proprietary",
+                "SPNs": [12345],
+                "SPNStartBits": [[0, 16]],
+            }
+        },
+        "J1939SPNdb": {
+            "12345": {
+                "Name": "SplitSPN",
+                "Units": "count",
+                "SPNLength": 16,
+                "Resolution": 1,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 65530,
+            }
+        },
+    }
+    describer = get_describer(da_json=db)
+
+    # Value 0x0A0B: Low byte 0x0B (at bit 0), High byte 0x0A (at bit 16).
+    # Data hex: 0B 00 0A 00 00 00 00 00
+    data = bitstring.Bits(hex="0B000A0000000000")
+    res = describer(data, 0x18FF0000)
+
+    # Expected combined value: 0x0A0B (2571)
+    assert "SplitSPN" in res
+    assert "2571 [count]" in res["SplitSPN"]
+
+
+def test_indicator_parameter_specific():
+    """Priority 10: Verify Parameter Specific indicator (0xFB)."""
+    db = {
+        "J1939PGNdb": {
+            "65280": {
+                "Label": "PROP",
+                "Name": "Proprietary",
+                "SPNs": [12345],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "12345": {
+                "Name": "SpecSPN",
+                "Units": "count",
+                "SPNLength": 8,
+                "Resolution": 1,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 250,
+            }
+        },
+    }
+    describer = get_describer(da_json=db)
+
+    # 0xFB (251) is Parameter Specific for an 8-bit field
+    data = bitstring.Bits(hex="FB00000000000000")
+    res = describer(data, 0x18FF0000)
+    assert res["SpecSPN"] == "Parameter specific"
+
+
+def test_variable_length_delimiter_parsing():
+    """Priority 1: Verify variable length SPN parsing with delimiters."""
+    # Custom DB with a delimited variable length SPN
+    db = {
+        "J1939PGNdb": {
+            "65259": {
+                "Label": "VI",
+                "Name": "Vehicle Identification",
+                "SPNs": [237],
+                "SPNStartBits": [-1],  # Variable
+            }
+        },
+        "J1939SPNdb": {
+            "237": {
+                "Name": "VIN",
+                "Units": "ASCII",
+                "SPNLength": "Variable",
+                "Delimiter": "0x2A",  # '*'
+            }
+        },
+    }
+    describer = get_describer(da_json=db)
+
+    # VIN: "ABC*DEF" (Delimited)
+    data = bitstring.Bits(bytes=b"ABC*DEF")
+    # PGN 65259 = 0xFEFF is actually VI in many DAs, but wait.
+    # 0xFEFF = 65279.
+    # 65259 = 0xFEEB.
+    res = describer(data, 0x18FEEB00)
+
+    assert "VIN" in res
+    assert "ABC" in res["VIN"]
+
+
+def test_ascii_error_indicator():
+    """Priority 4: Verify ASCII Error indicator (0x00)."""
+    db = {
+        "J1939PGNdb": {
+            "65259": {
+                "Label": "VI",
+                "Name": "Vehicle Identification",
+                "SPNs": [237],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {"237": {"Name": "VIN", "Units": "ASCII", "SPNLength": 40}},
+    }
+    describer = get_describer(da_json=db)
+
+    # ASCII Error: All 0x00
+    data = bitstring.Bits(hex="0000000000")
+    res = describer(data, 0x18FEEB00)
+    assert res["VIN"] == "Error"
+
+
+def test_resolution_logic():
+    """Priority 3: Verify PGN and Address resolution logic."""
+    describer = get_describer()
+    da = describer.da_describer
+
+    # PGN resolution
+    pgns = da.resolve_pgn("EEC1")
+    assert 61444 in pgns
+
+    # "Engine Speed" might be in many PGNs, but EEC1 (61444) should be one if its Name contains it.
+    # Let's check for "Electronic Engine Controller 1" which is the Name for 61444.
+    pgns = da.resolve_pgn("Electronic Engine Controller 1")
+    assert 61444 in pgns
+
+    # Address resolution
+    # "Engine #1" is the label for SA 0
+    addrs = da.resolve_address("Engine #1")
+    assert 0 in addrs
+
+    addrs = da.resolve_address("Global")
+    assert 255 in addrs
+
+
+def test_legacy_schema_fallback():
+    """Priority 5: Verify fallback to old StartBit schema."""
+    db = {
+        "J1939PGNdb": {
+            "61444": {
+                "Label": "EEC1",
+                "Name": "Electronic Engine Controller 1",
+                "SPNs": [190],
+                # SPNStartBits missing
+            }
+        },
+        "J1939SPNdb": {
+            "190": {
+                "Name": "Engine Speed",
+                "Units": "rpm",
+                "SPNLength": 16,
+                "Resolution": 0.125,
+                "Offset": 0,
+                "StartBit": 24,  # Old schema
+                "OperationalLow": 0,
+                "OperationalHigh": 8031.875,
+            }
+        },
+    }
+    describer = get_describer(da_json=db)
+
+    # 1000 rpm = 8000 raw. 8000 = 0x1F40. LE = 40 1F.
+    # Bits 24-39 (Bytes 4-5).
+    data = bitstring.Bits(hex="FFFFFF401FFFFFFF")
+    with pytest.warns(DeprecationWarning, match="Database uses old schema"):
+        res = describer(data, 0x0CF00400)
+
+    assert "Engine Speed" in res
+    assert "1000.0" in res["Engine Speed"]

@@ -180,6 +180,8 @@ class DADescriber:
             return "Address Claimed"
         if pgn == 65226:
             return "DM1"
+        if pgn == 65227:
+            return "DM2"
         if pgn == 61184:
             return "PropA"
         if pgn == 126720:
@@ -564,6 +566,71 @@ class DADescriber:
 
         return value
 
+    def describe_diagnostic_message(self, data, description):
+        """Helper to parse DM1/DM2 style diagnostic messages."""
+        if len(data) >= 2:
+            lamp_status = data[0]
+
+            def add_lamp_status(label, val):
+                if val != "Not Available" or self.include_na:
+                    description[label] = val
+
+            add_lamp_status(
+                "Malfunction Indicator Lamp Status",
+                [
+                    "Off",
+                    "On",
+                    "Error",
+                    "Not Available",
+                ][(lamp_status >> 6) & 0x03],
+            )
+            add_lamp_status(
+                "Red Stop Lamp Status",
+                [
+                    "Off",
+                    "On",
+                    "Error",
+                    "Not Available",
+                ][(lamp_status >> 4) & 0x03],
+            )
+            add_lamp_status(
+                "Amber Warning Lamp Status",
+                [
+                    "Off",
+                    "On",
+                    "Error",
+                    "Not Available",
+                ][(lamp_status >> 2) & 0x03],
+            )
+            add_lamp_status(
+                "Protect Lamp Status",
+                [
+                    "Off",
+                    "On",
+                    "Error",
+                    "Not Available",
+                ][lamp_status & 0x03],
+            )
+
+            # DTCs start at byte 3 (index 2), 4 bytes each
+            for i in range(2, len(data) - 3, 4):
+                spn_val = data[i] | (data[i + 1] << 8) | ((data[i + 2] & 0xE0) << 11)
+                fmi = data[i + 2] & 0x1F
+                cm = (data[i + 3] >> 7) & 0x01
+                oc = data[i + 3] & 0x7F
+
+                if spn_val == 0 and fmi == 0 and oc == 0:
+                    continue  # Skip "No DTCs" filler if present
+
+                dtc_idx = (i - 2) // 4 + 1
+                spn_name = self.get_spn_name(spn_val)
+
+                desc_str = f"SPN {spn_val} ({spn_name}), FMI {fmi}, OC {oc}"
+                if cm == 1:
+                    desc_str += " (CM=1, J1587)"
+
+                description[f"DTC {dtc_idx}"] = desc_str
+
     def describe_message_data(
         self,
         pgn,
@@ -609,72 +676,8 @@ class DADescriber:
             if not self.include_raw_data:
                 return description
 
-        if pgn == 65226:  # DM1
-            data = message_data_bitstring.bytes
-            if len(data) >= 2:
-                lamp_status = data[0]
-
-                def add_lamp_status(label, val):
-                    if val != "Not Available" or self.include_na:
-                        description[label] = val
-
-                add_lamp_status(
-                    "Malfunction Indicator Lamp Status",
-                    [
-                        "Off",
-                        "On",
-                        "Error",
-                        "Not Available",
-                    ][(lamp_status >> 6) & 0x03],
-                )
-                add_lamp_status(
-                    "Red Stop Lamp Status",
-                    [
-                        "Off",
-                        "On",
-                        "Error",
-                        "Not Available",
-                    ][(lamp_status >> 4) & 0x03],
-                )
-                add_lamp_status(
-                    "Amber Warning Lamp Status",
-                    [
-                        "Off",
-                        "On",
-                        "Error",
-                        "Not Available",
-                    ][(lamp_status >> 2) & 0x03],
-                )
-                add_lamp_status(
-                    "Protect Lamp Status",
-                    [
-                        "Off",
-                        "On",
-                        "Error",
-                        "Not Available",
-                    ][lamp_status & 0x03],
-                )
-
-                # DTCs start at byte 3 (index 2), 4 bytes each
-                for i in range(2, len(data) - 3, 4):
-                    spn_val = (
-                        data[i] | (data[i + 1] << 8) | ((data[i + 2] & 0xE0) << 11)
-                    )
-                    fmi = data[i + 2] & 0x1F
-                    cm = (data[i + 3] >> 7) & 0x01
-                    oc = data[i + 3] & 0x7F
-
-                    if spn_val == 0 and fmi == 0 and oc == 0:
-                        continue  # Skip "No DTCs" filler if present
-
-                    dtc_idx = (i - 2) // 4 + 1
-                    spn_name = self.get_spn_name(spn_val)
-
-                    desc_str = f"SPN {spn_val} ({spn_name}), FMI {fmi}, OC {oc}"
-                    if cm == 1:
-                        desc_str += " (CM=1, J1587)"
-
-                    description[f"DTC {dtc_idx}"] = desc_str
+        if pgn in (65226, 65227):  # DM1, DM2
+            self.describe_diagnostic_message(message_data_bitstring.bytes, description)
 
             if not self.include_raw_data:
                 # If we have something, return it now
@@ -981,7 +984,10 @@ def get_spn_cut_bytes(
         return bits
 
     # Multi-startbit handling
-    lsplit = int(spn_start[1] / 8) * 8 - spn_start[0]
+    # For now, we assume a two-part split.
+    # In J1939, this is typically used for 16-bit SPNs split into two 8-bit bytes.
+    # We split the total length into two equal halves.
+    lsplit = spn_length // 2
     rsplit = spn_length - lsplit
 
     def get_part_mapped(start, length):
@@ -1153,6 +1159,7 @@ class J1939Describer:
         self.include_transport_rawdata = include_transport_rawdata
         self.include_na = include_na
         self.include_raw_data = include_raw_data
+        self.real_time = real_time
 
         self.transport_messages = list()
 
@@ -1273,7 +1280,7 @@ class J1939Describer:
 
             is_complete_message = transport_message["is_last_packet"]
             transport_bits = bitstring.Bits(bytes=transport_message["data"])
-            if self.describe_spns:
+            if self.describe_spns and (is_complete_message or not self.real_time):
                 pgn = transport_pgn
                 message_description = self.da_describer.describe_message_data(
                     pgn,

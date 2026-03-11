@@ -498,3 +498,112 @@ def test_cli_dynamic_name_tracking():
     assert "ID:12345" in stdout
     assert "Unknown Function" in stdout
     assert "(128)" in stdout
+
+
+def test_cli_multi_packet_dm2():
+    """Verify CLI reassembly and decoding of a multi-packet DM2 message."""
+    # DM2 (PGN 65227 / 0xFECB) from SA 0. 2 DTCs = 2 + 2*4 = 10 bytes.
+    # Data: 00 FF 5B 00 03 01 5C 00 04 02
+    # TP.CM_BAM: 18ECFF00#200A0002FFCBFE00
+    # TP.DT 1:   18EBFF00#0100FF5B0003015C
+    # TP.DT 2:   18EBFF00#02000402FFFFFFFF
+    candump_data = (
+        " (1) can0 18ECFF00#200A0002FFCBFE00\n"
+        " (2) can0 18EBFF00#0100FF5B0003015C\n"
+        " (3) can0 18EBFF00#02000402FFFFFFFF\n"
+    )
+
+    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    stdout, stderr, code = run_cli(
+        ["-", "--no-summary", "--da-json", db_path, "--json"],
+        stdin_content=candump_data,
+    )
+
+    assert code == 0
+    assert "DM2(65227)" in stdout
+    assert "DTC 1" in stdout
+    assert "SPN 91" in stdout
+    assert "DTC 2" in stdout
+    assert "SPN 92" in stdout
+
+
+def test_cli_filter_da():
+    """Priority 11: Verify CLI Destination Address filtering."""
+    candump_data = (
+        " (1) can0 18EF3305#0000000000000000\n"  # DA 0x33 (51)
+        " (2) can0 18EF4405#0000000000000000\n"  # DA 0x44 (68)
+    )
+    # Filter only for DA 51
+    stdout, stderr, code = run_cli(
+        ["-", "--filter-da", "51", "--no-summary", "--json"], stdin_content=candump_data
+    )
+    assert code == 0
+    # DA 51 is "Tire Pressure Controller" in standard DB
+    assert '"DA":"Tire Pressure Controller( 51)"' in stdout
+    assert "68" not in stdout
+
+
+def test_cli_real_time_transport():
+    """Priority 14: Verify CLI real-time mode with transport messages."""
+    # Using a custom DB to ensure SPN 237 (VIN) is at the start and long enough
+    db = {
+        "J1939PGNdb": {
+            "65259": {
+                "Label": "VI",
+                "Name": "Vehicle Identification",
+                "SPNs": [237],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "237": {
+                "Name": "VIN",
+                "Units": "ASCII",
+                "SPNLength": 136,
+                "Resolution": 1,
+                "Offset": 0,
+            }
+        },
+    }
+    import json
+
+    db_filename = "tmp_rt_db.json"
+    with open(db_filename, "w") as f:
+        json.dump(db, f)
+
+    # BAM sequence: VI (65259). 17 bytes (3 packets).
+    # VIN "ABCDEFGHIJKLMNOPQ"
+    candump_data = (
+        " (1) can0 18ECFF00#20110003FFEBFE00\n"
+        " (2) can0 18EBFF00#0141424344454647\n"
+        " (3) can0 18EBFF00#0248494A4B4C4D4E\n"
+        " (4) can0 18EBFF00#034F5051FFFFFFFF\n"
+    )
+    try:
+        # Using --real-time and --candata
+        stdout, stderr, code = run_cli(
+            [
+                "-",
+                "--real-time",
+                "--no-summary",
+                "--da-json",
+                db_filename,
+                "--json",
+                "--candata",
+            ],
+            stdin_content=candump_data,
+        )
+
+        if code != 0:
+            print(f"CLI Error: {stderr}")
+        assert code == 0
+
+        # In real-time mode, it shows the data packets as they come.
+        # Currently, partial decodes are tricky. Let's verify we see the bytes
+        # and the final segment that was reassembled.
+        assert "41424344454647" in stdout
+        assert "48494A4B4C4D4E" in stdout
+        assert "OPQ" in stdout
+    finally:
+        if os.path.exists(db_filename):
+            os.remove(db_filename)

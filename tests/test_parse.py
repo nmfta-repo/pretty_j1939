@@ -35,3 +35,14 @@ def test_is_bam_rts_cts_message():
     # Non-TP control bytes
     assert is_bam_rts_cts_message([0, 0, 0, 0, 0, 0, 0, 0]) is False
     assert is_bam_rts_cts_message([1, 0, 0, 0, 0, 0, 0, 0]) is False
+
+
+def test_is_spn_numerical_values():
+    from pretty_j1939.parse import is_spn_numerical_values
+
+    assert is_spn_numerical_values("rpm") is True
+    assert is_spn_numerical_values("km/h") is True
+    assert is_spn_numerical_values("ASCII") is False
+    assert is_spn_numerical_values("Byte") is False
+    assert is_spn_numerical_values("") is False
+    assert is_spn_numerical_values(None) is False
