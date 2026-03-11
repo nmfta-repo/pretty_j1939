@@ -1302,3 +1302,110 @@ def test_legacy_schema_fallback():
 
     assert "Engine Speed" in res
     assert "1000.0" in res["Engine Speed"]
+
+
+def get_test_describe_mock_db():
+    return {
+        "J1939PGNdb": {
+            "65280": {
+                "Label": "MOCK",
+                "Name": "Mock PGN",
+                "SPNs": [10001, 10002, 10003],
+                "SPNStartBits": [5, 12, 24],
+            }
+        },
+        "J1939SPNdb": {
+            "10001": {
+                "Name": "Unaligned SPN",
+                "Units": "count",
+                "SPNLength": 3,
+                "Resolution": 1.0,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 7,
+            },
+            "10002": {
+                "Name": "Indicator SPN",
+                "Units": "count",
+                "SPNLength": 8,
+                "Resolution": 1.0,
+                "Offset": 0,
+                "OperationalLow": 0,
+                "OperationalHigh": 250,
+            },
+            "10003": {
+                "Name": "Format SPN",
+                "Units": "V",
+                "SPNLength": 16,
+                "Resolution": 0.5,
+                "Offset": -10.0,
+                "OperationalLow": -10.0,
+                "OperationalHigh": 117.5,
+            },
+        },
+        "J1939SATabledb": {},
+        "J1939BitDecodings": {},
+    }
+
+
+def test_describe_mock_init():
+    describer = get_describer(da_json=get_test_describe_mock_db())
+    assert describer is not None
+
+
+def test_describe_message_data_unaligned():
+    db = get_test_describe_mock_db()
+    describer = get_describer(da_json=db)
+
+    # SPN 10001: start bit 5, length 3.
+    # Bits 5, 6, 7 of Byte 0.
+    # Let's set value to 5 (binary 101).
+    # Since bit 5 is the LSB of the SPN, bits 5, 6, 7 get 1, 0, 1 respectively.
+    # Byte 0 binary: 10100000 -> 0xA0
+    msg_data = bitstring.Bits(hex="A000000000000000")
+
+    # The PGN is 65280. Msg ID = 0x18FF0000
+    res = describer(msg_data, 0x18FF0000)
+    assert "Unaligned SPN" in res
+    assert "5.0 [count]" in res["Unaligned SPN"]
+
+
+def test_describe_message_data_indicators():
+    db = get_test_describe_mock_db()
+
+    # Indicator SPN: start bit 12, length 8. Bits 12-19.
+    # Byte 1 (bits 8-15): SPN's lower 4 bits are in bits 12-15.
+    # Byte 2 (bits 16-23): SPN's upper 4 bits are in bits 16-19.
+
+    # N/A is 0xFF (255).
+    # Error is 0xFE (254).
+
+    # For N/A (0xFF): bits 12-15 = 1111 (0xF), bits 16-19 = 1111 (0xF)
+    # Byte 1: F0, Byte 2: 0F
+    msg_data_na = bitstring.Bits(hex="00F00F0000000000")
+    describer_na = get_describer(da_json=db, include_na=True)
+    res_na = describer_na(msg_data_na, 0x18FF0000)
+    assert res_na["Indicator SPN"] == "N/A"
+
+    # For Error (0xFE = 1111 1110): LSB=0, next 7 bits=1.
+    # Bits 12-15 = 1110 (0xE) -> LSB is bit 12 (0). So Byte 1 is 1110 0000 (0xE0)
+    # Bits 16-19 = 1111 (0xF) -> Byte 2 is 0000 1111 (0x0F)
+    msg_data_err = bitstring.Bits(hex="00E00F0000000000")
+    describer_err = get_describer(da_json=db, include_na=True)
+    res_err = describer_err(msg_data_err, 0x18FF0000)
+    assert res_err["Indicator SPN"] == "Error"
+
+
+def test_describe_message_data_resolution():
+    db = get_test_describe_mock_db()
+    describer = get_describer(da_json=db)
+
+    # Format SPN: start bit 24, length 16. (Bytes 3-4)
+    # Resolution: 0.5, Offset: -10.0
+    # Let's test a raw value of 40 (0x0028).
+    # Real value = 40 * 0.5 - 10.0 = 20.0 - 10.0 = 10.0
+    # Byte 3 (bits 24-31) = 0x28, Byte 4 (bits 32-39) = 0x00
+    msg_data = bitstring.Bits(hex="0000002800000000")
+    res = describer(msg_data, 0x18FF0000)
+    assert "Format SPN" in res
+    assert "10.0 [V]" in res["Format SPN"]

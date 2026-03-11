@@ -691,5 +691,197 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
         self.assertEqual(bit_object["3"], "engine shutting down")
 
 
+class TestProcessSpnsAndPgnsTab(unittest.TestCase):
+    def setUp(self):
+        self.converter = J1939daConverter.__new__(J1939daConverter)
+        self.converter.j1939db = OrderedDict()
+        self.converter.digital_annex_xls_list = []
+
+    def _create_mock_sheet(self, data_rows):
+        header = [
+            "PGN",
+            "SPN",
+            "PG_ACRONYM",
+            "PG_LABEL",
+            "PG_DATA_LENGTH",
+            "TRANSMISSION_RATE",
+            "SP_POSITION_IN_PG",
+            "SP_LABEL",
+            "OFFSET",
+            "DATA_RANGE",
+            "RESOLUTION",
+            "SP_LENGTH",
+            "UNITS",
+            "OPERATIONAL_RANGE",
+            "SP_DESCRIPTION",
+        ]
+
+        class MockSheetLocal:
+            def __init__(self, rows):
+                self.rows = [header] + rows
+                self.nrows = len(self.rows)
+
+            def row_values(self, row_num):
+                return self.rows[row_num]
+
+        return MockSheetLocal(data_rows)
+
+    def test_process_spns_standard(self):
+        row = [
+            61444,
+            190,
+            "EEC1",
+            "Electronic Engine Controller 1",
+            8,
+            "100 ms",
+            "4.1",
+            "Engine Speed",
+            "0",
+            "0 to 8031.875 rpm",
+            "0.125 rpm/bit",
+            16,
+            "rpm",
+            "0 to 8031.875",
+            "Engine speed description.",
+        ]
+        sheet = self._create_mock_sheet([row])
+        self.converter.process_spns_and_pgns_tab(sheet)
+
+        self.assertIn("J1939PGNdb", self.converter.j1939db)
+        self.assertIn("J1939SPNdb", self.converter.j1939db)
+
+        pgndb = self.converter.j1939db["J1939PGNdb"]
+        spndb = self.converter.j1939db["J1939SPNdb"]
+
+        self.assertIn("61444", pgndb)
+        self.assertEqual(pgndb["61444"]["Name"], "Electronic Engine Controller 1")
+        self.assertEqual(pgndb["61444"]["SPNs"], [190])
+        self.assertEqual(pgndb["61444"]["SPNStartBits"], [[24]])
+
+        self.assertIn("190", spndb)
+        self.assertEqual(spndb["190"]["Name"], "Engine Speed")
+        self.assertEqual(spndb["190"]["SPNLength"], 16)
+        self.assertEqual(spndb["190"]["Resolution"], 0.125)
+        self.assertEqual(spndb["190"]["Offset"], 0.0)
+
+    def test_process_spns_enum(self):
+        row = [
+            61444,
+            899,
+            "EEC1",
+            "Electronic Engine Controller 1",
+            8,
+            "100 ms",
+            "1.1",
+            "Engine Torque Mode",
+            "0",
+            "",
+            "4 states",
+            4,
+            "bit",
+            "",
+            "00b Low speed\n01b High speed\n10b Error\n11b Not available",
+        ]
+        sheet = self._create_mock_sheet([row])
+        self.converter.process_spns_and_pgns_tab(sheet)
+
+        self.assertIn("J1939BitDecodings", self.converter.j1939db)
+        bit_decodings = self.converter.j1939db["J1939BitDecodings"]
+
+        self.assertIn("899", bit_decodings)
+        self.assertEqual(bit_decodings["899"]["0"], "low speed")
+        self.assertEqual(bit_decodings["899"]["1"], "high speed")
+        self.assertEqual(bit_decodings["899"]["2"], "error")
+        self.assertEqual(bit_decodings["899"]["3"], "not available")
+
+    def test_process_spns_variable_length(self):
+        row = [
+            65226,
+            1706,
+            "DM1",
+            "Active Diagnostic Trouble Codes",
+            "Variable",
+            "1 s",
+            "",
+            "Active DTCs",
+            "0",
+            "",
+            "",
+            "Variable, delimiter *",
+            "",
+            "",
+            "A list of DTCs",
+        ]
+        sheet = self._create_mock_sheet([row])
+        self.converter.process_spns_and_pgns_tab(sheet)
+
+        pgndb = self.converter.j1939db["J1939PGNdb"]
+        spndb = self.converter.j1939db["J1939SPNdb"]
+
+        self.assertEqual(pgndb["65226"]["PGNLength"], "Variable")
+        self.assertEqual(spndb["1706"]["SPNLength"], "Variable")
+        self.assertEqual(spndb["1706"]["Delimiter"], "0x2a")  # '*' is 0x2a
+
+    def test_process_spns_edge_cases(self):
+        row1 = [
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
+        row2 = ["", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+        row3 = [
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+            "N/A",
+        ]
+        row4 = [
+            65226,
+            "",
+            "DM1",
+            "Active Diagnostic Trouble Codes",
+            "Variable",
+            "1 s",
+            "",
+            "",
+            "0",
+            "",
+            "1",
+            "Variable",
+            "",
+            "",
+            "",
+        ]
+        sheet = self._create_mock_sheet([row1, row2, row3, row4])
+        self.converter.process_spns_and_pgns_tab(sheet)
+
+        pgndb = self.converter.j1939db["J1939PGNdb"]
+        self.assertIn("65226", pgndb)
+        self.assertEqual(pgndb["65226"]["SPNs"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

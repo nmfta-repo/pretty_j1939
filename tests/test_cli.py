@@ -607,3 +607,92 @@ def test_cli_real_time_transport():
     finally:
         if os.path.exists(db_filename):
             os.remove(db_filename)
+
+
+class DummyArgs:
+    pass
+
+
+def get_test_runner():
+    args = DummyArgs()
+    args.da_json = os.path.join("pretty_j1939", "J1939db.json")
+    args.pgn = True
+    args.spn = True
+    args.link = False
+    args.transport = True
+    args.real_time = False
+    args.candata = False
+    args.include_na = False
+    args.include_raw_data = False
+    args.enable_isotp = True
+    args.color = "never"
+    args.format = False
+    args.theme = None
+    args.write = None
+    args.summary = False
+
+    from pretty_j1939.__main__ import J1939Runner
+
+    runner = J1939Runner(
+        args=args,
+        extra_kwargs={},
+        can_filters=[],
+        pgn_list=[],
+        sa_list=[],
+        da_list=[],
+        ca_list=[],
+    )
+    return runner
+
+
+def test_process_messages_candump(capsys):
+    runner = get_test_runner()
+    candump_line = "(1612543138.000000) vcan0 0CF00400#0041FF20481400F0\n"
+    source = [candump_line]
+    runner.process_messages(source)
+
+    captured = capsys.readouterr()
+    assert "EEC1" in captured.out or "61444" in captured.out
+
+
+def test_process_messages_alternate_formats(capsys):
+    runner = get_test_runner()
+    ts_line = (
+        "Timestamp: 1612543138.000000 ID: 0CF00400 DL: 8 00 41 FF 20 48 14 00 F0\n"
+    )
+    ws_line = "0CF00400#0041FF20481400F0\n"
+
+    source = [ts_line, ws_line]
+    runner.process_messages(source)
+
+    captured = capsys.readouterr()
+    assert captured.out.count("EEC1") >= 2 or captured.out.count("61444") >= 2
+
+
+def test_process_messages_malformed(capsys, caplog):
+    import logging
+
+    runner = get_test_runner()
+    malformed_lines = [
+        "Timestamp: 1612543138.000000 ID: 0CF00400 DL: NOT_INT 00 41 FF 20 48 14 00 F0",
+        "Timestamp: BAD_TS ID: 0CF00400 DL: 8 00 41 FF 20 48 14 00 F0",
+        "0CF00400#ZZZZ",
+        "just some random text",
+        "(bad_ts) vcan0 0CF00400#0041FF20481400F0",
+        "1 (bad_ts) vcan0 0CF00400#0041FF20481400F0",
+        "vcan0 NO_HASH",
+    ]
+
+    with caplog.at_level(logging.DEBUG):
+        runner.process_messages(malformed_lines)
+
+    captured = capsys.readouterr()
+    # It should cleanly skip them, producing nothing
+    assert "EEC1" not in captured.out
+
+    # We should have debug logs for some lines
+    log_text = caplog.text
+    assert (
+        "Skipping malformed message due to decoding error" in log_text
+        or "Skipping candump line due to decoding error" in log_text
+    )

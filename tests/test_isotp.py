@@ -34,7 +34,9 @@ def test_isotp_reassembly():
     expected_pgn = 55808
     expected_data = "48656C6C6F20576F726C64"  # "Hello World" in hex
 
-    assert res.get("_pgn") == expected_pgn, f"FAIL: PGN mismatch. Expected {expected_pgn}, got {res.get('_pgn')}"
+    assert (
+        res.get("_pgn") == expected_pgn
+    ), f"FAIL: PGN mismatch. Expected {expected_pgn}, got {res.get('_pgn')}"
 
     # Check if raw bytes are present (describer might output them if no SPNs found)
     # Since DIAG3 likely has no SPNs in the default DB, we expect raw bytes if configured
@@ -43,7 +45,10 @@ def test_isotp_reassembly():
     # Let's check Bytes field.
 
     assert "Bytes" in res, "FAIL: 'Bytes' field missing"
-    assert res["Bytes"] == expected_data, f"FAIL: Data mismatch. Expected {expected_data}, got {res['Bytes']}"
+    assert (
+        res["Bytes"] == expected_data
+    ), f"FAIL: Data mismatch. Expected {expected_data}, got {res['Bytes']}"
+
 
 if __name__ == "__main__":
     if test_isotp_reassembly():

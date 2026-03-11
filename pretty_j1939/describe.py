@@ -1375,15 +1375,9 @@ def get_describer(da_json=None, **kwargs):
     # enable_isotp is only used by J1939Describer
     enable_isotp = kwargs.pop("enable_isotp", True)
 
-    describer = J1939Describer(
-        enable_isotp=enable_isotp,
-        **kwargs
-    )
+    describer = J1939Describer(enable_isotp=enable_isotp, **kwargs)
 
-    da_describer = DADescriber(
-        da_json=da_json,
-        **kwargs
-    )
+    da_describer = DADescriber(da_json=da_json, **kwargs)
     describer.set_da_describer(da_describer)
 
     return describer

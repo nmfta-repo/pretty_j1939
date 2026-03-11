@@ -15,12 +15,18 @@ PCI_FC = 0x30  # Flow Control
 
 from typing import Callable, Any
 
+
 class IsoTpTracker:
     def __init__(self, real_time: bool):
         self.is_real_time = real_time
         self.sessions = {}
 
-    def process(self, transport_found_processor: Callable[..., Any], message_bytes: bytes, message_id: int) -> None:
+    def process(
+        self,
+        transport_found_processor: Callable[..., Any],
+        message_bytes: bytes,
+        message_id: int,
+    ) -> None:
         pgn, da, sa = parse_j1939_id(message_id)
 
         # Only process DIAG3 PGN (0xDA00 / 55808)

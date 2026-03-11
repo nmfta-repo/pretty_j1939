@@ -12,10 +12,13 @@ import os
 import json
 import re
 import importlib.resources
+import logging
 from io import StringIO
 from rich.console import Console
 from rich.theme import Theme
 from rich.text import Text
+
+logger = logging.getLogger(__name__)
 
 try:
     import can
@@ -337,7 +340,9 @@ class J1939Runner:
                             message_id = bitstring.Bits(hex=msg_id_str)
                             message_data = bitstring.Bits(hex=data_hex_str)
                         except (ValueError, IndexError) as e:
-                            logger.debug(f"Skipping malformed message due to decoding error: {e}")
+                            logger.debug(
+                                f"Skipping malformed message due to decoding error: {e}"
+                            )
                             continue
                     else:
                         parts = candump_line.split()
@@ -375,7 +380,9 @@ class J1939Runner:
                             message_id = bitstring.Bits(hex=msg_id_str)
                             message_data = bitstring.Bits(hex=msg_data_str)
                         except (ValueError, IndexError) as e:
-                            logger.debug(f"Skipping candump line due to decoding error: {e}")
+                            logger.debug(
+                                f"Skipping candump line due to decoding error: {e}"
+                            )
                             continue
                 elif can and isinstance(item, can.Message):
                     message_id = bitstring.Bits(uint=item.arbitration_id, length=32)
