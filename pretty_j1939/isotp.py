@@ -34,17 +34,8 @@ class IsoTpTracker:
         if pci_type == PCI_SF:
             # Single Frame
             length = pci_byte & 0x0F
-            if length == 0:
-                if len(message_bytes) > 1:
-                    length = message_bytes[1]
-                    data_start = 2
-                else:
-                    return
-            else:
-                data_start = 1
-
-            if len(message_bytes) >= data_start + length:
-                data = message_bytes[data_start : data_start + length]
+            if len(message_bytes) >= 1 + length:
+                data = message_bytes[1 : 1 + length]
                 transport_found_processor(bytes(data), sa, pgn, is_last_packet=True)
 
         elif pci_type == PCI_FF:

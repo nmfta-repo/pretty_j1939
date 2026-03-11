@@ -19,9 +19,9 @@ import operator
 import itertools
 from . import describe
 
-ENUM_SINGLE_LINE_RE = r"[ ]*([0-9bxXA-F]+)[ ]*[-=:]?(.*)"
+ENUM_SINGLE_LINE_RE = r"[ ]*([0-9bxXA-F]+)[ ]*[-=:]?[ ]*(.*)"
 ENUM_RANGE_LINE_RE = (
-    r"[ ]*([0-9bxXA-F]+)[ ]*(\-|to|thru)[ ]*([0-9bxXA-F]+)[ ]+[-=:]?(.*)"
+    r"[ ]*([0-9bxXA-F]+)[ ]*(\-|to|thru)[ ]*([0-9bxXA-F]+)[ ]+[-=:]?[ ]*(.*)"
 )
 
 
@@ -39,12 +39,11 @@ class SheetWrapper:
     def _clean_value(self, v):
         if isinstance(v, str):
             # Clean up XML artifacts like _x000d_ (case-insensitive)
-            # We replace them with space then strip to avoid joining words if they were intended as separators
-            v = re.sub(r"_x000[dD]_", " ", v)
-            v = v.replace("\r", " ")
-            v = v.replace("\n", " ")
-            # Collapse multiple spaces
-            v = re.sub(r"[ ]+", " ", v)
+            # Use a more robust regex that catches all xNNNN artifacts commonly found in Excel/XML
+            v = re.sub(r"_x[0-9a-fA-F]{4}_", " ", v)
+            # Collapse multiple spaces, but PRESERVE newlines
+            # We only collapse horizontal whitespace (space and tab)
+            v = re.sub(r"[ \t]+", " ", v)
             return v.strip()
         return v
 
@@ -78,12 +77,10 @@ class J1939daConverter:
     def __init__(self, digital_annex_xls_list):
         defusedxml.defuse_stdlib()
         self.j1939db = OrderedDict()
-        self.digital_annex_xls_list = list(
-            map(
-                lambda da: self.secure_open_workbook(filename=da, on_demand=True),
-                digital_annex_xls_list,
-            )
-        )
+        self.digital_annex_xls_list = []
+        for da in digital_annex_xls_list:
+            book = self.secure_open_workbook(filename=da, on_demand=True)
+            self.digital_annex_xls_list.append(book)
 
     @staticmethod
     def secure_open_workbook(filename, **kwargs):
@@ -165,17 +162,17 @@ class J1939daConverter:
     @staticmethod
     def get_spn_units(contents, raw_spn_resolution):
         norm_contents = unidecode.unidecode(str(contents)).lower().strip()
-        raw_spn_resolution = (
+        raw_spn_resolution_norm = (
             unidecode.unidecode(str(raw_spn_resolution)).lower().strip()
         )
         if norm_contents == "":
-            if "states" in raw_spn_resolution:
+            if "states" in raw_spn_resolution_norm:
                 norm_contents = "bit"
-            elif "bit-mapped" in raw_spn_resolution:
+            elif "bit-mapped" in raw_spn_resolution_norm:
                 norm_contents = "bit-mapped"
-            elif "binary" in raw_spn_resolution:
+            elif "binary" in raw_spn_resolution_norm:
                 norm_contents = "binary"
-            elif "ascii" in raw_spn_resolution:
+            elif "ascii" in raw_spn_resolution_norm:
                 norm_contents = "ascii"
         return norm_contents
 
@@ -273,9 +270,14 @@ class J1939daConverter:
     # return a list of int of the start bits ([some_bit_pos] or [some_bit_pos,some_other_bit_pos]) of the SPN; or [
     # -1] (if unknown or variable).
     def get_spn_start_bit(contents):
-        norm_contents = str(contents).lower()
+        norm_contents = str(contents).lower().strip()
 
-        if ";" in norm_contents:  # special handling for e.g. '0x00;2'
+        if norm_contents == "":
+            return [0]
+
+        if (
+            norm_contents == "n/a" or ";" in norm_contents
+        ):  # special handling for e.g. '0x00;2'
             return [-1]
 
         # Explanation of multi-startbit (from J4L): According to 1939-71, "If the data length is larger than 1 byte
@@ -332,8 +334,13 @@ class J1939daConverter:
 
     @staticmethod
     def is_enum_line(line):
-        if line.lower().startswith("bit state"):
+        line_norm = line.lower().strip()
+        if line_norm.startswith("bit state"):
             return True
+        # Match "00b =", "01b =", "10b =", "11b =", "00 =", "0x1 =" etc.
+        if re.match(r"^[ ]*[0-9bxXA-F\-:]+[ ]*[-=:]", line):
+            return True
+        # Fallback for old style
         elif re.match(r"^[ ]*[0-9][0-9bxXA-F\-:]*[ ]+[^ ]+", line):
             return True
         return False
@@ -364,7 +371,8 @@ class J1939daConverter:
 
         any_found = False
         for line in description_lines:
-            if J1939daConverter.is_enum_line(line):
+            is_enum = J1939daConverter.is_enum_line(line)
+            if is_enum:
                 if any_found:
                     add_enum_line(line)
                 else:
@@ -372,14 +380,17 @@ class J1939daConverter:
                         line
                     ):  # special handling: first enum must use single assignment
                         any_found = add_enum_line(line)
-
         return enum_lines
 
     @staticmethod
     def is_enum_lines_binary(enum_lines_only):
         all_ones_and_zeroes = True
         for line in enum_lines_only:
-            first = J1939daConverter.match_single_enum_line(line).groups()[0]
+            match = J1939daConverter.match_single_enum_line(line)
+            if not match:
+                all_ones_and_zeroes = False
+                break
+            first = match.groups()[0]
             if re.sub(r"[^10b]", "", first) != first:
                 all_ones_and_zeroes = False
                 break
@@ -392,8 +403,6 @@ class J1939daConverter:
         match = re.match(ENUM_RANGE_LINE_RE, line)
         if match:
             groups = match.groups()
-            if re.match(r"[01b]", groups[0]) and not re.match(r"[01b]", groups[2]):
-                return None
             return groups[0], groups[2]
         else:
             return None
@@ -408,7 +417,7 @@ class J1939daConverter:
     # returns the description part (just that part) of an enum line
     def get_enum_line_description(line):
         # Additional cleanup for artifacts that might be in multiline descriptions
-        line = re.sub(r"_x000[dD]_", " ", line)
+        line = re.sub(r"_x[0-9a-fA-F]{4}_", " ", line)
         line = re.sub(r"[ ]+", " ", line)
         line = re.sub(r"[ ]?\-\-[ ]?", " = ", line)
         match = re.match(ENUM_RANGE_LINE_RE, line)
@@ -434,32 +443,52 @@ class J1939daConverter:
 
             range_boundaries = J1939daConverter.get_enum_line_range(line)
             if range_boundaries is not None:
-                if is_binary:
-                    first = re.sub(r"b", "", range_boundaries[0])
-                    first_val = int(first, base=2)
-                    second = re.sub(r"b", "", range_boundaries[1])
-                    second_val = int(second, base=2)
-                elif "x" in range_boundaries[0].lower():
-                    first_val = int(range_boundaries[0], base=16)
-                    second_val = int(range_boundaries[1], base=16)
-                else:
-                    first_val = int(range_boundaries[0], base=10)
-                    second_val = int(range_boundaries[1], base=10)
+                try:
+                    if is_binary:
+                        first = re.sub(r"b", "", range_boundaries[0])
+                        first_val = int(first, base=2)
+                        second = re.sub(r"b", "", range_boundaries[1])
+                        second_val = int(second, base=2)
+                    elif "x" in range_boundaries[0].lower() or any(
+                        c in range_boundaries[0].upper() for c in "ABCDEF"
+                    ):
+                        first_val = int(
+                            range_boundaries[0].lower().replace("0x", ""), base=16
+                        )
+                        second_val = int(
+                            range_boundaries[1].lower().replace("0x", ""), base=16
+                        )
+                    else:
+                        first_val = int(range_boundaries[0], base=10)
+                        second_val = int(range_boundaries[1], base=10)
 
-                for i in range(first_val, second_val + 1):
-                    bit_object.update(({str(i): enum_description}))
+                    for i in range(first_val, second_val + 1):
+                        val_str = str(i)
+                        if val_str not in bit_object:
+                            bit_object.update(({val_str: enum_description}))
+                except ValueError:
+                    continue
             else:
-                first = re.match(r"[ ]*([0-9bxXA-F]+)", line).groups()[0]
+                match = re.match(r"[ ]*([0-9bxXA-F]+)", line)
+                if not match:
+                    continue
+                first = match.groups()[0]
 
-                if is_binary:
-                    first = re.sub(r"b", "", first)
-                    val = str(int(first, base=2))
-                elif "x" in first.lower():
-                    val = str(int(first, base=16))
-                else:
-                    val = str(int(first, base=10))
+                try:
+                    if is_binary:
+                        first = re.sub(r"b", "", first)
+                        val = str(int(first, base=2))
+                    elif "x" in first.lower() or any(
+                        c in first.upper() for c in "ABCDEF"
+                    ):
+                        val = str(int(first.lower().replace("0x", ""), base=16))
+                    else:
+                        val = str(int(first, base=10))
 
-                bit_object.update(({val: enum_description}))
+                    if val not in bit_object:
+                        bit_object.update(({val: enum_description}))
+                except ValueError:
+                    continue
 
     @staticmethod
     def is_spn_likely_bitmapped(spn_description):
@@ -596,6 +625,7 @@ class J1939daConverter:
                     str(row[units_col]) if row[units_col] is not None else "",
                     str(row[resolution_col]) if row[resolution_col] is not None else "",
                 )
+
                 data_range = (
                     unidecode.unidecode(str(row[data_range_col]))
                     if row[data_range_col] is not None
@@ -705,9 +735,7 @@ class J1939daConverter:
                     if row[spn_description_col] is not None
                     else ""
                 )
-                if row[units_col] == "bit" or self.is_spn_likely_bitmapped(
-                    spn_description
-                ):
+                if spn_units == "bit" or self.is_spn_likely_bitmapped(spn_description):
                     bit_object = OrderedDict()
                     self.create_bit_object_from_description(spn_description, bit_object)
                     if len(bit_object) > 0:
@@ -766,7 +794,7 @@ class J1939daConverter:
         return header_row, header_row_num
 
     def lookup_header_row(self, sheet):
-        # search for a row containing 'PGN' or 'SOURCE_ADDRESS_ID'
+        # search for a row containing known headers
         # look in first 10 rows
         for i in range(min(10, sheet.nrows)):
             row = sheet.row_values(i)
@@ -774,8 +802,37 @@ class J1939daConverter:
             row_str = [
                 str(x).replace(" ", "_").upper() if x is not None else "" for x in row
             ]
-            if ("PGN" in row_str and ("SPN" in row_str or "SP" in row_str)) or (
-                "SOURCE_ADDRESS_ID" in row_str and "NAME" in row_str
+            # A valid header row should have multiple columns and match our patterns
+            populated_cols = len(
+                [x for x in row if x is not None and str(x).strip() != ""]
+            )
+            if populated_cols < 2:
+                continue
+
+            if (
+                ("PGN" in row_str and ("SPN" in row_str or "SP" in row_str))
+                or ("SOURCE_ADDRESS_ID" in row_str or "SOURCE_ADDRESS" in row_str)
+                or (
+                    "MANUFACTURER_CODE" in row_str
+                    or "MANUFACTURER_ID" in row_str
+                    or "MFR_ID" in row_str
+                    or "MANUFACTURER" in row_str
+                )
+                or (
+                    "INDUSTRY_GROUP_CODE" in row_str
+                    or "INDUSTRY_GROUP_ID" in row_str
+                    or "INDUSTRY_GROUP" in row_str
+                )
+                or (
+                    "VEHICLE_SYSTEM_CODE" in row_str
+                    or "VEHICLE_SYSTEM_ID" in row_str
+                    or "VEHICLE_SYSTEM" in row_str
+                )
+                or (
+                    "FUNCTION_CODE" in row_str
+                    or "FUNCTION_ID" in row_str
+                    or "FUNCTION" in row_str
+                )
             ):
                 return i
         return 0
@@ -797,11 +854,6 @@ class J1939daConverter:
                     here_spn = spn_in_pgn_list[i][0]
 
                     if calced_spn_length == 0:
-                        print(
-                            "Warning: calculated zero-length SPN %s in PGN %s"
-                            % (here_spn, pgn),
-                            file=sys.stderr,
-                        )
                         continue
                     else:
                         spn_obj = j1939_spn_db.get(str(here_spn))
@@ -973,7 +1025,7 @@ class J1939daConverter:
         header_row, header_row_num = self.get_header_row(sheet)
 
         source_address_id_col = self.get_any_header_column(
-            header_row, "SOURCE_ADDRESS_ID"
+            header_row, ["SOURCE_ADDRESS_ID", "SOURCE_ADDRESS", "ID"]
         )
         name_col = self.get_any_header_column(header_row, "NAME")
 
@@ -986,45 +1038,275 @@ class J1939daConverter:
                 else ""
             )
             if name.startswith("thru") or name.startswith("through"):
-                start_range = int(row[source_address_id_col])
-                range_clues = name.replace("thru", "").replace("through", "")
-                range_clues = range_clues.strip()
-                end_range = int(range_clues.split(" ")[0])
-                description = "".join(name.split(str(end_range))[1:]).strip()
-                description = (
-                    description
-                    + " "
-                    + (
-                        unidecode.unidecode(str(row[name_col + 1]))
-                        if row[name_col + 1] is not None
-                        else ""
+                try:
+                    start_range = int(row[source_address_id_col])
+                    range_clues = name.replace("thru", "").replace("through", "")
+                    range_clues = range_clues.strip()
+                    end_range = int(range_clues.split(" ")[0])
+                    description = "".join(name.split(str(end_range))[1:]).strip()
+                    description = (
+                        description
+                        + " "
+                        + (
+                            unidecode.unidecode(str(row[name_col + 1]))
+                            if row[name_col + 1] is not None
+                            else ""
+                        )
                     )
-                )
-                description = re.sub(r"^are ", "", description)
-                description = description.strip()
-                for val in range(start_range, end_range + 1):
-                    j1939_sa_tabledb.update({str(val): description})
+                    description = re.sub(r"^are ", "", description)
+                    description = description.strip()
+                    for val in range(start_range, end_range + 1):
+                        j1939_sa_tabledb.update({str(val): description})
+                except (ValueError, TypeError, IndexError):
+                    continue
             elif (
-                row[source_address_id_col] is not None
+                source_address_id_col != -1
+                and row[source_address_id_col] is not None
                 and row[source_address_id_col] != ""
             ):
-                val = str(int(row[source_address_id_col]))
-                name = name.strip()
-                j1939_sa_tabledb.update({val: name})
+                try:
+                    val = str(int(row[source_address_id_col]))
+                    name = name.strip()
+                    j1939_sa_tabledb.update({val: name})
+                except (ValueError, TypeError):
+                    continue
         return
+
+    def process_manufacturers_sheet(self, sheet):
+        if sheet is None:
+            return
+        if self.j1939db.get("J1939Manufacturerdb") is None:
+            self.j1939db.update({"J1939Manufacturerdb": OrderedDict()})
+        mfr_db = self.j1939db.get("J1939Manufacturerdb")
+
+        header_row, header_row_num = self.get_header_row(sheet)
+        id_col = self.get_any_header_column(
+            header_row, ["MANUFACTURER_CODE", "MANUFACTURER_ID", "MFR_ID", "ID"]
+        )
+        name_col = self.get_any_header_column(
+            header_row, ["MANUFACTURER_NAME", "MANUFACTURER", "NAME"]
+        )
+
+        for i in range(header_row_num + 1, sheet.nrows):
+            row = sheet.row_values(i)
+            if (
+                id_col != -1
+                and name_col != -1
+                and row[id_col] is not None
+                and row[id_col] != ""
+            ):
+                try:
+                    val = str(int(row[id_col]))
+                    name = unidecode.unidecode(str(row[name_col])).strip()
+                    mfr_db.update({val: name})
+                except (ValueError, TypeError):
+                    continue
+
+    def process_industry_groups_sheet(self, sheet):
+        if sheet is None:
+            return
+        if self.j1939db.get("J1939IndustryGroupdb") is None:
+            self.j1939db.update({"J1939IndustryGroupdb": OrderedDict()})
+        ig_db = self.j1939db.get("J1939IndustryGroupdb")
+
+        header_row, header_row_num = self.get_header_row(sheet)
+        id_col = self.get_any_header_column(
+            header_row, ["INDUSTRY_GROUP_CODE", "INDUSTRY_GROUP_ID", "ID"]
+        )
+        name_col = self.get_any_header_column(
+            header_row, ["INDUSTRY_GROUP_NAME", "INDUSTRY_GROUP_DESCRIPTION", "NAME"]
+        )
+
+        for i in range(header_row_num + 1, sheet.nrows):
+            row = sheet.row_values(i)
+            if (
+                id_col != -1
+                and name_col != -1
+                and row[id_col] is not None
+                and row[id_col] != ""
+            ):
+                try:
+                    val = str(int(row[id_col]))
+                    name = unidecode.unidecode(str(row[name_col])).strip()
+                    ig_db.update({val: name})
+                except (ValueError, TypeError):
+                    continue
+
+    def process_vehicle_systems_sheet(self, sheet, ig_val=None):
+        if sheet is None:
+            return
+        if self.j1939db.get("J1939VehicleSystemdb") is None:
+            self.j1939db.update({"J1939VehicleSystemdb": OrderedDict()})
+        vs_db = self.j1939db.get("J1939VehicleSystemdb")
+
+        header_row, header_row_num = self.get_header_row(sheet)
+        id_col = self.get_any_header_column(
+            header_row, ["VEHICLE_SYSTEM_CODE", "VEHICLE_SYSTEM_ID", "ID"]
+        )
+        name_col = self.get_any_header_column(
+            header_row, ["VEHICLE_SYSTEM_NAME", "VEHICLE_SYSTEM_DESCRIPTION", "NAME"]
+        )
+
+        for i in range(header_row_num + 1, sheet.nrows):
+            row = sheet.row_values(i)
+            if (
+                id_col != -1
+                and name_col != -1
+                and row[id_col] is not None
+                and row[id_col] != ""
+            ):
+                try:
+                    val = str(int(row[id_col]))
+                    name = unidecode.unidecode(str(row[name_col])).strip()
+                    if ig_val is not None:
+                        key = f"{ig_val}_{val}"
+                        vs_db.update({key: name})
+                    else:
+                        vs_db.update({val: name})
+                except (ValueError, TypeError):
+                    continue
+
+    def process_functions_sheet(self, sheet, ig_val=None, vs_val=None):
+        if sheet is None:
+            return
+        if self.j1939db.get("J1939Functiondb") is None:
+            self.j1939db.update({"J1939Functiondb": OrderedDict()})
+        func_db = self.j1939db.get("J1939Functiondb")
+
+        header_row, header_row_num = self.get_header_row(sheet)
+
+        ig_id_col = self.get_any_header_column(header_row, ["INDUSTRY_GROUP_ID"])
+        vs_id_col = self.get_any_header_column(header_row, ["VEHICLE_SYSTEM_ID"])
+        vs_name_col = self.get_any_header_column(
+            header_row, ["VEHICLE_SYSTEM_DESCRIPTION"]
+        )
+        id_col = self.get_any_header_column(
+            header_row, ["FUNCTION_CODE", "FUNCTION_ID", "ID"]
+        )
+        name_col = self.get_any_header_column(
+            header_row, ["FUNCTION_NAME", "FUNCTION_DESCRIPTION", "NAME"]
+        )
+
+        for i in range(header_row_num + 1, sheet.nrows):
+            row = sheet.row_values(i)
+            if (
+                id_col != -1
+                and name_col != -1
+                and row[id_col] is not None
+                and row[id_col] != ""
+            ):
+                try:
+                    val = int(row[id_col])
+                    name = unidecode.unidecode(str(row[name_col])).strip()
+
+                    row_ig_val = ig_val
+                    if (
+                        ig_id_col != -1
+                        and row[ig_id_col] is not None
+                        and row[ig_id_col] != ""
+                    ):
+                        row_ig_val = int(row[ig_id_col])
+
+                    row_vs_val = vs_val
+                    if (
+                        vs_id_col != -1
+                        and row[vs_id_col] is not None
+                        and row[vs_id_col] != ""
+                    ):
+                        row_vs_val = int(row[vs_id_col])
+
+                    if val <= 127:
+                        func_db.update({str(val): name})
+                    elif row_ig_val is not None and row_vs_val is not None:
+                        key = f"{row_ig_val}_{row_vs_val}_{val}"
+                        func_db.update({key: name})
+
+                    if vs_id_col != -1 and vs_name_col != -1 and row_ig_val is not None:
+                        vs_id = str(int(row[vs_id_col]))
+                        vs_name = unidecode.unidecode(str(row[vs_name_col])).strip()
+                        if self.j1939db.get("J1939VehicleSystemdb") is None:
+                            self.j1939db.update({"J1939VehicleSystemdb": OrderedDict()})
+                        self.j1939db["J1939VehicleSystemdb"].update(
+                            {f"{row_ig_val}_{vs_id}": vs_name}
+                        )
+
+                except (ValueError, TypeError):
+                    continue
 
     def convert(self, output_file):
         self.j1939db = OrderedDict()
         sheet_name = ["SPNs & PGNs", "SPs & PGs"]
-        self.process_spns_and_pgns_tab(self.find_first_sheet_by_name(sheet_name))
-        sheet_name = "Global Source Addresses (B2)"
-        self.process_any_source_addresses_sheet(
-            self.find_first_sheet_by_name(sheet_name)
+        pgn_spn_sheet = self.find_first_sheet_by_name(sheet_name)
+        if pgn_spn_sheet:
+            self.process_spns_and_pgns_tab(pgn_spn_sheet)
+
+        for sa_sheet_name in [
+            "Global Source Addresses (B2)",
+            "Global Source Addresses",
+            "IG1 Source Addresses (B3)",
+            "IG1 Source Addresses",
+        ]:
+            sheet = self.find_first_sheet_by_name(sa_sheet_name)
+            if sheet:
+                self.process_any_source_addresses_sheet(sheet)
+
+        mfr_sheet = self.find_first_sheet_by_name(
+            [
+                "Manufacturers (B1)",
+                "Manufacturers",
+                "Manufacturer IDs (B10)",
+                "Manufacturer IDs",
+            ]
         )
-        sheet_name = "IG1 Source Addresses (B3)"
-        self.process_any_source_addresses_sheet(
-            self.find_first_sheet_by_name(sheet_name)
+        if mfr_sheet:
+            self.process_manufacturers_sheet(mfr_sheet)
+
+        ig_sheet = self.find_first_sheet_by_name(
+            [
+                "Global Industry Groups (B4)",
+                "Global Industry Groups",
+                "Industry Groups (B1)",
+                "Industry Groups",
+            ]
         )
+        if ig_sheet:
+            self.process_industry_groups_sheet(ig_sheet)
+
+        vs_sheet = self.find_first_sheet_by_name(
+            ["Global Vehicle Systems (B5)", "Global Vehicle Systems", "Vehicle Systems"]
+        )
+        if vs_sheet:
+            self.process_vehicle_systems_sheet(vs_sheet)
+
+        func_sheet = self.find_first_sheet_by_name(
+            [
+                "Global Functions (B6)",
+                "Global Functions",
+                "Global NAME Functions (B11)",
+                "Global NAME Functions",
+            ]
+        )
+        if func_sheet:
+            self.process_functions_sheet(func_sheet)
+
+        for ig in range(1, 6):
+            ig_name = f"IG{ig}"
+            vs_sheet_names = [
+                f"{ig_name} Vehicle Systems",
+                f" {ig_name} Vehicle Systems",
+            ]
+            sheet = self.find_first_sheet_by_name(vs_sheet_names)
+            if sheet:
+                self.process_vehicle_systems_sheet(sheet, ig_val=ig)
+
+            func_sheet_names = [
+                f"{ig_name} Functions",
+                f" {ig_name} Functions",
+                f"IG Specific NAME Function (B12)",
+            ]
+            sheet = self.find_first_sheet_by_name(func_sheet_names)
+            if sheet:
+                self.process_functions_sheet(sheet, ig_val=ig)
 
         out = open(output_file, "w") if output_file != "-" else sys.stdout
 
