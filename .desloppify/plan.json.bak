@@ -1,13 +1,9 @@
 {
   "version": 8,
   "created": "2026-03-11T03:13:11+00:00",
-  "updated": "2026-03-12T01:23:17+00:00",
+  "updated": "2026-03-12T01:35:07+00:00",
   "queue_order": [
-    "smells::pretty_j1939/__main__.py::high_cyclomatic_complexity",
-    "smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity",
-    "smells::pretty_j1939/describe.py::high_cyclomatic_complexity",
-    "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity",
-    "smells::pretty_j1939/render.py::high_cyclomatic_complexity"
+    "smells::pretty_j1939/describe.py::high_cyclomatic_complexity"
   ],
   "deferred": [],
   "skipped": {
@@ -131,26 +127,6 @@
       "review_after": null,
       "skipped_at_scan": 3
     },
-    "test_coverage::scripts/testme.py::untested_critical": {
-      "issue_id": "test_coverage::scripts/testme.py::untested_critical",
-      "kind": "temporary",
-      "reason": "these are test scripts/runners, not production modules requiring their own tests",
-      "note": null,
-      "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T18:41:15+00:00",
-      "review_after": null,
-      "skipped_at_scan": 3
-    },
-    "smells::scripts/testme.py::sys_exit_in_library": {
-      "issue_id": "smells::scripts/testme.py::sys_exit_in_library",
-      "kind": "temporary",
-      "reason": "sys.exit is appropriate for these standalone scripts in scripts/ directory.",
-      "note": null,
-      "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T18:44:40+00:00",
-      "review_after": null,
-      "skipped_at_scan": 3
-    },
     "smells::scripts/verify_all.py::sys_exit_in_library": {
       "issue_id": "smells::scripts/verify_all.py::sys_exit_in_library",
       "kind": "temporary",
@@ -168,26 +144,6 @@
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
       "created_at": "2026-03-11T18:45:09+00:00",
-      "review_after": null,
-      "skipped_at_scan": 3
-    },
-    "security::scripts/testme.py::security::B404::scripts/testme.py::4": {
-      "issue_id": "security::scripts/testme.py::security::B404::scripts/testme.py::4",
-      "kind": "temporary",
-      "reason": "shell=True is required for complex pipes in test scripts; B404/B603 are low risk for internal test runners.",
-      "note": null,
-      "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T18:45:16+00:00",
-      "review_after": null,
-      "skipped_at_scan": 3
-    },
-    "security::scripts/testme.py::security::B603::scripts/testme.py::19": {
-      "issue_id": "security::scripts/testme.py::security::B603::scripts/testme.py::19",
-      "kind": "temporary",
-      "reason": "shell=True is required for complex pipes in test scripts; B404/B603 are low risk for internal test runners.",
-      "note": null,
-      "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T18:45:16+00:00",
       "review_after": null,
       "skipped_at_scan": 3
     },
@@ -237,9 +193,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::ai_generated_debt": {
       "issue_id": "subjective::ai_generated_debt",
@@ -247,9 +203,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::api_surface_coherence": {
       "issue_id": "subjective::api_surface_coherence",
@@ -257,9 +213,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::authorization_consistency": {
       "issue_id": "subjective::authorization_consistency",
@@ -267,9 +223,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::contract_coherence": {
       "issue_id": "subjective::contract_coherence",
@@ -277,9 +233,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::convention_outlier": {
       "issue_id": "subjective::convention_outlier",
@@ -287,9 +243,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::cross_module_architecture": {
       "issue_id": "subjective::cross_module_architecture",
@@ -297,9 +253,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::dependency_health": {
       "issue_id": "subjective::dependency_health",
@@ -307,9 +263,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::design_coherence": {
       "issue_id": "subjective::design_coherence",
@@ -317,9 +273,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::error_consistency": {
       "issue_id": "subjective::error_consistency",
@@ -327,9 +283,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::high_level_elegance": {
       "issue_id": "subjective::high_level_elegance",
@@ -337,9 +293,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::incomplete_migration": {
       "issue_id": "subjective::incomplete_migration",
@@ -347,9 +303,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::initialization_coupling": {
       "issue_id": "subjective::initialization_coupling",
@@ -357,9 +313,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::logic_clarity": {
       "issue_id": "subjective::logic_clarity",
@@ -367,9 +323,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::low_level_elegance": {
       "issue_id": "subjective::low_level_elegance",
@@ -377,9 +333,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::mid_level_elegance": {
       "issue_id": "subjective::mid_level_elegance",
@@ -387,9 +343,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::naming_quality": {
       "issue_id": "subjective::naming_quality",
@@ -397,9 +353,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::package_organization": {
       "issue_id": "subjective::package_organization",
@@ -407,9 +363,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::test_strategy": {
       "issue_id": "subjective::test_strategy",
@@ -417,9 +373,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     },
     "subjective::type_safety": {
       "issue_id": "subjective::type_safety",
@@ -427,9 +383,9 @@
       "reason": "cannot run codex AI for subjective review",
       "note": null,
       "attestation": "I have actually reflected and I am not deferring this for lazy reasons.",
-      "created_at": "2026-03-11T20:58:09+00:00",
+      "created_at": "2026-03-12T01:34:28+00:00",
       "review_after": null,
-      "skipped_at_scan": 4
+      "skipped_at_scan": 6
     }
   },
   "active_cluster": null,
@@ -545,14 +501,14 @@
     "smells::pretty_j1939/__main__.py::high_cyclomatic_complexity": {
       "issue_id": "smells::pretty_j1939/__main__.py::high_cyclomatic_complexity",
       "created_at": "2026-03-11T03:13:11+00:00",
-      "cluster": "auto/smells-high_cyclomatic_complexity",
-      "updated_at": "2026-03-11T18:41:02+00:00"
+      "cluster": null,
+      "updated_at": "2026-03-12T01:35:06+00:00"
     },
     "smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity": {
       "issue_id": "smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity",
       "created_at": "2026-03-11T03:13:11+00:00",
-      "cluster": "auto/smells-high_cyclomatic_complexity",
-      "updated_at": "2026-03-11T18:41:02+00:00"
+      "cluster": null,
+      "updated_at": "2026-03-12T01:35:07+00:00"
     },
     "smells::pretty_j1939/describe.py::high_cyclomatic_complexity": {
       "issue_id": "smells::pretty_j1939/describe.py::high_cyclomatic_complexity",
@@ -563,14 +519,14 @@
     "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity": {
       "issue_id": "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity",
       "created_at": "2026-03-11T03:13:11+00:00",
-      "cluster": "auto/smells-high_cyclomatic_complexity",
-      "updated_at": "2026-03-11T18:41:02+00:00"
+      "cluster": null,
+      "updated_at": "2026-03-12T01:30:05+00:00"
     },
     "smells::pretty_j1939/render.py::high_cyclomatic_complexity": {
       "issue_id": "smells::pretty_j1939/render.py::high_cyclomatic_complexity",
       "created_at": "2026-03-11T03:13:11+00:00",
-      "cluster": "auto/smells-high_cyclomatic_complexity",
-      "updated_at": "2026-03-11T18:41:02+00:00"
+      "cluster": null,
+      "updated_at": "2026-03-12T01:33:25+00:00"
     },
     "smells::pretty_j1939/viewer.py::high_cyclomatic_complexity": {
       "issue_id": "smells::pretty_j1939/viewer.py::high_cyclomatic_complexity",
@@ -617,8 +573,8 @@
     "smells::pretty_j1939/create_j1939db_json.py::todo_fixme": {
       "issue_id": "smells::pretty_j1939/create_j1939db_json.py::todo_fixme",
       "created_at": "2026-03-11T03:13:11+00:00",
-      "cluster": "auto/smells-todo_fixme",
-      "updated_at": "2026-03-11T18:41:02+00:00"
+      "cluster": null,
+      "updated_at": "2026-03-12T01:27:30+00:00"
     },
     "smells::pretty_j1939/describe.py::todo_fixme": {
       "issue_id": "smells::pretty_j1939/describe.py::todo_fixme",
@@ -893,8 +849,8 @@
     "test_coverage::scripts/testme.py::untested_critical": {
       "issue_id": "test_coverage::scripts/testme.py::untested_critical",
       "created_at": "2026-03-11T18:41:02+00:00",
-      "cluster": "auto/test_coverage",
-      "updated_at": "2026-03-11T18:41:02+00:00"
+      "cluster": null,
+      "updated_at": "2026-03-12T01:27:30+00:00"
     },
     "smells::scripts/testme.py::subprocess_no_timeout": {
       "issue_id": "smells::scripts/testme.py::subprocess_no_timeout",
@@ -911,8 +867,8 @@
     "smells::scripts/testme.py::sys_exit_in_library": {
       "issue_id": "smells::scripts/testme.py::sys_exit_in_library",
       "created_at": "2026-03-11T18:41:02+00:00",
-      "cluster": "auto/smells-sys_exit_in_library",
-      "updated_at": "2026-03-11T18:41:02+00:00"
+      "cluster": null,
+      "updated_at": "2026-03-12T01:27:30+00:00"
     },
     "smells::scripts/verify_all.py::sys_exit_in_library": {
       "issue_id": "smells::scripts/verify_all.py::sys_exit_in_library",
@@ -923,14 +879,14 @@
     "security::scripts/testme.py::security::B404::scripts/testme.py::4": {
       "issue_id": "security::scripts/testme.py::security::B404::scripts/testme.py::4",
       "created_at": "2026-03-11T18:41:02+00:00",
-      "cluster": "auto/security",
-      "updated_at": "2026-03-11T18:41:02+00:00"
+      "cluster": null,
+      "updated_at": "2026-03-12T01:27:30+00:00"
     },
     "security::scripts/testme.py::security::B603::scripts/testme.py::19": {
       "issue_id": "security::scripts/testme.py::security::B603::scripts/testme.py::19",
       "created_at": "2026-03-11T18:41:02+00:00",
-      "cluster": "auto/security",
-      "updated_at": "2026-03-11T18:41:02+00:00"
+      "cluster": null,
+      "updated_at": "2026-03-12T01:27:30+00:00"
     },
     "security::scripts/verify_all.py::security::B404::scripts/verify_all.py::5": {
       "issue_id": "security::scripts/verify_all.py::security::B404::scripts/verify_all.py::5",
@@ -962,8 +918,7 @@
       "name": "auto/test_coverage",
       "description": "Fix 2 test coverage issues",
       "issue_ids": [
-        "test_coverage::scripts/verify_all.py::untested_module",
-        "test_coverage::scripts/testme.py::untested_critical"
+        "test_coverage::scripts/verify_all.py::untested_module"
       ],
       "created_at": "2026-03-11T03:13:11+00:00",
       "updated_at": "2026-03-11T18:41:02+00:00",
@@ -1009,11 +964,7 @@
       "name": "auto/smells-high_cyclomatic_complexity",
       "description": "Fix 7 high cyclomatic complexity issues",
       "issue_ids": [
-        "smells::pretty_j1939/__main__.py::high_cyclomatic_complexity",
-        "smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity",
-        "smells::pretty_j1939/describe.py::high_cyclomatic_complexity",
-        "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity",
-        "smells::pretty_j1939/render.py::high_cyclomatic_complexity"
+        "smells::pretty_j1939/describe.py::high_cyclomatic_complexity"
       ],
       "created_at": "2026-03-11T03:13:11+00:00",
       "updated_at": "2026-03-11T18:41:02+00:00",
@@ -1054,7 +1005,6 @@
       "name": "auto/smells-todo_fixme",
       "description": "Fix 2 todo fixme issues",
       "issue_ids": [
-        "smells::pretty_j1939/create_j1939db_json.py::todo_fixme",
         "smells::pretty_j1939/describe.py::todo_fixme"
       ],
       "created_at": "2026-03-11T03:13:11+00:00",
@@ -1084,8 +1034,6 @@
       "name": "auto/security",
       "description": "Fix 6 security issues",
       "issue_ids": [
-        "security::scripts/testme.py::security::B404::scripts/testme.py::4",
-        "security::scripts/testme.py::security::B603::scripts/testme.py::19",
         "security::scripts/verify_all.py::security::B404::scripts/verify_all.py::5",
         "security::scripts/verify_all.py::security::B602::scripts/verify_all.py::13",
         "security::scripts/verify_all.py::security::B603::scripts/verify_all.py::130",
@@ -1186,7 +1134,6 @@
       "name": "auto/smells-sys_exit_in_library",
       "description": "Fix 2 sys exit in library issues",
       "issue_ids": [
-        "smells::scripts/testme.py::sys_exit_in_library",
         "smells::scripts/verify_all.py::sys_exit_in_library"
       ],
       "created_at": "2026-03-11T18:41:02+00:00",
@@ -1450,6 +1397,144 @@
         "smells::scripts/verify_all.py::sys_exit_in_library",
         "smells::scripts/verify_all.py::deferred_import"
       ]
+    },
+    "security::scripts/testme.py::security::B404::scripts/testme.py::4": {
+      "original_id": "security::scripts/testme.py::security::B404::scripts/testme.py::4",
+      "original_detector": "security",
+      "original_file": "scripts/testme.py",
+      "original_summary": "[B404] Consider possible security implications associated with the subprocess module.",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:27:30+00:00",
+      "remapped_to": null,
+      "candidates": []
+    },
+    "security::scripts/testme.py::security::B603::scripts/testme.py::19": {
+      "original_id": "security::scripts/testme.py::security::B603::scripts/testme.py::19",
+      "original_detector": "security",
+      "original_file": "scripts/testme.py",
+      "original_summary": "[B603] subprocess call - check for execution of untrusted input.",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:27:30+00:00",
+      "remapped_to": null,
+      "candidates": []
+    },
+    "smells::pretty_j1939/__main__.py::monster_function": {
+      "original_id": "smells::pretty_j1939/__main__.py::monster_function",
+      "original_detector": "smells",
+      "original_file": "pretty_j1939/__main__.py",
+      "original_summary": "2x Monster function (>150 LOC)",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:27:30+00:00",
+      "remapped_to": null,
+      "candidates": [
+        "smells::pretty_j1939/__main__.py::annotation_quality",
+        "smells::pretty_j1939/__main__.py::high_cyclomatic_complexity",
+        "smells::pretty_j1939/__main__.py::optional_param_sprawl",
+        "smells::pretty_j1939/__main__.py::deferred_import",
+        "smells::pretty_j1939/__main__.py::swallowed_error"
+      ]
+    },
+    "smells::pretty_j1939/create_j1939db_json.py::monster_function": {
+      "original_id": "smells::pretty_j1939/create_j1939db_json.py::monster_function",
+      "original_detector": "smells",
+      "original_file": "pretty_j1939/create_j1939db_json.py",
+      "original_summary": "1x Monster function (>150 LOC)",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:27:30+00:00",
+      "remapped_to": null,
+      "candidates": [
+        "smells::pretty_j1939/create_j1939db_json.py::silent_except",
+        "smells::pretty_j1939/create_j1939db_json.py::annotation_quality",
+        "smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity",
+        "smells::pretty_j1939/create_j1939db_json.py::magic_number"
+      ]
+    },
+    "smells::pretty_j1939/create_j1939db_json.py::todo_fixme": {
+      "original_id": "smells::pretty_j1939/create_j1939db_json.py::todo_fixme",
+      "original_detector": "smells",
+      "original_file": "pretty_j1939/create_j1939db_json.py",
+      "original_summary": "2x TODO/FIXME/HACK comments",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:27:30+00:00",
+      "remapped_to": null,
+      "candidates": [
+        "smells::pretty_j1939/create_j1939db_json.py::silent_except",
+        "smells::pretty_j1939/create_j1939db_json.py::annotation_quality",
+        "smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity",
+        "smells::pretty_j1939/create_j1939db_json.py::magic_number"
+      ]
+    },
+    "smells::pretty_j1939/viewer.py::monster_function": {
+      "original_id": "smells::pretty_j1939/viewer.py::monster_function",
+      "original_detector": "smells",
+      "original_file": "pretty_j1939/viewer.py",
+      "original_summary": "1x Monster function (>150 LOC)",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:27:30+00:00",
+      "remapped_to": null,
+      "candidates": [
+        "smells::pretty_j1939/viewer.py::high_cyclomatic_complexity",
+        "smells::pretty_j1939/viewer.py::deferred_import",
+        "smells::pretty_j1939/viewer.py::swallowed_error"
+      ]
+    },
+    "smells::scripts/testme.py::high_cyclomatic_complexity": {
+      "original_id": "smells::scripts/testme.py::high_cyclomatic_complexity",
+      "original_detector": "smells",
+      "original_file": "scripts/testme.py",
+      "original_summary": "1x High cyclomatic complexity (>12 decision points)",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:27:30+00:00",
+      "remapped_to": null,
+      "candidates": [
+        "smells::scripts/testme.py::swallowed_error"
+      ]
+    },
+    "smells::scripts/testme.py::monster_function": {
+      "original_id": "smells::scripts/testme.py::monster_function",
+      "original_detector": "smells",
+      "original_file": "scripts/testme.py",
+      "original_summary": "1x Monster function (>150 LOC)",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:27:30+00:00",
+      "remapped_to": null,
+      "candidates": [
+        "smells::scripts/testme.py::swallowed_error"
+      ]
+    },
+    "smells::scripts/testme.py::sys_exit_in_library": {
+      "original_id": "smells::scripts/testme.py::sys_exit_in_library",
+      "original_detector": "smells",
+      "original_file": "scripts/testme.py",
+      "original_summary": "1x sys.exit() outside CLI entry point \u2014 use exceptions",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:27:30+00:00",
+      "remapped_to": null,
+      "candidates": [
+        "smells::scripts/testme.py::swallowed_error"
+      ]
+    },
+    "test_coverage::scripts/testme.py::untested_critical": {
+      "original_id": "test_coverage::scripts/testme.py::untested_critical",
+      "original_detector": "test_coverage",
+      "original_file": "scripts/testme.py",
+      "original_summary": "Untested critical module (339 LOC, 0 importers) \u2014 high blast radius",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:27:30+00:00",
+      "remapped_to": null,
+      "candidates": [
+        "test_coverage::scripts/testme.py::untested_module"
+      ]
+    },
+    "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity": {
+      "original_id": "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity",
+      "original_detector": "smells",
+      "original_file": "pretty_j1939/isotp.py",
+      "original_summary": "1x High cyclomatic complexity (>12 decision points)",
+      "status": "superseded",
+      "superseded_at": "2026-03-12T01:34:16+00:00",
+      "remapped_to": null,
+      "candidates": []
     }
   },
   "promoted_ids": [],
@@ -3426,6 +3511,288 @@
         "status": "fixed",
         "attestation": "I have actually High cyclomatic complexity in _draw_message_row was addressed by the generalist subagent through extraction of helper functions, reducing decision points and improving readability. Verified with existing tests. and I am not gaming the score."
       }
+    },
+    {
+      "timestamp": "2026-03-12T01:25:48+00:00",
+      "action": "commit_record",
+      "issue_ids": [
+        "smells::pretty_j1939/viewer.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": null,
+      "detail": {
+        "sha": "17642012350e",
+        "branch": "viewer"
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:27:30+00:00",
+      "action": "reconcile",
+      "issue_ids": [
+        "security::scripts/testme.py::security::B404::scripts/testme.py::4",
+        "security::scripts/testme.py::security::B603::scripts/testme.py::19",
+        "smells::pretty_j1939/__main__.py::monster_function",
+        "smells::pretty_j1939/create_j1939db_json.py::monster_function",
+        "smells::pretty_j1939/create_j1939db_json.py::todo_fixme",
+        "smells::pretty_j1939/viewer.py::monster_function",
+        "smells::scripts/testme.py::high_cyclomatic_complexity",
+        "smells::scripts/testme.py::monster_function",
+        "smells::scripts/testme.py::sys_exit_in_library",
+        "test_coverage::scripts/testme.py::untested_critical"
+      ],
+      "cluster_name": null,
+      "actor": "system",
+      "note": null,
+      "detail": {
+        "superseded_count": 10,
+        "pruned_count": 0,
+        "resurfaced_count": 0,
+        "clusters_completed_count": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:27:30+00:00",
+      "action": "sync_unscored",
+      "issue_ids": [],
+      "cluster_name": null,
+      "actor": "system",
+      "note": null,
+      "detail": {
+        "changes": true
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:28:07+00:00",
+      "action": "skip",
+      "issue_ids": [
+        "subjective::abstraction_fitness",
+        "subjective::ai_generated_debt",
+        "subjective::api_surface_coherence",
+        "subjective::authorization_consistency",
+        "subjective::contract_coherence",
+        "subjective::convention_outlier",
+        "subjective::cross_module_architecture",
+        "subjective::dependency_health",
+        "subjective::design_coherence",
+        "subjective::error_consistency",
+        "subjective::high_level_elegance",
+        "subjective::incomplete_migration",
+        "subjective::initialization_coupling",
+        "subjective::logic_clarity",
+        "subjective::low_level_elegance",
+        "subjective::mid_level_elegance",
+        "subjective::naming_quality",
+        "subjective::package_organization",
+        "subjective::test_strategy",
+        "subjective::type_safety"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": null,
+      "detail": {
+        "kind": "temporary",
+        "reason": "cannot run codex AI for subjective review"
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:30:05+00:00",
+      "action": "done",
+      "issue_ids": [
+        "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": "Refactored the  method into smaller, more focused helper functions (, , ) to reduce cyclomatic complexity.",
+      "detail": {}
+    },
+    {
+      "timestamp": "2026-03-12T01:30:05+00:00",
+      "action": "resolve",
+      "issue_ids": [
+        "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": "Refactored the  method into smaller, more focused helper functions (, , ) to reduce cyclomatic complexity.",
+      "detail": {
+        "status": "fixed",
+        "attestation": "I have actually Refactored the  method into smaller, more focused helper functions (, , ) to reduce cyclomatic complexity. and I am not gaming the score."
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:30:08+00:00",
+      "action": "commit_record",
+      "issue_ids": [
+        "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": null,
+      "detail": {
+        "sha": "307fd008ed9c",
+        "branch": "viewer"
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:33:25+00:00",
+      "action": "done",
+      "issue_ids": [
+        "smells::pretty_j1939/render.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": "Refactored the  method into smaller, more focused helper functions (, , and ) to reduce cyclomatic complexity.",
+      "detail": {}
+    },
+    {
+      "timestamp": "2026-03-12T01:33:25+00:00",
+      "action": "resolve",
+      "issue_ids": [
+        "smells::pretty_j1939/render.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": "Refactored the  method into smaller, more focused helper functions (, , and ) to reduce cyclomatic complexity.",
+      "detail": {
+        "status": "fixed",
+        "attestation": "I have actually Refactored the  method into smaller, more focused helper functions (, , and ) to reduce cyclomatic complexity. and I am not gaming the score."
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:33:30+00:00",
+      "action": "commit_record",
+      "issue_ids": [
+        "smells::pretty_j1939/render.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": null,
+      "detail": {
+        "sha": "57404db8cbea",
+        "branch": "viewer"
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:34:16+00:00",
+      "action": "reconcile",
+      "issue_ids": [
+        "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "system",
+      "note": null,
+      "detail": {
+        "superseded_count": 1,
+        "pruned_count": 0,
+        "resurfaced_count": 0,
+        "clusters_completed_count": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:34:16+00:00",
+      "action": "sync_unscored",
+      "issue_ids": [],
+      "cluster_name": null,
+      "actor": "system",
+      "note": null,
+      "detail": {
+        "changes": true
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:34:28+00:00",
+      "action": "skip",
+      "issue_ids": [
+        "subjective::abstraction_fitness",
+        "subjective::ai_generated_debt",
+        "subjective::api_surface_coherence",
+        "subjective::authorization_consistency",
+        "subjective::contract_coherence",
+        "subjective::convention_outlier",
+        "subjective::cross_module_architecture",
+        "subjective::dependency_health",
+        "subjective::design_coherence",
+        "subjective::error_consistency",
+        "subjective::high_level_elegance",
+        "subjective::incomplete_migration",
+        "subjective::initialization_coupling",
+        "subjective::logic_clarity",
+        "subjective::low_level_elegance",
+        "subjective::mid_level_elegance",
+        "subjective::naming_quality",
+        "subjective::package_organization",
+        "subjective::test_strategy",
+        "subjective::type_safety"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": null,
+      "detail": {
+        "kind": "temporary",
+        "reason": "cannot run codex AI for subjective review"
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:35:06+00:00",
+      "action": "done",
+      "issue_ids": [
+        "smells::pretty_j1939/__main__.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": "High cyclomatic complexity in __main__.py was addressed by extracting argument parsing and message processing into several private helper methods.",
+      "detail": {}
+    },
+    {
+      "timestamp": "2026-03-12T01:35:06+00:00",
+      "action": "resolve",
+      "issue_ids": [
+        "smells::pretty_j1939/__main__.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": "High cyclomatic complexity in __main__.py was addressed by extracting argument parsing and message processing into several private helper methods.",
+      "detail": {
+        "status": "fixed",
+        "attestation": "I have actually High cyclomatic complexity in __main__.py was addressed by extracting argument parsing and message processing into several private helper methods. and I am not gaming the score."
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:35:07+00:00",
+      "action": "done",
+      "issue_ids": [
+        "smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": "High cyclomatic complexity in create_j1939db_json.py was addressed by splitting massive process_spns_and_pgns_tab loop into private helper functions.",
+      "detail": {}
+    },
+    {
+      "timestamp": "2026-03-12T01:35:07+00:00",
+      "action": "resolve",
+      "issue_ids": [
+        "smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": "High cyclomatic complexity in create_j1939db_json.py was addressed by splitting massive process_spns_and_pgns_tab loop into private helper functions.",
+      "detail": {
+        "status": "fixed",
+        "attestation": "I have actually High cyclomatic complexity in create_j1939db_json.py was addressed by splitting massive process_spns_and_pgns_tab loop into private helper functions. and I am not gaming the score."
+      }
+    },
+    {
+      "timestamp": "2026-03-12T01:35:07+00:00",
+      "action": "done",
+      "issue_ids": [
+        "smells::pretty_j1939/describe.py::high_cyclomatic_complexity"
+      ],
+      "cluster_name": null,
+      "actor": "user",
+      "note": "High cyclomatic complexity in describe.py was addressed by extracting special PGN handling, SPN property caching, and SPN description/marking logic into helper methods.",
+      "detail": {}
     }
   ],
   "epic_triage_meta": {},
@@ -3527,10 +3894,41 @@
       "recorded_at": "2026-03-12T01:10:16+00:00",
       "note": null,
       "cluster_name": null
+    },
+    {
+      "sha": "17642012350e",
+      "branch": "viewer",
+      "issue_ids": [
+        "smells::pretty_j1939/viewer.py::high_cyclomatic_complexity"
+      ],
+      "recorded_at": "2026-03-12T01:25:48+00:00",
+      "note": null,
+      "cluster_name": null
+    },
+    {
+      "sha": "307fd008ed9c",
+      "branch": "viewer",
+      "issue_ids": [
+        "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity"
+      ],
+      "recorded_at": "2026-03-12T01:30:08+00:00",
+      "note": null,
+      "cluster_name": null
+    },
+    {
+      "sha": "57404db8cbea",
+      "branch": "viewer",
+      "issue_ids": [
+        "smells::pretty_j1939/render.py::high_cyclomatic_complexity"
+      ],
+      "recorded_at": "2026-03-12T01:33:30+00:00",
+      "note": null,
+      "cluster_name": null
     }
   ],
   "uncommitted_issues": [
-    "smells::pretty_j1939/viewer.py::high_cyclomatic_complexity"
+    "smells::pretty_j1939/__main__.py::high_cyclomatic_complexity",
+    "smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity"
   ],
   "commit_tracking_branch": null
 }
