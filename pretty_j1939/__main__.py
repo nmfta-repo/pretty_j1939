@@ -595,6 +595,12 @@ class J1939Runner:
                     bus.shutdown()
                 except Exception as e:
                     logger.warning(f"Failed to shutdown bus cleanly: {e}")
+            final_descriptions = self.describe_obj.cleanup()
+            for desc in final_descriptions:
+                desc_line = self.render_description(desc, indent=self.args.format)
+                if len(desc_line) > 0:
+                    print(desc_line, flush=True)
+
             self.print_summary()
             if self.write_f:
                 self.write_f.close()

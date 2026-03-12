@@ -258,7 +258,16 @@ class J1939Viewer:
         if screen_row + state.num_rows - 1 < 1 or screen_row >= self.screen_h:
             return
 
-        # UI context
+        attr_base, is_hover, is_marked, is_logging = self._get_row_attributes(key)
+
+        self._clear_and_highlight_rows(
+            screen_row, state.num_rows, attr_base, is_hover, is_marked
+        )
+        self._draw_static_columns(screen_row, state, attr_base, is_marked, is_logging)
+        self._draw_bytes_column(screen_row, state, attr_base, is_hover, is_marked)
+        self._draw_pretty_column(screen_row, state, attr_base, is_hover, is_marked)
+
+    def _get_row_attributes(self, key: int) -> Tuple[int, bool, bool, bool]:
         is_hover = (
             self.ui.selection_cursor is not None
             and self.id_order[self.ui.selection_cursor] == key
@@ -273,9 +282,12 @@ class J1939Viewer:
         )
         if is_logging:
             attr_base |= curses.A_BOLD
+        return attr_base, is_hover, is_marked, is_logging
 
-        # 1. Clear rows and draw selection highlight
-        for i in range(state.num_rows):
+    def _clear_and_highlight_rows(
+        self, screen_row: int, num_rows: int, attr_base: int, is_hover: bool, is_marked: bool
+    ):
+        for i in range(num_rows):
             r = screen_row + i
             if 1 <= r < self.screen_h:
                 self.stdscr.move(r, 0)
@@ -283,7 +295,9 @@ class J1939Viewer:
                 if is_hover or is_marked:
                     self.stdscr.chgat(r, 0, -1, attr_base)
 
-        # 2. Draw standard columns (Count, dt, ID)
+    def _draw_static_columns(
+        self, screen_row: int, state: MessageState, attr_base: int, is_marked: bool, is_logging: bool
+    ):
         if 1 <= screen_row < self.screen_h:
             marker = ">" if is_marked else ("*" if is_logging else " ")
             id_hex = (
@@ -293,55 +307,96 @@ class J1939Viewer:
             )
 
             self.stdscr.addstr(screen_row, 0, f"{state.count:<8}", attr_base)
-            self.stdscr.addstr(screen_row, 8, f"{round(state.dt, 2):<8.3f}", attr_base)
+            self.stdscr.addstr(
+                screen_row, 8, f"{round(state.dt, 2):<8.3f}", attr_base
+            )
             self.stdscr.addstr(screen_row, 16, f"{marker}{id_hex:<11}", attr_base)
 
-            # 2.1 Draw Bytes column
-            curr_x = 28
-            data_hex = state.msg.data.hex().upper()
+    def _get_byte_attr(
+        self, byte_str: str, is_diff: bool, is_hover: bool, is_marked: bool, attr_base: int
+    ) -> int:
+        if is_hover or is_marked:
+            return attr_base
+        if is_diff and self.ui.highlight_changes:
+            return curses.color_pair(5)
 
-            # Use same coloring logic as HighPerformanceRenderer
-            def get_byte_attr(byte_str, is_diff):
-                if is_hover or is_marked:
-                    return attr_base
-                if is_diff and self.ui.highlight_changes:
-                    return curses.color_pair(5)
+        if byte_str == "00":
+            return curses.color_pair(10)
+        if byte_str == "FF":
+            return curses.color_pair(11)
 
-                if byte_str == "00":
-                    return curses.color_pair(10)
-                if byte_str == "FF":
-                    return curses.color_pair(11)
+        try:
+            b_int = int(byte_str, 16)
+            if 32 <= b_int <= 126:
+                return curses.color_pair(12)
+        except ValueError as e:
+            logger.debug(f"Byte {byte_str} is not valid hex: {e}")
+        return curses.color_pair(13)
 
-                try:
-                    b_int = int(byte_str, 16)
-                    if 32 <= b_int <= 126:
-                        return curses.color_pair(12)
-                except ValueError as e:
-                    logger.debug(f"Byte {byte_str} is not valid hex: {e}")
-                return curses.color_pair(13)
+    def _draw_bytes_column(
+        self, screen_row: int, state: MessageState, attr_base: int, is_hover: bool, is_marked: bool
+    ):
+        if not (1 <= screen_row < self.screen_h):
+            return
 
-            prev_data_hex = ""
-            if self.ui.highlight_changes:
-                # msg in MessageState is the CURRENT message.
-                # To highlight changes we need the data from the message that produced state.previous_description.
-                # Actually MessageState holds the current message, and we update it in _process_message.
-                # So we need to store the previous data hex.
-                prev_data_hex = getattr(state, "previous_data_hex", "")
+        curr_x = 28
+        data_hex = state.msg.data.hex().upper()
+        prev_data_hex = getattr(state, "previous_data_hex", "")
 
-            for i in range(0, min(len(data_hex), 16), 2):
-                byte_str = data_hex[i : i + 2]
-                is_diff = False
-                if prev_data_hex and i < len(prev_data_hex):
-                    is_diff = byte_str != prev_data_hex[i : i + 2]
+        for i in range(0, min(len(data_hex), 16), 2):
+            byte_str = data_hex[i : i + 2]
+            is_diff = False
+            if prev_data_hex and i < len(prev_data_hex):
+                is_diff = byte_str != prev_data_hex[i : i + 2]
 
-                attr = get_byte_attr(byte_str, is_diff)
-                self.stdscr.addstr(screen_row, curr_x, byte_str, attr)
-                curr_x += 2
+            attr = self._get_byte_attr(byte_str, is_diff, is_hover, is_marked, attr_base)
+            self.stdscr.addstr(screen_row, curr_x, byte_str, attr)
+            curr_x += 2
 
-            if len(data_hex) > 16:
-                self.stdscr.addstr(screen_row, curr_x, "..", attr_base)
+        if len(data_hex) > 16:
+            self.stdscr.addstr(screen_row, curr_x, "..", attr_base)
 
-        # 3. Draw Pretty column with wrapping
+    def _draw_pretty_value(self, curr_y, curr_x, v_str, val_attr):
+        # Apply numeric colorization if using default color and parens are present
+        if val_attr == curses.color_pair(3) and "(" in v_str:
+            last_end = 0
+            for match in NUM_IN_PARENS_RE.finditer(v_str):
+                # Text before number (including '(')
+                pre = v_str[last_end : match.start(2)]
+                room = self.screen_w - 1 - curr_x
+                if room <= 0:
+                    break
+                self.stdscr.addstr(curr_y, curr_x, pre[:room], val_attr)
+                curr_x += len(pre[:room])
+
+                # Number itself
+                num_part = match.group(2)
+                room = self.screen_w - 1 - curr_x
+                if room <= 0:
+                    break
+                self.stdscr.addstr(
+                    curr_y, curr_x, num_part[:room], curses.color_pair(2)
+                )
+                curr_x += len(num_part[:room])
+
+                last_end = match.end(2)
+
+            # Remaining text
+            post = v_str[last_end:]
+            room = self.screen_w - 1 - curr_x
+            if room > 0:
+                self.stdscr.addstr(curr_y, curr_x, post[:room], val_attr)
+                curr_x += len(post[:room])
+        else:
+            room = self.screen_w - 1 - curr_x
+            if room > 0:
+                self.stdscr.addstr(curr_y, curr_x, v_str[:room], val_attr)
+                curr_x += len(v_str[:room])
+        return curr_x
+
+    def _draw_pretty_column(
+        self, screen_row: int, state: MessageState, attr_base: int, is_hover: bool, is_marked: bool
+    ):
         curr_x, curr_y = PRETTY_COL_OFFSET, screen_row
         prev_desc = state.previous_description
 
@@ -382,7 +437,11 @@ class J1939Viewer:
             curr_x += len(k) + 2
 
             # Draw Value
-            if is_bytes and k in prev_desc and len(v_str) == len(str(prev_desc[k])):
+            if (
+                is_bytes
+                and k in prev_desc
+                and len(v_str) == len(str(prev_desc[k]))
+            ):
                 # Special granular byte highlight
                 prev_v_str = str(prev_desc[k])
                 for i in range(0, len(v_str), 2):
@@ -400,48 +459,14 @@ class J1939Viewer:
                         self.stdscr.addstr(curr_y, curr_x, pair, attr)
                         curr_x += 2
             else:
-                # Determine color for this value
                 val_attr = (
                     attr_base
                     if (is_hover or is_marked)
-                    else (curses.color_pair(5) if is_changed else curses.color_pair(3))
+                    else (
+                        curses.color_pair(5) if is_changed else curses.color_pair(3)
+                    )
                 )
-
-                # Apply numeric colorization if using default color and parens are present
-                if not (is_hover or is_marked or is_changed) and "(" in v_str:
-                    last_end = 0
-                    for match in NUM_IN_PARENS_RE.finditer(v_str):
-                        # Text before number (including '(')
-                        pre = v_str[last_end : match.start(2)]
-                        room = self.screen_w - 1 - curr_x
-                        if room <= 0:
-                            break
-                        self.stdscr.addstr(curr_y, curr_x, pre[:room], val_attr)
-                        curr_x += len(pre[:room])
-
-                        # Number itself
-                        num_part = match.group(2)
-                        room = self.screen_w - 1 - curr_x
-                        if room <= 0:
-                            break
-                        self.stdscr.addstr(
-                            curr_y, curr_x, num_part[:room], curses.color_pair(2)
-                        )
-                        curr_x += len(num_part[:room])
-
-                        last_end = match.end(2)
-
-                    # Remaining text
-                    post = v_str[last_end:]
-                    room = self.screen_w - 1 - curr_x
-                    if room > 0:
-                        self.stdscr.addstr(curr_y, curr_x, post[:room], val_attr)
-                        curr_x += len(post[:room])
-                else:
-                    room = self.screen_w - 1 - curr_x
-                    if room > 0:
-                        self.stdscr.addstr(curr_y, curr_x, v_str[:room], val_attr)
-                        curr_x += len(v_str[:room])
+                curr_x = self._draw_pretty_value(curr_y, curr_x, v_str, val_attr)
 
     def _redraw_all(self):
         """Full screen refresh."""

@@ -21,6 +21,14 @@ class IsoTpTracker:
         self.is_real_time = real_time
         self.sessions = {}
 
+    def cleanup(self, transport_found_processor: Callable[..., Any]):
+        for (da, sa), session in self.sessions.items():
+            if not self.is_real_time:
+                transport_found_processor(
+                    bytes(session["data"]), sa, session["pgn"], is_last_packet=True
+                )
+        self.sessions.clear()
+
     def process(
         self,
         transport_found_processor: Callable[..., Any],

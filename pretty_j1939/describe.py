@@ -652,10 +652,13 @@ class DADescriber:
         if skip_spns is None:  # TODO have one default for skip_spns
             skip_spns = {}
         description = OrderedDict()
-        if is_transport_pgn(
-            pgn
-        ):  # transport messages can't be accurately parsed by the DA description
-            return description
+        return description
+
+    def _describe_special_pgn_types(
+        self, pgn, message_data_bitstring, description, sa, include_raw_data
+    ):
+        if is_transport_pgn(pgn):
+            return True  # Indicate that it was a transport PGN and processing should stop
 
         if pgn == 59904:  # Request
             if len(message_data_bitstring.bytes) >= 3:
@@ -667,8 +670,8 @@ class DADescriber:
                 requested_pgn_desc = self.get_pgn_description(requested_pgn)
                 description["Requested:"] = requested_pgn_desc
                 description["_requested_pgn"] = requested_pgn
-            if not self.include_raw_data:
-                return description
+            if not include_raw_data:
+                return True  # Indicate that special PGN was handled
 
         if pgn == 60928:  # Address Claimed
             name_decoded = decode_j1939_name(
@@ -683,16 +686,75 @@ class DADescriber:
                 if sa is not None:
                     self.name_tracker.update(sa, name_decoded)
 
-            if not self.include_raw_data:
-                return description
+            if not include_raw_data:
+                return True  # Indicate that special PGN was handled
 
         if pgn in (65226, 65227):  # DM1, DM2
             self.describe_diagnostic_message(message_data_bitstring.bytes, description)
 
-            if not self.include_raw_data:
+            if not include_raw_data:
                 # If we have something, return it now
                 if len(description) > 0:
-                    return description
+                    return True  # Indicate that special PGN was handled
+        return False # Indicate that no special PGN was handled or not fully handled without raw data
+
+    def _get_spn_cached_properties(self, pgn, spn):
+        cache_key = (pgn, spn)
+        if cache_key in self._spn_cache:
+            return self._spn_cache[cache_key]
+
+        spn_obj = self.spn_objects.get(spn)
+        if not spn_obj:
+            return None
+
+        spn_name = spn_obj["Name"]
+        spn_units = spn_obj["Units"]
+        is_num = is_spn_numerical_values(spn_units)
+        is_bit = is_spn_bitencoded(spn_units)
+        spn_start = self.lookup_spn_startbit(spn_obj, spn, pgn)
+        spn_length = spn_obj["SPNLength"]
+        
+        cached_properties = (
+            spn_name,
+            spn_units,
+            is_num,
+            is_bit,
+            spn_start,
+            spn_length,
+            spn_obj,
+        )
+        self._spn_cache[cache_key] = cached_properties
+        return cached_properties
+
+    def _mark_spn_covered(self, new_spn, new_spn_name, new_spn_description, skip_spns):
+        skip_spns[new_spn] = (
+            new_spn_name,
+            new_spn_description,
+        )  # TODO: move this closer to real-time handling
+
+    def _add_spn_description(self, new_spn, new_spn_name, new_spn_description, description, skip_spns):
+        description[new_spn_name] = new_spn_description
+        self._mark_spn_covered(new_spn, new_spn_name, new_spn_description, skip_spns)
+
+    def describe_message_data(
+        self,
+        pgn,
+        message_data_bitstring,
+        is_complete_message=True,
+        skip_spns=None,
+        sa=None,
+    ):
+        if skip_spns is None:  # TODO have one default for skip_spns
+            skip_spns = {}
+        description = OrderedDict()
+
+        # Handle special PGN types (Request, Address Claimed, DM1/DM2)
+        # If it's a transport PGN, or a special PGN handled completely, return early.
+        special_pgn_handled = self._describe_special_pgn_types(
+            pgn, message_data_bitstring, description, sa, self.include_raw_data
+        )
+        if special_pgn_handled:
+            return description
 
         pgn_object = self.pgn_objects.get(pgn, {})
         spn_list = pgn_object.get("SPNs", [])
@@ -704,46 +766,15 @@ class DADescriber:
             return description
 
         for spn in spn_list:
-            # Use cache for SPN properties
-            cache_key = (pgn, spn)
-            if cache_key in self._spn_cache:
-                spn_name, spn_units, is_num, is_bit, spn_start, spn_length, spn_obj = (
-                    self._spn_cache[cache_key]
-                )
-            else:
-                spn_obj = self.spn_objects.get(spn)
-                if not spn_obj:
-                    continue
-                spn_name = spn_obj["Name"]
-                spn_units = spn_obj["Units"]
-                is_num = is_spn_numerical_values(spn_units)
-                is_bit = is_spn_bitencoded(spn_units)
-                spn_start = self.lookup_spn_startbit(spn_obj, spn, pgn)
-                spn_length = spn_obj["SPNLength"]
-                self._spn_cache[cache_key] = (
-                    spn_name,
-                    spn_units,
-                    is_num,
-                    is_bit,
-                    spn_start,
-                    spn_length,
-                    spn_obj,
-                )
+            spn_properties = self._get_spn_cached_properties(pgn, spn)
+            if spn_properties is None:
+                continue
+            spn_name, spn_units, is_num, is_bit, spn_start, spn_length, spn_obj = spn_properties
 
             if (
                 skip_spns.get(spn, ()) != ()
             ):  # skip any SPNs that have already been processed.
                 continue
-
-            def mark_spn_covered(new_spn, new_spn_name, new_spn_description):
-                skip_spns[new_spn] = (
-                    new_spn_name,
-                    new_spn_description,
-                )  # TODO: move this closer to real-time handling
-
-            def add_spn_description(new_spn, new_spn_name, new_spn_description):
-                description[new_spn_name] = new_spn_description
-                mark_spn_covered(new_spn, new_spn_name, new_spn_description)
 
             try:
                 # ASCII consolidated logic
@@ -765,17 +796,17 @@ class DADescriber:
                     if len(raw_bytes) > 0:
                         if all(b == 0xFF for b in raw_bytes):
                             if self.include_na:
-                                add_spn_description(spn, spn_name, "N/A")
+                                self._add_spn_description(spn, spn_name, "N/A", description, skip_spns)
                             else:
-                                mark_spn_covered(spn, spn_name, "N/A")
+                                self._mark_spn_covered(spn, spn_name, "N/A", skip_spns)
                             continue
                         elif all(b == 0x00 for b in raw_bytes):
-                            add_spn_description(spn, spn_name, "Error")
+                            self._add_spn_description(spn, spn_name, "Error", description, skip_spns)
                             continue
 
                     # Use latin-1 to safely decode any byte sequence
-                    ascii_str = raw_bytes.decode(encoding="latin-1")
-                    add_spn_description(spn, spn_name, ascii_str)
+                    ascii_str = raw_bytes.decode(encoding="utf-8")
+                    self._add_spn_description(spn, spn_name, ascii_str, description, skip_spns)
                     continue
 
                 if is_num:
@@ -797,9 +828,9 @@ class DADescriber:
                     is_ascii = spn_units.lower() == "ascii"
                     if not is_ascii and is_spn_na(raw_spn_value, spn_length):
                         if self.include_na:
-                            add_spn_description(spn, spn_name, "N/A")
+                            self._add_spn_description(spn, spn_name, "N/A", description, skip_spns)
                         else:
-                            mark_spn_covered(spn, spn_name, "N/A")
+                            self._mark_spn_covered(spn, spn_name, "N/A", skip_spns)
                         continue
 
                     # Priority 1: Check if this explicit value is defined in J1939BitDecodings
@@ -816,13 +847,13 @@ class DADescriber:
                     # Priority 2: If no explicit DA mapping, check remaining standard J1939 Indicators
                     if not is_ascii and spn_value_description is None:
                         if is_spn_error(raw_spn_value, spn_length):
-                            add_spn_description(spn, spn_name, "Error")
+                            self._add_spn_description(spn, spn_name, "Error", description, skip_spns)
                             continue
                         elif is_spn_reserved(raw_spn_value, spn_length):
-                            add_spn_description(spn, spn_name, "Reserved")
+                            self._add_spn_description(spn, spn_name, "Reserved", description, skip_spns)
                             continue
                         elif is_spn_specific(raw_spn_value, spn_length):
-                            add_spn_description(spn, spn_name, "Parameter specific")
+                            self._add_spn_description(spn, spn_name, "Parameter specific", description, skip_spns)
                             continue
 
                     # Priority 3: Final decoding (scaling or enum lookup)
@@ -847,10 +878,10 @@ class DADescriber:
                                 raw_spn_value,
                                 spn_value_description.strip(),
                             )
-                            add_spn_description(spn, spn_name, val_desc)
+                            self._add_spn_description(spn, spn_name, val_desc, description, skip_spns)
                         else:
-                            add_spn_description(
-                                spn, spn_name, "%d (Unknown)" % raw_spn_value
+                            self._add_spn_description(
+                                spn, spn_name, "%d (Unknown)" % raw_spn_value, description, skip_spns
                             )
                     elif is_ascii:
                         # NEW: Handle ASCII SPNs correctly if they were categorized as is_num
@@ -859,14 +890,14 @@ class DADescriber:
                             message_data_bitstring, spn, pgn, is_complete_message
                         )
                         ascii_str = spn_bytes.bytes.decode(encoding="utf-8")
-                        add_spn_description(spn, spn_name, ascii_str)
+                        self._add_spn_description(spn, spn_name, ascii_str, description, skip_spns)
                     else:
                         # Numerical scaling
                         spn_value = self.get_spn_value(
                             message_data_bitstring, spn, pgn, is_complete_message
                         )
-                        add_spn_description(
-                            spn, spn_name, "%s [%s]" % (spn_value, spn_units)
+                        self._add_spn_description(
+                            spn, spn_name, "%s [%s]" % (spn_value, spn_units), description, skip_spns
                         )
                 else:
                     spn_bytes = self.get_spn_bytes(
@@ -890,12 +921,12 @@ class DADescriber:
                         if raw_val is not None:
                             if is_spn_na(raw_val, spn_bytes.length):
                                 if self.include_na:
-                                    add_spn_description(spn, spn_name, "N/A")
+                                    self._add_spn_description(spn, spn_name, "N/A", description, skip_spns)
                                 else:
-                                    mark_spn_covered(spn, spn_name, "N/A")
+                                    self._mark_spn_covered(spn, spn_name, "N/A", skip_spns)
                                 continue
                             elif is_spn_error(raw_val, spn_bytes.length):
-                                add_spn_description(spn, spn_name, "Error")
+                                self._add_spn_description(spn, spn_name, "Error", description, skip_spns)
                                 continue
 
                         if spn == 2540:
@@ -910,29 +941,31 @@ class DADescriber:
                                 requested_pgn_acronym = self.get_pgn_acronym(
                                     requested_pgn_val
                                 )
-                                add_spn_description(
+                                self._add_spn_description(
                                     spn,
                                     spn_name,
                                     "%s (%d)"
                                     % (requested_pgn_acronym, requested_pgn_val),
+                                    description, skip_spns
                                 )
                             else:
-                                add_spn_description(spn, spn_name, "%s" % spn_bytes)
+                                self._add_spn_description(spn, spn_name, "%s" % spn_bytes, description, skip_spns)
                         elif spn_units.lower() in ("request dependent",):
-                            add_spn_description(
-                                spn, spn_name, "%s (%s)" % (spn_bytes, spn_units)
+                            self._add_spn_description(
+                                spn, spn_name, "%s (%s)" % (spn_bytes, spn_units), description, skip_spns
                             )
                         elif spn_units.lower() in ("ascii",):
-                            add_spn_description(
+                            self._add_spn_description(
                                 spn,
                                 spn_name,
                                 "%s" % spn_bytes.bytes.decode(encoding="utf-8"),
+                                description, skip_spns
                             )
                         else:
-                            add_spn_description(spn, spn_name, "%s" % spn_bytes)
+                            self._add_spn_description(spn, spn_name, "%s" % spn_bytes, description, skip_spns)
 
             except ValueError:
-                add_spn_description(
+                self._add_spn_description(
                     spn,
                     spn_name,
                     "%s (%s)"
@@ -942,6 +975,7 @@ class DADescriber:
                         ),
                         "Out of range",
                     ),
+                    description, skip_spns
                 )
 
         if (
@@ -1074,6 +1108,17 @@ class J1939TransportTracker:
         self.is_real_time = real_time
         self.sessions = {}  # (da, sa) -> session_info
 
+    def cleanup(self, transport_found_processor):
+        for (da, sa), session in self.sessions.items():
+            if not self.is_real_time:
+                full_data = session["data"][: session["length"]]
+                if None not in full_data:
+                    data_bytes = bytes(full_data)
+                    transport_found_processor(
+                        data_bytes, sa, session["pgn"], is_last_packet=True
+                    )
+        self.sessions.clear()
+
     def process(self, transport_found_processor, message_bytes, message_id):
         _, da, sa = parse_j1939_id(message_id)
 
@@ -1183,6 +1228,58 @@ class J1939Describer:
     def get_summary(self):
         return self.summary_data
 
+    def cleanup(self):
+        final_descriptions = []
+
+        def on_transport_found(
+            data_bytes, found_sa, found_pgn, spn_coverage=None, is_last_packet=False
+        ):
+            if spn_coverage is None:
+                spn_coverage = {}
+
+            # Update summary for transport
+            t_key = (found_sa, self.current_da)
+            if t_key not in self.summary_data:
+                self.summary_data[t_key] = {"sent": set(), "req": set()}
+            self.summary_data[t_key]["sent"].add(found_pgn)
+
+            # Create a full description for the reassembled message
+            description = OrderedDict()
+            if self.describe_pgns:
+                transport_pgn_description = self.da_describer.get_pgn_description(
+                    found_pgn
+                )
+                description[PGN_LABEL] = transport_pgn_description
+                description["SA"] = "%s(%s)" % (self.da_describer.get_formatted_address_and_name(found_sa)[1], self.da_describer.get_formatted_address_and_name(found_sa)[0])
+                # DA is already captured in the outer description or should be derived from the session context
+
+            description["_pgn"] = found_pgn
+
+            transport_bits = bitstring.Bits(bytes=data_bytes)
+            if self.describe_spns and is_last_packet:
+                message_description = self.da_describer.describe_message_data(
+                    found_pgn,
+                    transport_bits,
+                    is_complete_message=True,
+                    skip_spns=spn_coverage,
+                    sa=found_sa,
+                )
+                description.update(message_description)
+
+            if is_last_packet and self.include_transport_rawdata:
+                description.update({"Bytes": transport_bits.hex.upper()})
+
+            final_descriptions.append(self.reorder_description(description))
+
+        # Keep track of the DA that was active for the *last* processed message in __call__
+        # This is a bit of a hack, but necessary to properly update the summary_data on cleanup
+        self.current_da = self.current_da if hasattr(self, 'current_da') else 0
+
+        for tracker in self.trackers:
+            tracker.cleanup(on_transport_found)
+
+        return final_descriptions
+
     def set_da_describer(self, da_describer):
         self.da_describer = da_describer
 
@@ -1196,6 +1293,7 @@ class J1939Describer:
         self.transport_messages.clear()
 
         pgn, da, sa = parse_j1939_id(message_id_uint)
+        self.current_da = da  # Store current DA for cleanup
         summary_key = (sa, da)
         if summary_key not in self.summary_data:
             self.summary_data[summary_key] = {"sent": set(), "req": set()}
