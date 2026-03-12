@@ -192,13 +192,7 @@ class J1939Runner:
                 resolved.update(matches)
         return list(resolved)
 
-    def _generate_can_filters(self):
-        """Generate CAN-level filters from J1939 filter criteria."""
-        if not (self.pgn_list or self.sa_list or self.da_list or self.ca_list):
-            return
-
-        from itertools import product
-
+    def _get_pgn_filters(self):
         pgn_filters = []
         for val in self.pgn_list:
             pf = (val >> 8) & 0xFF
@@ -206,29 +200,29 @@ class J1939Runner:
                 pgn_filters.append(((val << 8), 0x03FF0000))
             else:
                 pgn_filters.append(((val << 8), 0x03FFFF00))
+        return pgn_filters
 
-        sa_filters = [(val, 0x000000FF) for val in self.sa_list]
-        da_filters = [((val << 8), 0x0000FF00) for val in self.da_list]
+    def _get_sa_filters(self):
+        return [(val, 0x000000FF) for val in self.sa_list]
 
-        if not self.can_filters:
-            self.can_filters = []
+    def _get_da_filters(self):
+        return [((val << 8), 0x0000FF00) for val in self.da_list]
+
+    def _add_filter(self, can_id, can_mask):
+        self.can_filters.append(
+            {"can_id": can_id, "can_mask": can_mask, "extended": True}
+        )
+
+    def _add_combined_filters(self, pgn_filters, sa_filters, da_filters):
+        from itertools import product
 
         tmp_pgn_filters = pgn_filters if pgn_filters else [(0, 0)]
         tmp_sa_filters = sa_filters if sa_filters else [(0, 0)]
         tmp_da_filters = da_filters if da_filters else [(0, 0)]
 
-        def add_filter(pf, sf, df):
-            self.can_filters.append(
-                {
-                    "can_id": pf[0] | sf[0] | df[0],
-                    "can_mask": pf[1] | sf[1] | df[1],
-                    "extended": True,
-                }
-            )
-
         if not self.ca_list:
             for pf, sf, df in product(tmp_pgn_filters, tmp_sa_filters, tmp_da_filters):
-                add_filter(pf, sf, df)
+                self._add_filter(pf[0] | sf[0] | df[0], pf[1] | sf[1] | df[1])
         else:
             for c in self.ca_list:
                 # 1. Match SA == c
@@ -244,7 +238,7 @@ class J1939Runner:
                     for pf, sf, df in product(
                         tmp_pgn_filters, sas_to_use, tmp_da_filters
                     ):
-                        add_filter(pf, sf, df)
+                        self._add_filter(pf[0] | sf[0] | df[0], pf[1] | sf[1] | df[1])
                 # 2. Match DA == c
                 das_to_use = (
                     [((c << 8), 0x0000FF00)]
@@ -258,19 +252,43 @@ class J1939Runner:
                     for pf, sf, df in product(
                         tmp_pgn_filters, tmp_sa_filters, das_to_use
                     ):
-                        add_filter(pf, sf, df)
+                        self._add_filter(pf[0] | sf[0] | df[0], pf[1] | sf[1] | df[1])
 
-        # Include transport PGNs if PGN filtering is active
-        if self.pgn_list:
-            for tp_pgn in [60416, 60160, 59392]:
-                tp_pf = (tp_pgn << 8, 0x03FF0000)
-                if not self.ca_list:
-                    for _, sf, df in product([(0, 0)], tmp_sa_filters, tmp_da_filters):
-                        add_filter(tp_pf, sf, df)
-                else:
-                    for c in self.ca_list:
-                        add_filter(tp_pf, (c, 0x000000FF), (0, 0))
-                        add_filter(tp_pf, (0, 0), ((c << 8), 0x0000FF00))
+    def _add_transport_pgn_filters(self, sa_filters, da_filters):
+        from itertools import product
+
+        if not self.pgn_list:
+            return
+
+        tmp_sa_filters = sa_filters if sa_filters else [(0, 0)]
+        tmp_da_filters = da_filters if da_filters else [(0, 0)]
+
+        for tp_pgn in [60416, 60160, 59392]:
+            tp_pf = (tp_pgn << 8, 0x03FF0000)
+            if not self.ca_list:
+                for _, sf, df in product([(0, 0)], tmp_sa_filters, tmp_da_filters):
+                    self._add_filter(
+                        tp_pf[0] | sf[0] | df[0], tp_pf[1] | sf[1] | df[1]
+                    )
+            else:
+                for c in self.ca_list:
+                    self._add_filter(tp_pf[0] | c, tp_pf[1] | 0x000000FF)
+                    self._add_filter(tp_pf[0] | (c << 8), tp_pf[1] | 0x0000FF00)
+
+    def _generate_can_filters(self):
+        """Generate CAN-level filters from J1939 filter criteria."""
+        if not (self.pgn_list or self.sa_list or self.da_list or self.ca_list):
+            return
+
+        pgn_filters = self._get_pgn_filters()
+        sa_filters = self._get_sa_filters()
+        da_filters = self._get_da_filters()
+
+        if not self.can_filters:
+            self.can_filters = []
+
+        self._add_combined_filters(pgn_filters, sa_filters, da_filters)
+        self._add_transport_pgn_filters(sa_filters, da_filters)
 
     def render_description(
         self,
@@ -311,64 +329,72 @@ class J1939Runner:
             description, indent=indent, can_line=can_line, highlight=highlight
         )
 
-    def _parse_candump_line(self, candump_line):
+    def _parse_verbose_candump_line(self, candump_line):
         timestamp = 0.0
         interface = "can"
         message_id = None
         message_data = None
+        
+        parts = candump_line.split()
+        try:
+            if "Timestamp:" in parts:
+                ts_idx = parts.index("Timestamp:") + 1
+                timestamp = float(parts[ts_idx])
+            id_idx = parts.index("ID:") + 1
+            msg_id_str = parts[id_idx]
+            dl_idx = parts.index("DL:") + 1
+            length = int(parts[dl_idx])
+            data_start_idx = dl_idx + 1
+            data_hex_list = parts[data_start_idx : data_start_idx + length]
+            data_hex_str = "0x" + "".join(data_hex_list)
+            message_id = bitstring.Bits(hex=msg_id_str)
+            message_data = bitstring.Bits(hex=data_hex_str)
+            return timestamp, interface, message_id, message_data
+        except (ValueError, IndexError) as e:
+            logger.debug(f"Skipping malformed message due to decoding error: {e}")
+            return None
 
+    def _parse_standard_candump_line(self, candump_line):
+        parts = candump_line.split()
+        if not parts:
+            return None
+        if parts[0].isdigit() and len(parts) > 1 and parts[1].startswith("("):
+            parts = parts[1:]
+
+        if len(parts) < 1:
+            return None
+        try:
+            timestamp = 0.0
+            interface = "can"
+            if len(parts) >= 3 and parts[0].startswith("(") and parts[0].endswith(")"):
+                timestamp = float(parts[0][1:-1])
+                interface = parts[1]
+                message = parts[2]
+            elif len(parts) >= 2:
+                interface = parts[0]
+                message = parts[1]
+            else:
+                message = parts[0]
+                interface = "can"
+
+            if "#" not in message:
+                return None
+            msg_id_str, msg_data_str = message.split("#", 1)
+            message_id = bitstring.Bits(hex=msg_id_str)
+            message_data = bitstring.Bits(hex=msg_data_str)
+            return timestamp, interface, message_id, message_data
+        except (ValueError, IndexError) as e:
+            logger.debug(f"Skipping candump line due to decoding error: {e}")
+            return None
+
+    def _parse_candump_line(self, candump_line):
         if not candump_line.strip():
             return None
 
         if candump_line.strip().startswith("Timestamp:"):
-            parts = candump_line.split()
-            try:
-                if "Timestamp:" in parts:
-                    ts_idx = parts.index("Timestamp:") + 1
-                    timestamp = float(parts[ts_idx])
-                id_idx = parts.index("ID:") + 1
-                msg_id_str = parts[id_idx]
-                dl_idx = parts.index("DL:") + 1
-                length = int(parts[dl_idx])
-                data_start_idx = dl_idx + 1
-                data_hex_list = parts[data_start_idx : data_start_idx + length]
-                data_hex_str = "0x" + "".join(data_hex_list)
-                message_id = bitstring.Bits(hex=msg_id_str)
-                message_data = bitstring.Bits(hex=data_hex_str)
-            except (ValueError, IndexError) as e:
-                logger.debug(f"Skipping malformed message due to decoding error: {e}")
-                return None
+            return self._parse_verbose_candump_line(candump_line)
         else:
-            parts = candump_line.split()
-            if not parts:
-                return None
-            if parts[0].isdigit() and len(parts) > 1 and parts[1].startswith("("):
-                parts = parts[1:]
-
-            if len(parts) < 1:
-                return None
-            try:
-                if len(parts) >= 3 and parts[0].startswith("(") and parts[0].endswith(")"):
-                    timestamp = float(parts[0][1:-1])
-                    interface = parts[1]
-                    message = parts[2]
-                elif len(parts) >= 2:
-                    interface = parts[0]
-                    message = parts[1]
-                else:
-                    message = parts[0]
-                    interface = "can"
-
-                if "#" not in message:
-                    return None
-                msg_id_str, msg_data_str = message.split("#", 1)
-                message_id = bitstring.Bits(hex=msg_id_str)
-                message_data = bitstring.Bits(hex=msg_data_str)
-            except (ValueError, IndexError) as e:
-                logger.debug(f"Skipping candump line due to decoding error: {e}")
-                return None
-
-        return timestamp, interface, message_id, message_data
+            return self._parse_standard_candump_line(candump_line)
 
     def _parse_can_message(self, item):
         message_id = bitstring.Bits(uint=item.arbitration_id, length=32)
@@ -529,72 +555,80 @@ class J1939Runner:
 
                 self.write_f.write(f_summary + "\n")
 
-    def run(self):
+    def _run_from_can_interface(self):
+        if can is None:
+            print("Error: 'python-can' is not installed", file=sys.stderr)
+            sys.exit(1)
+        
         bus = None
         try:
-            if self.args.interface:
-                if can is None:
-                    print("Error: 'python-can' is not installed", file=sys.stderr)
-                    sys.exit(1)
-                try:
-                    bus_kwargs = {
-                        "interface": self.args.interface,
-                        "channel": self.args.channel,
-                        "bitrate": self.args.bitrate,
-                        **self.extra_kwargs,
-                    }
-                    # Filter out None values to let python-can use its defaults
-                    bus_kwargs = {k: v for k, v in bus_kwargs.items() if v is not None}
+            bus_kwargs = {
+                "interface": self.args.interface,
+                "channel": self.args.channel,
+                "bitrate": self.args.bitrate,
+                **self.extra_kwargs,
+            }
+            # Filter out None values to let python-can use its defaults
+            bus_kwargs = {k: v for k, v in bus_kwargs.items() if v is not None}
 
-                    if self.can_filters:
-                        bus_kwargs["can_filters"] = self.can_filters
+            if self.can_filters:
+                bus_kwargs["can_filters"] = self.can_filters
 
-                    bus = can.Bus(**bus_kwargs)
-                    print(f"Connected to {bus.__class__.__name__}: {bus.channel_info}")
-                    self.process_messages(bus, self.can_filters)
-                except can.CanError as e:
-                    print(f"CAN error: {e}", file=sys.stderr)
-                    if "Unknown interface" in str(e):
-                        backends = sorted(list(can.interfaces.BACKENDS.keys()))
-                        print(
-                            f"Available interfaces: {', '.join(backends)}",
-                            file=sys.stderr,
-                        )
-                    sys.exit(1)
-            else:
-                f = None
-                if self.args.candump == "-":
-                    f = sys.stdin
-                elif self.args.candump:
-                    try:
-                        f = open(self.args.candump, "r")
-                    except FileNotFoundError:
-                        print(
-                            f"Error: file '{self.args.candump}' not found",
-                            file=sys.stderr,
-                        )
-                        sys.exit(1)
-                else:
-                    print(
-                        "Error: must specify either a log file or an interface (-i)",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
-
-                try:
-                    self.process_messages(f, self.can_filters)
-                finally:
-                    if f is not None and f is not sys.stdin:
-                        f.close()
-        except KeyboardInterrupt:
-            print("\nInterrupted by user", file=sys.stderr)
-            sys.exit(0)
+            bus = can.Bus(**bus_kwargs)
+            print(f"Connected to {bus.__class__.__name__}: {bus.channel_info}")
+            self.process_messages(bus, self.can_filters)
+        except can.CanError as e:
+            print(f"CAN error: {e}", file=sys.stderr)
+            if "Unknown interface" in str(e):
+                backends = sorted(list(can.interfaces.BACKENDS.keys()))
+                print(
+                    f"Available interfaces: {', '.join(backends)}",
+                    file=sys.stderr,
+                )
+            sys.exit(1)
         finally:
             if bus:
                 try:
                     bus.shutdown()
                 except Exception as e:
                     logger.warning(f"Failed to shutdown bus cleanly: {e}")
+
+    def _run_from_candump(self):
+        f = None
+        if self.args.candump == "-":
+            f = sys.stdin
+        elif self.args.candump:
+            try:
+                f = open(self.args.candump, "r")
+            except FileNotFoundError:
+                print(
+                    f"Error: file '{self.args.candump}' not found",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+        else:
+            print(
+                "Error: must specify either a log file or an interface (-i)",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        try:
+            self.process_messages(f, self.can_filters)
+        finally:
+            if f is not None and f is not sys.stdin:
+                f.close()
+
+    def run(self):
+        try:
+            if self.args.interface:
+                self._run_from_can_interface()
+            else:
+                self._run_from_candump()
+        except KeyboardInterrupt:
+            print("\nInterrupted by user", file=sys.stderr)
+            sys.exit(0)
+        finally:
             final_descriptions = self.describe_obj.cleanup()
             for desc in final_descriptions:
                 desc_line = self.render_description(desc, indent=self.args.format)
@@ -828,6 +862,15 @@ def get_parser():
     return parser
 
 
+def _parse_list_args(arg_list):
+    new_list = []
+    if arg_list:
+        for item in arg_list:
+            for sub_item in item.replace(",", " ").split():
+                new_list.append(sub_item)
+    return new_list
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "viewer":
         from .viewer import main as viewer_main
@@ -870,53 +913,15 @@ def main():
                     }
                 )
 
-    pgn_list, pgn_filters = [], []
-    if args.filter_pgn:
-        for p in args.filter_pgn:
-            for sub_p in p.replace(",", " ").split():
-                pgn_list.append(sub_p)
+    pgn_list = _parse_list_args(args.filter_pgn)
+    sa_list = _parse_list_args(args.filter_sa)
+    da_list = _parse_list_args(args.filter_da)
+    ca_list = _parse_list_args(args.filter_ca)
 
-    sa_list = []
-    if args.filter_sa:
-        for s in args.filter_sa:
-            for sub_s in s.replace(",", " ").split():
-                sa_list.append(sub_s)
-
-    da_list = []
-    if args.filter_da:
-        for d in args.filter_da:
-            for sub_d in d.replace(",", " ").split():
-                da_list.append(sub_d)
-
-    ca_list = []
-    if args.filter_ca:
-        for c in args.filter_ca:
-            for sub_c in c.replace(",", " ").split():
-                ca_list.append(sub_c)
-
-    h_pgn_list = []
-    if args.highlight_pgn:
-        for p in args.highlight_pgn:
-            for sub_p in p.replace(",", " ").split():
-                h_pgn_list.append(sub_p)
-
-    h_sa_list = []
-    if args.highlight_sa:
-        for s in args.highlight_sa:
-            for sub_s in s.replace(",", " ").split():
-                h_sa_list.append(sub_s)
-
-    h_da_list = []
-    if args.highlight_da:
-        for d in args.highlight_da:
-            for sub_d in d.replace(",", " ").split():
-                h_da_list.append(sub_d)
-
-    h_ca_list = []
-    if args.highlight_ca:
-        for c in args.highlight_ca:
-            for sub_c in c.replace(",", " ").split():
-                h_ca_list.append(sub_c)
+    h_pgn_list = _parse_list_args(args.highlight_pgn)
+    h_sa_list = _parse_list_args(args.highlight_sa)
+    h_da_list = _parse_list_args(args.highlight_da)
+    h_ca_list = _parse_list_args(args.highlight_ca)
 
     # Note: CAN level filters will be populated inside J1939Runner after string resolution
     runner = J1939Runner(

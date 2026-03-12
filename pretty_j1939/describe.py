@@ -384,18 +384,16 @@ class DADescriber:
             spn_list = pgn_object["SPNs"]
             if delimiter is None:
                 if len(spn_list) == 1:
-                    if is_complete_message:
-                        effective_start = spn_start
-                        if effective_start == [-1]:
-                            effective_start = [0]
-                        return get_spn_cut_bytes(
-                            effective_start,
-                            len(message_data_bitstring.bytes) * 8,
-                            message_data_bitstring,
-                            is_complete_message,
-                        )
-                    else:
-                        return EMPTY_BITS
+                    effective_start = spn_start
+                    if effective_start == [-1]:
+                        effective_start = [0]
+                    # Always return what's available for ASCII in real-time, even if incomplete
+                    return get_spn_cut_bytes(
+                        effective_start,
+                        len(message_data_bitstring.bytes) * 8,
+                        message_data_bitstring,
+                        is_complete_message, # Still pass, but logic in get_spn_cut_bytes will be lenient for ASCII
+                    )
                 else:
                     print(
                         "Warning: skipping SPN %d in non-delimited and multi-spn and variable-length PGN %d"
@@ -778,13 +776,12 @@ class DADescriber:
 
             try:
                 # ASCII consolidated logic
-                is_ascii = spn_units.lower() == "ascii"
-
-                if is_ascii:
+                should_decode_as_ascii = spn_units.lower() == "ascii"
+                if should_decode_as_ascii:
                     spn_bytes = self.get_spn_bytes(
                         message_data_bitstring, spn, pgn, is_complete_message
                     )
-                    if spn_bytes.length == 0 and not is_complete_message:
+                    if spn_bytes.length == 0:
                         continue
 
                     # NEW: Implement ASCII indicator rules from J1939/71 Table 7.5.
@@ -825,8 +822,8 @@ class DADescriber:
                     # Standard J1939 N/A check is decoupled from formatting and takes precedence.
                     # Even if J1939BitDecodings has a mapping, we flag it as N/A if it matches the mask.
                     # NEW: Skip indicator checks for ASCII units as per J1939-71.
-                    is_ascii = spn_units.lower() == "ascii"
-                    if not is_ascii and is_spn_na(raw_spn_value, spn_length):
+                    # is_ascii = spn_units.lower() == "ascii" # This is now handled by should_decode_as_ascii
+                    if not should_decode_as_ascii and is_spn_na(raw_spn_value, spn_length):
                         if self.include_na:
                             self._add_spn_description(spn, spn_name, "N/A", description, skip_spns)
                         else:
@@ -845,7 +842,7 @@ class DADescriber:
                             )
 
                     # Priority 2: If no explicit DA mapping, check remaining standard J1939 Indicators
-                    if not is_ascii and spn_value_description is None:
+                    if not should_decode_as_ascii and spn_value_description is None:
                         if is_spn_error(raw_spn_value, spn_length):
                             self._add_spn_description(spn, spn_name, "Error", description, skip_spns)
                             continue
@@ -883,7 +880,7 @@ class DADescriber:
                             self._add_spn_description(
                                 spn, spn_name, "%d (Unknown)" % raw_spn_value, description, skip_spns
                             )
-                    elif is_ascii:
+                    elif should_decode_as_ascii: # This else-if is technically redundant due to the initial if, but kept for clarity
                         # NEW: Handle ASCII SPNs correctly if they were categorized as is_num
                         # (e.g. if is_spn_numerical_values didn't catch it)
                         spn_bytes = self.get_spn_bytes(
@@ -903,16 +900,14 @@ class DADescriber:
                     spn_bytes = self.get_spn_bytes(
                         message_data_bitstring, spn, pgn, is_complete_message
                     )
-                    if (
-                        spn_bytes.length == 0 and not is_complete_message
-                    ):  # incomplete message
+                    if spn_bytes.length == 0 and not is_complete_message:
                         continue
                     else:
                         # NEW: check for NA/Error even if not numerical
                         # SKIP if ASCII as per J1939-71
-                        is_ascii = spn_units.lower() == "ascii"
+                        # is_ascii = spn_units.lower() == "ascii" # This is now handled by should_decode_as_ascii
                         raw_val = None
-                        if not is_ascii and 0 < spn_bytes.length <= 64:
+                        if not should_decode_as_ascii and 0 < spn_bytes.length <= 64:
                             if spn_bytes.length % 8 == 0 and spn_bytes.length > 8:
                                 raw_val = spn_bytes.uintle
                             else:
@@ -1009,7 +1004,8 @@ def get_spn_cut_bytes(
         if start_bit % 8 == 0 and spn_length % 8 == 0:
             spn_end = start_bit + spn_length - 1
             if not is_complete_message and spn_end > message_data_bitstring.length:
-                return EMPTY_BITS
+                # For incomplete messages, return the available portion for display
+                return message_data_bitstring[start_bit : message_data_bitstring.length]
             return message_data_bitstring[start_bit : spn_end + 1]
 
         # Non-aligned fields (always small, so we build a big-endian integer bitstring)
