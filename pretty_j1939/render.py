@@ -119,6 +119,79 @@ class HighPerformanceRenderer:
             data_hex = "".join(f"{b:02X}" for b in data_bytes)
         return f"({timestamp:17.6f}) {interface} {can_id:08X}#{data_hex}"
 
+    def _render_json_output(self, filtered_desc, indent, can_line):
+        json_str = json.dumps(filtered_desc, indent=4 if indent else None, separators=(",", ":") if not indent else None)
+        if can_line:
+            if indent:
+                spacer = (" " * (len(can_line) - 3) + " ; " if can_line.endswith(" ; ") else " " * len(can_line))
+                lines = json_str.splitlines()
+                res = can_line + lines[0]
+                for line in lines[1:]:
+                    res += "\n" + spacer + line
+                return res
+            else:
+                return can_line + json_str
+        return json_str
+
+    def _format_bytes_value(self, value, highlight):
+        res_parts = ['"']
+        clean_value = value[2:] if value.lower().startswith("0x") else value
+        esc = self.ansi_esc
+        h_style = esc.get("highlight", "") if highlight else ""
+        reset = esc["default"]
+
+        last_style = None
+        batch = []
+        for i in range(0, len(clean_value), 2):
+            byte = clean_value[i : i + 2]
+            if byte == "00":
+                style = "zero_bytes"
+            elif byte == "FF" or byte == "ff":
+                style = "disabled_bytes"
+            else:
+                byte_int = int(byte, 16)
+                style = (
+                    "ascii_bytes" if 32 <= byte_int <= 126 else "normal_bytes"
+                )
+
+            if style == last_style:
+                batch.append(byte)
+            else:
+                if batch:
+                    effective_style = h_style if highlight else esc[last_style]
+                    res_parts.append(f'{effective_style}{"".join(batch)}')
+                batch = [byte]
+                last_style = style
+        if batch:
+            effective_style = h_style if highlight else esc[last_style]
+            res_parts.append(f'{effective_style}{"".join(batch)}')
+        res_parts.append(f'{reset}"')
+        return "".join(res_parts)
+
+    def _format_other_value(self, value, highlight):
+        res_parts = []
+        val_json = json.dumps(value)
+        esc = self.ansi_esc
+        h_style = esc.get("highlight", "") if highlight else ""
+        reset = esc["default"]
+
+        # performance optimization: fast-path check for parentheses
+        if "(" in val_json:
+            last_end = 0
+            style_str = h_style if highlight else esc["strings"]
+            style_num = h_style if highlight else esc["numbers"]
+            res_parts.append(style_str)
+            for match in NUM_IN_PARENS_RE.finditer(val_json):
+                res_parts.append(val_json[last_end : match.start(2)])
+                res_parts.append(f"{style_num}{match.group(2)}{style_str}")
+                last_end = match.end(2)
+            res_parts.append(val_json[last_end:])
+            res_parts.append(reset)
+        else:
+            style_str = h_style if highlight else esc["strings"]
+            res_parts.append(f"{style_str}{val_json}{reset}")
+        return "".join(res_parts)
+
     def render(self, description, indent=False, can_line=None, highlight=False):
         """
         Renders a J1939 description dictionary into a colorized ANSI string.
@@ -130,23 +203,7 @@ class HighPerformanceRenderer:
         filtered_desc = {k: v for k, v in description.items() if not k.startswith("_")}
 
         if not self.color_system:
-            if indent:
-                json_str = json.dumps(filtered_desc, indent=4)
-                if can_line:
-                    spacer = (
-                        " " * (len(can_line) - 3) + " ; "
-                        if can_line.endswith(" ; ")
-                        else " " * len(can_line)
-                    )
-                    lines = json_str.splitlines()
-                    res = can_line + lines[0]
-                    for line in lines[1:]:
-                        res += "\n" + spacer + line
-                    return res
-                return json_str
-            else:
-                json_str = json.dumps(filtered_desc, separators=(",", ":"))
-                return (can_line + json_str) if can_line else json_str
+            return self._render_json_output(filtered_desc, indent, can_line)
 
         res_parts = []
         if can_line:
@@ -191,52 +248,9 @@ class HighPerformanceRenderer:
                 or "Manufacturer Specific Information" in key
                 or "Manufacturer Defined Usage" in key
             ):
-                clean_value = value[2:] if value.lower().startswith("0x") else value
-                res_parts.append('"')
-
-                last_style = None
-                batch = []
-                for i in range(0, len(clean_value), 2):
-                    byte = clean_value[i : i + 2]
-                    if byte == "00":
-                        style = "zero_bytes"
-                    elif byte == "FF" or byte == "ff":
-                        style = "disabled_bytes"
-                    else:
-                        byte_int = int(byte, 16)
-                        style = (
-                            "ascii_bytes" if 32 <= byte_int <= 126 else "normal_bytes"
-                        )
-
-                    if style == last_style:
-                        batch.append(byte)
-                    else:
-                        if batch:
-                            effective_style = h_style if highlight else esc[last_style]
-                            res_parts.append(f'{effective_style}{"".join(batch)}')
-                        batch = [byte]
-                        last_style = style
-                if batch:
-                    effective_style = h_style if highlight else esc[last_style]
-                    res_parts.append(f'{effective_style}{"".join(batch)}')
-                res_parts.append(f'{reset}"')
+                res_parts.append(self._format_bytes_value(value, highlight))
             else:
-                val_json = json.dumps(value)
-                # performance optimization: fast-path check for parentheses
-                if "(" in val_json:
-                    last_end = 0
-                    style_str = h_style if highlight else esc["strings"]
-                    style_num = h_style if highlight else esc["numbers"]
-                    res_parts.append(style_str)
-                    for match in NUM_IN_PARENS_RE.finditer(val_json):
-                        res_parts.append(val_json[last_end : match.start(2)])
-                        res_parts.append(f"{style_num}{match.group(2)}{style_str}")
-                        last_end = match.end(2)
-                    res_parts.append(val_json[last_end:])
-                    res_parts.append(reset)
-                else:
-                    style_str = h_style if highlight else esc["strings"]
-                    res_parts.append(f"{style_str}{val_json}{reset}")
+                res_parts.append(self._format_other_value(value, highlight))
 
             first = False
 
