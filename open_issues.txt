@@ -1,0 +1,1 @@
+Pattern required (or use --chronic). Try: desloppify show --help

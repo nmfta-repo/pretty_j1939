@@ -1,0 +1,39 @@
+
+Code smells: 137 instances across 10 patterns
+
+Sev       Pattern                                   Count   Files 
+──────────────────────────────────────────────────────────────────
+HIGH      Monster function (>150 LOC)               6       5     
+HIGH      Catch block that only logs (swallowed error)  5       4     
+HIGH      sys.exit() outside CLI entry point — use exceptions  3       2     
+HIGH      Except handler silently suppresses error (pass/continue, no log)  2       1     
+MEDIUM    Loose type annotation — use specific types  69      8     
+MEDIUM    High cyclomatic complexity (>12 decision points)  24      7     
+MEDIUM    Too many optional params — consider a config object  2       2     
+LOW       Magic numbers (>1000 in logic)            13      2     
+LOW       TODO/FIXME/HACK comments                  8       2     
+LOW       Function-level import (possible circular import workaround)  5       4     
+
+  Monster function (>150 LOC) (6 instances):
+    pretty_j1939/__main__.py:311  process_messages() - 178 LOC
+    pretty_j1939/__main__.py:596  get_parser() - 202 LOC
+    pretty_j1939/create_j1939db_json.py:499  process_spns_and_pgns_tab() - 279 LOC
+    pretty_j1939/describe.py:644  describe_message_data() - 309 LOC
+    pretty_j1939/viewer.py:252  _draw_message_row() - 193 LOC
+    scripts/testme.py:124  main() - 212 LOC
+
+  Catch block that only logs (swallowed error) (5 instances):
+    pretty_j1939/__main__.py:589  except Exception as e:
+    pretty_j1939/describe.py:1344  except Exception as e:
+    pretty_j1939/render.py:93  except Exception as e:
+    pretty_j1939/viewer.py:319  except ValueError as e:
+    pretty_j1939/viewer.py:725  except KeyboardInterrupt:
+
+  sys.exit() outside CLI entry point — use exceptions (3 instances):
+    scripts/testme.py:14  sys.exit() in library code — raise an exception instead
+    scripts/verify_all.py:174  sys.exit() in library code — raise an exception instead
+    scripts/verify_all.py:177  sys.exit() in library code — raise an exception instead
+
+  Except handler silently suppresses error (pass/continue, no log) (2 instances):
+    pretty_j1939/create_j1939db_json.py:785  except ValueError: pass — error silently suppressed
+    pretty_j1939/create_j1939db_json.py:1324  except BrokenPipeError: pass — error silently suppressed

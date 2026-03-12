@@ -1,0 +1,55 @@
+
+Code smells: 161 instances across 13 patterns
+
+Sev       Pattern                                   Count   Files 
+──────────────────────────────────────────────────────────────────
+HIGH      Except handler silently suppresses error (pass/continue, no log)  19      6     
+HIGH      Monster function (>150 LOC)               6       5     
+HIGH      subprocess call without timeout (can hang forever)  4       2     
+HIGH      sys.exit() outside CLI entry point — use exceptions  4       3     
+HIGH      Empty except block (except: pass)         3       3     
+MEDIUM    Loose type annotation — use specific types  70      9     
+MEDIUM    High cyclomatic complexity (>12 decision points)  24      7     
+MEDIUM    Constant defined identically in multiple modules  2       2     
+MEDIUM    Too many optional params — consider a config object  2       2     
+MEDIUM    Star import target has no __all__ (uncontrolled namespace)  1       1     
+LOW       Magic numbers (>1000 in logic)            13      2     
+LOW       TODO/FIXME/HACK comments                  8       2     
+LOW       Function-level import (possible circular import workaround)  5       4     
+
+  Except handler silently suppresses error (pass/continue, no log) (19 instances):
+    pretty_j1939/__main__.py:341  except (ValueError, IndexError): continue — error silently s
+    pretty_j1939/__main__.py:378  except (ValueError, IndexError): continue — error silently s
+    pretty_j1939/__main__.py:589  except Exception: pass — error silently suppressed
+    pretty_j1939/create_j1939db_json.py:469  except ValueError: continue — error silently suppressed
+    pretty_j1939/create_j1939db_json.py:490  except ValueError: continue — error silently suppressed
+    pretty_j1939/create_j1939db_json.py:712  except ValueError: continue — error silently suppressed
+    pretty_j1939/create_j1939db_json.py:782  except ValueError: continue — error silently suppressed
+    pretty_j1939/create_j1939db_json.py:1060  except (ValueError, TypeError, IndexError): continue — error
+    pretty_j1939/create_j1939db_json.py:1071  except (ValueError, TypeError): continue — error silently su
+    pretty_j1939/create_j1939db_json.py:1102  except (ValueError, TypeError): continue — error silently su
+
+  Monster function (>150 LOC) (6 instances):
+    pretty_j1939/__main__.py:313  process_messages() - 176 LOC
+    pretty_j1939/__main__.py:596  get_parser() - 202 LOC
+    pretty_j1939/create_j1939db_json.py:497  process_spns_and_pgns_tab() - 278 LOC
+    pretty_j1939/describe.py:634  describe_message_data() - 309 LOC
+    pretty_j1939/viewer.py:252  _draw_message_row() - 193 LOC
+    testme.py:123  main() - 212 LOC
+
+  subprocess call without timeout (can hang forever) (4 instances):
+    testme.py:19  subprocess.run() without timeout
+    verify_all.py:13  subprocess.run() without timeout
+    verify_all.py:130  subprocess.run() without timeout
+    verify_all.py:133  subprocess.run() without timeout
+
+  sys.exit() outside CLI entry point — use exceptions (4 instances):
+    pretty_j1939/viewer.py:699  sys.exit() in library code — raise an exception instead
+    testme.py:14  sys.exit() in library code — raise an exception instead
+    verify_all.py:174  sys.exit() in library code — raise an exception instead
+    verify_all.py:177  sys.exit() in library code — raise an exception instead
+
+  Empty except block (except: pass) (3 instances):
+    pretty_j1939/__main__.py:589  except Exception:
+    pretty_j1939/describe.py:1334  except Exception:
+    pretty_j1939/render.py:89  except Exception:

@@ -1,0 +1,27 @@
+{
+  "target_strict_score": 95,
+  "review_max_age_days": 30,
+  "review_batch_max_files": 80,
+  "holistic_max_age_days": 30,
+  "generate_scorecard": true,
+  "badge_path": "scorecard.png",
+  "exclude": [
+    "pretty_j1939.egg-info/"
+  ],
+  "ignore": [],
+  "ignore_metadata": {},
+  "zone_overrides": {},
+  "review_dimensions": [],
+  "large_files_threshold": 0,
+  "props_threshold": 0,
+  "issue_noise_budget": 10,
+  "issue_noise_global_budget": 0,
+  "execution_log_max_entries": 10000,
+  "needs_rescan": true,
+  "languages": {},
+  "commit_tracking_enabled": true,
+  "commit_pr": 0,
+  "commit_default_branch": "",
+  "commit_message_template": "desloppify: {status} {count} issue(s) \u2014 {summary}",
+  "trust_plugins": false
+}

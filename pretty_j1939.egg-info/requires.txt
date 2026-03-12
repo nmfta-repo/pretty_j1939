@@ -1,0 +1,12 @@
+asteval
+defusedxml
+unidecode
+xlrd
+openpyxl
+rich
+bitstring>=4.0.1
+python-can>=4.0.0
+
+[test]
+pytest
+pytest-cov

@@ -1,0 +1,5 @@
+[console_scripts]
+create-j1939db-json = pretty_j1939.create_j1939db_json:main
+create_j1939db-json = pretty_j1939.create_j1939db_json:main
+pretty-j1939 = pretty_j1939.__main__:main
+pretty_j1939 = pretty_j1939.__main__:main

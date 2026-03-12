@@ -1,0 +1,681 @@
+{
+  "command": "next",
+  "items": [
+    {
+      "id": "auto/smells-high_cyclomatic_complexity",
+      "kind": "cluster",
+      "action_type": "refactor",
+      "summary": "Fix 7 high cyclomatic complexity issues",
+      "member_count": 5,
+      "members": [
+        {
+          "id": "smells::pretty_j1939/__main__.py::high_cyclomatic_complexity",
+          "kind": "issue",
+          "confidence": "medium",
+          "detector": "smells",
+          "file": "pretty_j1939/__main__.py",
+          "summary": "4x High cyclomatic complexity (>12 decision points)",
+          "status": "open",
+          "primary_command": "desloppify plan resolve \"smells::pretty_j1939/__main__.py::high_cyclomatic_complexity\" --note \"<what you did>\" --confirm"
+        },
+        {
+          "id": "smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity",
+          "kind": "issue",
+          "confidence": "medium",
+          "detector": "smells",
+          "file": "pretty_j1939/create_j1939db_json.py",
+          "summary": "8x High cyclomatic complexity (>12 decision points)",
+          "status": "open",
+          "primary_command": "desloppify plan resolve \"smells::pretty_j1939/create_j1939db_json.py::high_cyclomatic_complexity\" --note \"<what you did>\" --confirm"
+        },
+        {
+          "id": "smells::pretty_j1939/describe.py::high_cyclomatic_complexity",
+          "kind": "issue",
+          "confidence": "medium",
+          "detector": "smells",
+          "file": "pretty_j1939/describe.py",
+          "summary": "5x High cyclomatic complexity (>12 decision points)",
+          "status": "open",
+          "primary_command": "desloppify plan resolve \"smells::pretty_j1939/describe.py::high_cyclomatic_complexity\" --note \"<what you did>\" --confirm"
+        },
+        {
+          "id": "smells::pretty_j1939/isotp.py::high_cyclomatic_complexity",
+          "kind": "issue",
+          "confidence": "medium",
+          "detector": "smells",
+          "file": "pretty_j1939/isotp.py",
+          "summary": "1x High cyclomatic complexity (>12 decision points)",
+          "status": "open",
+          "primary_command": "desloppify plan resolve \"smells::pretty_j1939/isotp.py::high_cyclomatic_complexity\" --note \"<what you did>\" --confirm"
+        },
+        {
+          "id": "smells::pretty_j1939/render.py::high_cyclomatic_complexity",
+          "kind": "issue",
+          "confidence": "medium",
+          "detector": "smells",
+          "file": "pretty_j1939/render.py",
+          "summary": "3x High cyclomatic complexity (>12 decision points)",
+          "status": "open",
+          "primary_command": "desloppify plan resolve \"smells::pretty_j1939/render.py::high_cyclomatic_complexity\" --note \"<what you did>\" --confirm"
+        }
+      ],
+      "cluster_name": "auto/smells-high_cyclomatic_complexity",
+      "cluster_auto": true,
+      "detector": "smells",
+      "primary_command": "fix code smells"
+    }
+  ],
+  "queue": {
+    "total": 1
+  },
+  "narrative": {
+    "phase": "middle_grind",
+    "headline": "\u26a0 6 security issues \u2014 review before other cleanup. 57 issues open. Abstraction fit (0.0%) needs attention \u2014 run `desloppify next` to start.",
+    "dimensions": {
+      "lowest_dimensions": [
+        {
+          "name": "Abstraction fit",
+          "strict": 0.0,
+          "failing": 0,
+          "impact": 0.0,
+          "subjective": true,
+          "impact_description": "re-review to improve"
+        },
+        {
+          "name": "AI generated debt",
+          "strict": 0.0,
+          "failing": 0,
+          "impact": 0.0,
+          "subjective": true,
+          "impact_description": "re-review to improve"
+        },
+        {
+          "name": "API coherence",
+          "strict": 0.0,
+          "failing": 0,
+          "impact": 0.0,
+          "subjective": true,
+          "impact_description": "re-review to improve"
+        }
+      ],
+      "biggest_gap_dimensions": [
+        {
+          "name": "Test health",
+          "lenient": 83.7,
+          "strict": 50.2,
+          "gap": 33.5,
+          "wontfix_count": 0
+        },
+        {
+          "name": "Code quality",
+          "lenient": 84.8,
+          "strict": 73.6,
+          "gap": 11.2,
+          "wontfix_count": 0
+        },
+        {
+          "name": "Security",
+          "lenient": 94.9,
+          "strict": 87.6,
+          "gap": 7.3,
+          "wontfix_count": 0
+        }
+      ],
+      "stagnant_dimensions": [
+        {
+          "name": "Abstraction fit",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "AI generated debt",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "API coherence",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Auth consistency",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Contracts",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Convention drift",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Cross-module arch",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Dep health",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Design coherence",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Error consistency",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "High elegance",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Stale migration",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Init coupling",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Logic clarity",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Low elegance",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Mid elegance",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Naming quality",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Structure nav",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Test strategy",
+          "strict": 0.0,
+          "stuck_scans": 4
+        },
+        {
+          "name": "Type safety",
+          "strict": 0.0,
+          "stuck_scans": 4
+        }
+      ]
+    },
+    "actions": [
+      {
+        "type": "reorganize",
+        "detector": "flat_dirs",
+        "count": 1,
+        "description": "1 flat_dirs issues \u2014 create subdirectories and use `desloppify move`",
+        "command": "desloppify show flat_dirs --status open",
+        "impact": 0.0,
+        "dimension": "Code quality",
+        "priority": 1,
+        "lane": "restructure"
+      },
+      {
+        "type": "refactor",
+        "detector": "structural",
+        "count": 10,
+        "description": "10 structural issues \u2014 review large files \u2014 split only when responsibilities are clearly separable",
+        "command": "desloppify show structural --status open",
+        "impact": 0.0,
+        "dimension": "File health",
+        "priority": 2,
+        "lane": "refactor_0"
+      },
+      {
+        "type": "refactor",
+        "detector": "dict_keys",
+        "count": 2,
+        "description": "2 dict_keys issues in 1 cluster(s) \u2014 run `desloppify next`",
+        "command": "desloppify next",
+        "impact": 0.0,
+        "dimension": "Code quality",
+        "priority": 3,
+        "clusters": [
+          "auto/dict_keys-overwritten_key"
+        ],
+        "cluster_count": 1,
+        "lane": "refactor_0"
+      },
+      {
+        "type": "refactor",
+        "detector": "test_coverage",
+        "count": 2,
+        "description": "2 test_coverage issues in 1 cluster(s) \u2014 run `desloppify next`",
+        "command": "desloppify next",
+        "impact": 0.0,
+        "dimension": "Test health",
+        "priority": 4,
+        "clusters": [
+          "auto/test_coverage"
+        ],
+        "cluster_count": 1,
+        "lane": "test_coverage"
+      },
+      {
+        "type": "refactor",
+        "detector": "responsibility_cohesion",
+        "count": 1,
+        "description": "1 responsibility_cohesion issues \u2014 split modules with too many responsibilities \u2014 extract focused sub-modules",
+        "command": "desloppify show responsibility_cohesion --status open",
+        "impact": 0.0,
+        "dimension": "Code quality",
+        "priority": 5,
+        "lane": "refactor_0"
+      },
+      {
+        "type": "refactor",
+        "detector": "boilerplate_duplication",
+        "count": 2,
+        "description": "2 boilerplate_duplication issues \u2014 extract shared boilerplate into reusable helpers or base classes",
+        "command": "desloppify show boilerplate_duplication --status open",
+        "impact": 0.0,
+        "dimension": "Duplication",
+        "priority": 6,
+        "lane": "refactor_0"
+      },
+      {
+        "type": "manual_fix",
+        "detector": "smells",
+        "count": 25,
+        "description": "25 smells issues in 11 cluster(s) \u2014 run `desloppify next`",
+        "command": "desloppify next",
+        "impact": 0.0,
+        "dimension": "Code quality",
+        "priority": 7,
+        "clusters": [
+          "auto/smells-silent_except",
+          "auto/smells-monster_function",
+          "auto/smells-annotation_quality",
+          "auto/smells-high_cyclomatic_complexity",
+          "auto/smells-optional_param_sprawl",
+          "auto/smells-magic_number",
+          "auto/smells-todo_fixme",
+          "auto/smells-deferred_import",
+          "auto/smells-swallowed_error",
+          "auto/smells-subprocess_no_timeout",
+          "auto/smells-sys_exit_in_library"
+        ],
+        "cluster_count": 11,
+        "lane": "refactor_0"
+      },
+      {
+        "type": "manual_fix",
+        "detector": "stale_exclude",
+        "count": 1,
+        "description": "1 stale_exclude issues \u2014 remove stale exclusion or verify it's still needed",
+        "command": "desloppify show stale_exclude --status open",
+        "impact": 0.0,
+        "dimension": "Code quality",
+        "priority": 8,
+        "lane": "refactor_1"
+      },
+      {
+        "type": "manual_fix",
+        "detector": "security",
+        "count": 6,
+        "description": "6 security issues in 1 cluster(s) \u2014 run `desloppify next`",
+        "command": "desloppify next",
+        "impact": 0.0,
+        "dimension": "Security",
+        "priority": 9,
+        "clusters": [
+          "auto/security"
+        ],
+        "cluster_count": 1,
+        "lane": "refactor_0"
+      },
+      {
+        "type": "manual_fix",
+        "detector": "subjective_review",
+        "count": 7,
+        "description": "7 subjective_review issues in 1 cluster(s) \u2014 run `desloppify next`",
+        "command": "desloppify next",
+        "impact": 0.0,
+        "dimension": "Test health",
+        "priority": 10,
+        "clusters": [
+          "auto/subjective_review"
+        ],
+        "cluster_count": 1,
+        "lane": "refactor_0"
+      },
+      {
+        "type": "debt_review",
+        "detector": null,
+        "description": "2.2 pts of wontfix debt \u2014 review stale decisions",
+        "command": "desloppify show --status wontfix",
+        "gap": 2.2,
+        "priority": 11,
+        "lane": "debt_review"
+      }
+    ],
+    "strategy": {
+      "fixer_leverage": {
+        "auto_fixable_count": 0,
+        "total_count": 57,
+        "coverage": 0.0,
+        "impact_ratio": 0.0,
+        "recommendation": "none"
+      },
+      "lanes": {
+        "restructure": {
+          "actions": [
+            1
+          ],
+          "file_count": 1,
+          "total_impact": 0.0,
+          "automation": "manual",
+          "run_first": false
+        },
+        "refactor_0": {
+          "actions": [
+            2,
+            3,
+            5,
+            6,
+            7,
+            9,
+            10
+          ],
+          "file_count": 14,
+          "total_impact": 0.0,
+          "automation": "manual",
+          "run_first": false
+        },
+        "refactor_1": {
+          "actions": [
+            8
+          ],
+          "file_count": 1,
+          "total_impact": 0.0,
+          "automation": "manual",
+          "run_first": false
+        },
+        "test_coverage": {
+          "actions": [
+            4
+          ],
+          "file_count": 2,
+          "total_impact": 0.0,
+          "automation": "manual",
+          "run_first": false
+        },
+        "debt_review": {
+          "actions": [
+            11
+          ],
+          "file_count": 0,
+          "total_impact": 0.0,
+          "automation": "manual",
+          "run_first": false
+        }
+      },
+      "can_parallelize": false,
+      "hint": "Work through actions in priority order. Rescan after each fix to track progress."
+    },
+    "tools": {
+      "fixers": [],
+      "move": {
+        "available": true,
+        "relevant": true,
+        "reason": "1 flat directories",
+        "usage": "desloppify move <source> <dest> [--dry-run]"
+      },
+      "plan": {
+        "command": "desloppify plan",
+        "description": "Generate prioritized markdown cleanup plan"
+      },
+      "badge": {
+        "generated": true,
+        "in_readme": false,
+        "path": "scorecard.png",
+        "recommendation": "Add to README: <img src=\"scorecard.png\" width=\"100%\">"
+      }
+    },
+    "debt": {
+      "overall_gap": 2.2,
+      "wontfix_count": 0,
+      "worst_dimension": "Test health",
+      "worst_gap": 33.5,
+      "trend": "growing"
+    },
+    "milestone": null,
+    "primary_action": {
+      "command": "desloppify show flat_dirs --status open",
+      "description": "1 flat_dirs issues \u2014 create subdirectories and use `desloppify move`"
+    },
+    "why_now": "Work through actions in priority order. Rescan after each fix to track progress.",
+    "verification_step": {
+      "command": "desloppify scan",
+      "reason": "revalidate after changes"
+    },
+    "risk_flags": [
+      {
+        "type": "wontfix_gap",
+        "severity": "medium",
+        "message": "Strict/lenient gap is 2.2 pts with 0 wontfix issues"
+      }
+    ],
+    "strict_target": {
+      "target": 95.0,
+      "current": 28.1,
+      "gap": 66.9,
+      "state": "below",
+      "warning": null
+    },
+    "reminders": [
+      {
+        "type": "wontfix_growing",
+        "message": "Wontfix debt is growing. Review stale decisions: `desloppify show --status wontfix`.",
+        "command": "desloppify show --status wontfix",
+        "priority": 2,
+        "severity": "medium"
+      }
+    ],
+    "reminder_history": {
+      "zone_classification": 3,
+      "report_scores": 4,
+      "feedback_nudge": 3,
+      "stagnant_nudge": 20,
+      "wontfix_growing": 3
+    }
+  },
+  "agent_notes": [
+    "Do NOT use `desloppify plan skip` unless the user explicitly asks you to skip an item.",
+    "If you cannot fix an item, report it and move to the next one.",
+    "For cluster items: if the autofix_hint finds 0 results, drill into individual issues with the primary_command."
+  ],
+  "plan": {
+    "active": true,
+    "focus": null,
+    "clusters": [
+      {
+        "name": "auto/test_coverage",
+        "description": "Fix 2 test coverage issues",
+        "item_count": 2
+      },
+      {
+        "name": "auto/smells-silent_except",
+        "description": "Fix 2 silent except issues",
+        "item_count": 0
+      },
+      {
+        "name": "auto/smells-monster_function",
+        "description": "Fix 5 monster function issues",
+        "item_count": 0
+      },
+      {
+        "name": "auto/smells-annotation_quality",
+        "description": "Fix 3 annotation quality issues",
+        "item_count": 0
+      },
+      {
+        "name": "auto/smells-high_cyclomatic_complexity",
+        "description": "Fix 7 high cyclomatic complexity issues",
+        "item_count": 5
+      },
+      {
+        "name": "auto/smells-optional_param_sprawl",
+        "description": "Fix 2 optional param sprawl issues",
+        "item_count": 2
+      },
+      {
+        "name": "auto/smells-magic_number",
+        "description": "Fix 2 magic number issues",
+        "item_count": 2
+      },
+      {
+        "name": "auto/smells-todo_fixme",
+        "description": "Fix 2 todo fixme issues",
+        "item_count": 2
+      },
+      {
+        "name": "auto/smells-deferred_import",
+        "description": "Fix 4 deferred import issues",
+        "item_count": 4
+      },
+      {
+        "name": "auto/security",
+        "description": "Fix 6 security issues",
+        "item_count": 6
+      },
+      {
+        "name": "auto/dict_keys-overwritten_key",
+        "description": "Fix 2 overwritten key issues",
+        "item_count": 0
+      },
+      {
+        "name": "auto/subjective_review",
+        "description": "Address 7 subjective_review review issues",
+        "item_count": 7
+      },
+      {
+        "name": "auto/initial-review",
+        "description": "Initial review of 20 unscored subjective dimensions",
+        "item_count": 20
+      },
+      {
+        "name": "auto/smells-swallowed_error",
+        "description": "Fix 4 swallowed error issues",
+        "item_count": 0
+      },
+      {
+        "name": "auto/smells-subprocess_no_timeout",
+        "description": "Fix 2 subprocess no timeout issues",
+        "item_count": 0
+      },
+      {
+        "name": "auto/smells-sys_exit_in_library",
+        "description": "Fix 2 sys exit in library issues",
+        "item_count": 2
+      }
+    ],
+    "total_ordered": 5,
+    "total_skipped": 42,
+    "plan_overrides_narrative": true
+  },
+  "overall_score": 35.1,
+  "objective_score": 87.8,
+  "strict_score": 28.1,
+  "scorecard_dimensions": [
+    {
+      "name": "File health",
+      "score": 60.0,
+      "strict": 53.0,
+      "checks": 10,
+      "failing": 6,
+      "tier": 3,
+      "subjective": false
+    },
+    {
+      "name": "Code quality",
+      "score": 84.8,
+      "strict": 73.6,
+      "checks": 73,
+      "failing": 28,
+      "tier": 3,
+      "subjective": false
+    },
+    {
+      "name": "Duplication",
+      "score": 98.8,
+      "strict": 98.8,
+      "checks": 120,
+      "failing": 2,
+      "tier": 3,
+      "subjective": false
+    },
+    {
+      "name": "Security",
+      "score": 94.9,
+      "strict": 87.6,
+      "checks": 41,
+      "failing": 6,
+      "tier": 4,
+      "subjective": false
+    },
+    {
+      "name": "Test health",
+      "score": 83.7,
+      "strict": 50.2,
+      "checks": 209,
+      "failing": 9,
+      "tier": 4,
+      "subjective": false
+    }
+  ],
+  "subjective_measures": [],
+  "config": {
+    "target_strict_score": 95,
+    "review_max_age_days": 30,
+    "review_batch_max_files": 80,
+    "holistic_max_age_days": 30,
+    "generate_scorecard": true,
+    "badge_path": "scorecard.png",
+    "exclude": [
+      "pretty_j1939.egg-info/"
+    ],
+    "ignore": [],
+    "ignore_metadata": {},
+    "zone_overrides": {},
+    "review_dimensions": [],
+    "large_files_threshold": 0,
+    "props_threshold": 0,
+    "issue_noise_budget": 10,
+    "issue_noise_global_budget": 0,
+    "execution_log_max_entries": 10000,
+    "needs_rescan": false,
+    "languages": {},
+    "commit_tracking_enabled": true,
+    "commit_pr": 0,
+    "commit_default_branch": "",
+    "commit_message_template": "desloppify: {status} {count} issue(s) \u2014 {summary}",
+    "trust_plugins": false
+  }
+}
