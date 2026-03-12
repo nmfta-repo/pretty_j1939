@@ -801,8 +801,8 @@ class DADescriber:
                             self._add_spn_description(spn, spn_name, "Error", description, skip_spns)
                             continue
 
-                    # Use latin-1 to safely decode any byte sequence
-                    ascii_str = raw_bytes.decode(encoding="utf-8")
+                    # J1939 ASCII is delimited by '*' and padded with nulls. Non-ASCII are replaced by '.'.
+                    ascii_str = raw_bytes.decode(encoding="ascii", errors="replace").replace('\ufffd', '.').rstrip('*\x00')
                     self._add_spn_description(spn, spn_name, ascii_str, description, skip_spns)
                     continue
 
@@ -886,7 +886,7 @@ class DADescriber:
                         spn_bytes = self.get_spn_bytes(
                             message_data_bitstring, spn, pgn, is_complete_message
                         )
-                        ascii_str = spn_bytes.bytes.decode(encoding="utf-8")
+                        ascii_str = spn_bytes.bytes.decode(encoding="ascii", errors="replace").replace('\ufffd', '.').rstrip('*\x00')
                         self._add_spn_description(spn, spn_name, ascii_str, description, skip_spns)
                     else:
                         # Numerical scaling
@@ -953,7 +953,7 @@ class DADescriber:
                             self._add_spn_description(
                                 spn,
                                 spn_name,
-                                "%s" % spn_bytes.bytes.decode(encoding="utf-8"),
+                                "%s" % spn_bytes.bytes.decode(encoding="ascii", errors="replace").replace('\ufffd', '.').rstrip('*\x00'),
                                 description, skip_spns
                             )
                         else:

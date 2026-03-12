@@ -609,6 +609,64 @@ def test_cli_real_time_transport():
             os.remove(db_filename)
 
 
+def test_cli_non_ascii_vin_handling():
+    """Verify CLI replaces non-ASCII VIN characters with periods."""
+    db = {
+        "J1939PGNdb": {
+            "65259": {
+                "Label": "VI",
+                "Name": "Vehicle Identification",
+                "SPNs": [237],
+                "SPNStartBits": [0],
+            }
+        },
+        "J1939SPNdb": {
+            "237": {
+                "Name": "VIN",
+                "Units": "ASCII",
+                "SPNLength": 136,
+                "Resolution": 1,
+                "Offset": 0,
+            }
+        },
+    }
+    import json
+
+    db_filename = "tmp_non_ascii_vin_db.json"
+    with open(db_filename, "w") as f:
+        json.dump(db, f)
+
+    # VIN "ABCDEFGHIJKLMNO.Q" (17 chars) with '.' as 0xFF
+    # 0xFF is inserted in the middle of a string
+    vin_hex_packet1 = "41424344454647"  # ABCDEFG (7 bytes)
+    vin_hex_packet2 = "48494A4B4C4D4E"  # HIJKLMN (7 bytes)
+    vin_hex_packet3 = "4FFF51"          # O.Q     (3 bytes: O, 0xFF, Q)
+    
+    # We use a 17-byte VIN for clarity, corresponding to 136 bits.
+    # The last byte is usually a delimiter like 0x2A ('*') or padding.
+    # Here, 0xFF is the non-ASCII char.
+    candump_data = (
+        " (1) can0 18ECFF00#20110003FFEBFE00\n"
+        f" (2) can0 18EBFF00#01{vin_hex_packet1}FFFFFF\n" # ABCDEFG
+        f" (3) can0 18EBFF00#02{vin_hex_packet2}FFFFFF\n" # HIJKLMN
+        f" (4) can0 18EBFF00#03{vin_hex_packet3}FFFFFFFF\n" # O.Q
+    )
+    
+    expected_vin = "ABCDEFGHIJKLMNO.Q"
+
+    try:
+        stdout, stderr, code = run_cli(
+            ["-", "--da-json", db_filename, "--json"], stdin_content=candump_data
+        )
+        if code != 0:
+            print(f"CLI Error: {stderr}")
+        assert code == 0
+        assert f'"VIN":"{expected_vin}"' in stdout
+    finally:
+        if os.path.exists(db_filename):
+            os.remove(db_filename)
+
+
 class DummyArgs:
     pass
 
