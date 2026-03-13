@@ -15,6 +15,15 @@ ENUM_RANGE_LINE_RE = (
 )
 
 def secure_open_workbook(filename, **kwargs):
+    """Secure open workbook operation.
+    
+    Args:
+        filename: The filename parameter.
+        **kwargs: The **kwargs parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     try:
         if filename.endswith(".xlsx"):
             return openpyxl.load_workbook(filename, data_only=True)
@@ -25,6 +34,14 @@ def secure_open_workbook(filename, **kwargs):
 
 # returns a string of number of bits, or 'Variable', or ''
 def get_pgn_data_len(contents):
+    """Gets pgn data len.
+    
+    Args:
+        contents: The contents parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     if contents is None:
         return ""
     if type(contents) is float or type(contents) is int:
@@ -42,6 +59,14 @@ def get_pgn_data_len(contents):
 
 # returns an int number of bits, or 'Variable'
 def get_spn_len(contents):
+    """Gets spn len.
+    
+    Args:
+        contents: The contents parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     if contents is None:
         return "Variable"
     if type(contents) is int:
@@ -67,6 +92,14 @@ def get_spn_len(contents):
 
 # returns a single-byte delimiter or None
 def get_spn_delimiter(contents):
+    """Gets spn delimiter.
+    
+    Args:
+        contents: The contents parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     contents = str(contents)
     if "delimiter" in contents.lower():
         if "*" in contents:
@@ -79,6 +112,14 @@ def get_spn_delimiter(contents):
         return None
 
 def just_numeric_expr(contents):
+    """Just numeric expr operation.
+    
+    Args:
+        contents: The contents parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     contents = str(contents)
     contents = re.sub(r"[^0-9\.\-/]", "", contents)  # remove all but number and '.'
     contents = re.sub(
@@ -87,6 +128,15 @@ def just_numeric_expr(contents):
     return contents
 
 def get_spn_units(contents, raw_spn_resolution):
+    """Gets spn units.
+    
+    Args:
+        contents: The contents parameter.
+        raw_spn_resolution: The raw spn resolution parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     norm_contents = unidecode.unidecode(str(contents)).lower().strip()
     raw_spn_resolution_norm = (
         unidecode.unidecode(str(raw_spn_resolution)).lower().strip()
@@ -104,6 +154,14 @@ def get_spn_units(contents, raw_spn_resolution):
 
 # returns a float in X per bit or int(0)
 def get_spn_resolution(contents):
+    """Gets spn resolution.
+    
+    Args:
+        contents: The contents parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     norm_contents = unidecode.unidecode(str(contents)).lower()
     if (
         "0 to 255 per byte" in norm_contents
@@ -138,6 +196,14 @@ def get_spn_resolution(contents):
     raise ValueError('unknown spn resolution "%s"' % contents)
 
 def asteval_eval(expr):
+    """Asteval eval operation.
+    
+    Args:
+        expr: The expr parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     interpreter = asteval.Interpreter()
     ret = interpreter(expr)
     if len(interpreter.error) > 0:
@@ -146,6 +212,14 @@ def asteval_eval(expr):
 
 # returns a float in 'units' of the SPN or int(0)
 def get_spn_offset(contents):
+    """Gets spn offset.
+    
+    Args:
+        contents: The contents parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     norm_contents = unidecode.unidecode(str(contents)).lower()
     if (
         "manufacturer defined" in norm_contents
@@ -159,6 +233,16 @@ def get_spn_offset(contents):
 
 # returns a pair of floats (low, high) in 'units' of the SPN or (-1, -1) for undefined operational ranges
 def get_operational_hilo(contents, units, spn_length):
+    """Gets operational hilo.
+    
+    Args:
+        contents: The contents parameter.
+        units: The units parameter.
+        spn_length: The spn length parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     norm_contents = str(contents).lower()
     if str(contents).strip() == "" and str(units).strip() == "":
         if type(spn_length) is int:
@@ -191,6 +275,14 @@ def get_operational_hilo(contents, units, spn_length):
 # return a list of int of the start bits ([some_bit_pos] or [some_bit_pos,some_other_bit_pos]) of the SPN; or [
 # -1] (if unknown or variable).
 def get_spn_start_bit(contents):
+    """Gets spn start bit.
+    
+    Args:
+        contents: The contents parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     norm_contents = str(contents).lower().strip()
 
     if norm_contents == "":
@@ -254,6 +346,14 @@ def get_spn_start_bit(contents):
     return pos_pair
 
 def is_enum_line(line):
+    """Checks if enum line.
+    
+    Args:
+        line: The line parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     line_norm = line.lower().strip()
     if line_norm.startswith("bit state"):
         return True
@@ -266,9 +366,25 @@ def is_enum_line(line):
     return False
 
 def get_enum_lines(description_lines):
+    """Gets enum lines.
+    
+    Args:
+        description_lines: The description lines parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     enum_lines = list()
 
     def add_enum_line(test_line):
+        """Add enum line operation.
+        
+        Args:
+            test_line: The test line parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         test_line = re.sub(
             r"(Bit States|Bit State)", "", test_line, flags=re.IGNORECASE
         )
@@ -302,6 +418,14 @@ def get_enum_lines(description_lines):
     return enum_lines
 
 def is_enum_lines_binary(enum_lines_only):
+    """Checks if enum lines binary.
+    
+    Args:
+        enum_lines_only: The enum lines only parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     all_ones_and_zeroes = True
     for line in enum_lines_only:
         match = match_single_enum_line(line)
@@ -317,6 +441,14 @@ def is_enum_lines_binary(enum_lines_only):
 
 # returns a pair of inclusive, inclusive range boundaries or None if this line is not a range
 def get_enum_line_range(line):
+    """Gets enum line range.
+    
+    Args:
+        line: The line parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     match = re.match(ENUM_RANGE_LINE_RE, line)
     if match:
         groups = match.groups()
@@ -325,6 +457,14 @@ def get_enum_line_range(line):
         return None
 
 def match_single_enum_line(line):
+    """Match single enum line operation.
+    
+    Args:
+        line: The line parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     line = re.sub(r"[ ]+", " ", line)
     line = re.sub(r"[ ]?\-\-[ ]?", " = ", line)
     return re.match(ENUM_SINGLE_LINE_RE, line)
@@ -332,6 +472,14 @@ def match_single_enum_line(line):
 # returns the description part (just that part) of an enum line
 def get_enum_line_description(line):
     # Additional cleanup for artifacts that might be in multiline descriptions
+    """Gets enum line description.
+    
+    Args:
+        line: The line parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     line = re.sub(r"_x[0-9a-fA-F]{4}_", " ", line)
     line = re.sub(r"[ ]+", " ", line)
     line = re.sub(r"[ ]?\-\-[ ]?", " = ", line)
@@ -348,6 +496,15 @@ def get_enum_line_description(line):
     return line
 
 def create_bit_object_from_description(spn_description, bit_object):
+    """Create bit object from description operation.
+    
+    Args:
+        spn_description: The spn description parameter.
+        bit_object: The bit object parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     description_lines = spn_description.splitlines()
     enum_lines = get_enum_lines(description_lines)
     is_binary = is_enum_lines_binary(enum_lines)
@@ -407,10 +564,27 @@ def create_bit_object_from_description(spn_description, bit_object):
                 continue
 
 def is_spn_likely_bitmapped(spn_description):
+    """Checks if spn likely bitmapped.
+    
+    Args:
+        spn_description: The spn description parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     return len(get_enum_lines(spn_description.splitlines())) > 2
 
 
 def fix_omittedlen_spns(j1939_pgn_db, j1939_spn_db):
+    """Fix omittedlen spns operation.
+    
+    Args:
+        j1939_pgn_db: The j1939 pgn db parameter.
+        j1939_spn_db: The j1939 spn db parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     modified_spns = dict()
     for pgn, pgn_object in j1939_pgn_db.items():
         spn_list = pgn_object.get("SPNs")
@@ -450,9 +624,26 @@ def fix_omittedlen_spns(j1939_pgn_db, j1939_spn_db):
                         )
 
 def is_length_variable(spn_length):
+    """Checks if length variable.
+    
+    Args:
+        spn_length: The spn length parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     return type(spn_length) is str and spn_length.startswith("Variable")
 
 def remove_startbitsunknown_spns(j1939_pgn_db, j1939_spn_db):
+    """Remove startbitsunknown spns operation.
+    
+    Args:
+        j1939_pgn_db: The j1939 pgn db parameter.
+        j1939_spn_db: The j1939 spn db parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     for pgn, pgn_object in j1939_pgn_db.items():
         spn_list = pgn_object.get("SPNs")
         if len(spn_list) > 1:
@@ -505,6 +696,15 @@ def remove_startbitsunknown_spns(j1939_pgn_db, j1939_spn_db):
             )
 
 def remove_underspecd_spns(j1939_pgn_db, j1939_spn_db):
+    """Remove underspecd spns operation.
+    
+    Args:
+        j1939_pgn_db: The j1939 pgn db parameter.
+        j1939_spn_db: The j1939 spn db parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     for pgn, pgn_object in j1939_pgn_db.items():
         spn_list = pgn_object.get("SPNs")
         if len(spn_list) > 1:
@@ -515,6 +715,14 @@ def remove_underspecd_spns(j1939_pgn_db, j1939_spn_db):
             spn_in_pgn_list = zip(spn_list, spn_startbit_list, spn_order_list)
 
             def should_remove(tup):
+                """Should remove operation.
+                
+                Args:
+                    tup: The tup parameter.
+                
+                Returns:
+                    The result of the operation.
+                """
                 spn = tup[0]
                 spn_obj = j1939_spn_db.get(str(spn))
                 current_spn_length = spn_obj.get("SPNLength")
@@ -553,6 +761,14 @@ def remove_underspecd_spns(j1939_pgn_db, j1939_spn_db):
             )
 
 def sort_spns_by_order(j1939_pgn_db):
+    """Sort spns by order operation.
+    
+    Args:
+        j1939_pgn_db: The j1939 pgn db parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     for pgn, pgn_object in j1939_pgn_db.items():
         spn_list = pgn_object.get("SPNs")
         spn_startbit_list = pgn_object.get("SPNStartBits")
@@ -576,6 +792,14 @@ def sort_spns_by_order(j1939_pgn_db):
         )
 
 def all_spns_positioned(spn_startbit_list):
+    """All spns positioned operation.
+    
+    Args:
+        spn_startbit_list: The spn startbit list parameter.
+    
+    Returns:
+        The result of the operation.
+    """
     if len(spn_startbit_list) == 0:
         return True
     else:

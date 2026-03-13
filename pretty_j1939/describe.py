@@ -25,7 +25,15 @@ from .isotp import IsoTpTracker
 
 
 def get_spn_indicator_byte(value, length):
-    """Returns the most significant byte of a parameter field for indicator checking."""
+    """Returns the most significant byte of a parameter field for indicator checking.
+
+    Args:
+        value (int): The parameter value.
+        length (int): The parameter length in bits.
+
+    Returns:
+        int: The most significant byte.
+    """
     if length <= 8:
         return value
     # For multi-byte, the indicator is in the highest byte
@@ -33,7 +41,15 @@ def get_spn_indicator_byte(value, length):
 
 
 def is_spn_error(value, length):
-    """Checks if a raw SPN value is in the Error Indicator range."""
+    """Checks if a raw SPN value is in the Error Indicator range.
+
+    Args:
+        value (int): The raw SPN value.
+        length (int): The parameter length in bits.
+
+    Returns:
+        bool: True if the value is in the Error Indicator range.
+    """
     if length >= 64:
         return False
     if length < 8:
@@ -45,7 +61,15 @@ def is_spn_error(value, length):
 
 
 def is_spn_na(value, length):
-    """Checks if a raw SPN value is in the Not Available range."""
+    """Checks if a raw SPN value is in the Not Available range.
+
+    Args:
+        value (int): The raw SPN value.
+        length (int): The parameter length in bits.
+
+    Returns:
+        bool: True if the value is in the Not Available range.
+    """
     if length >= 64:
         return False
     if length < 8:
@@ -58,7 +82,15 @@ def is_spn_na(value, length):
 
 
 def is_spn_specific(value, length):
-    """Checks if a raw SPN value is in the Parameter-specific range."""
+    """Checks if a raw SPN value is in the Parameter-specific range.
+
+    Args:
+        value (int): The raw SPN value.
+        length (int): The parameter length in bits.
+
+    Returns:
+        bool: True if the value is in the Parameter-specific range.
+    """
     if length < 8 or length >= 64:
         return False
     ib = get_spn_indicator_byte(value, length)
@@ -66,7 +98,15 @@ def is_spn_specific(value, length):
 
 
 def is_spn_reserved(value, length):
-    """Checks if a raw SPN value is in the Reserved range."""
+    """Checks if a raw SPN value is in the Reserved range.
+
+    Args:
+        value (int): The raw SPN value.
+        length (int): The parameter length in bits.
+
+    Returns:
+        bool: True if the value is in the Reserved range.
+    """
     if length < 8 or length >= 64:
         return False
     ib = get_spn_indicator_byte(value, length)
@@ -229,7 +269,14 @@ class DADescriber:
         return formatted_address, address_name
 
     def resolve_pgn(self, query):
-        """Find PGNs matching query string (case-insensitive substring match)."""
+        """Find PGNs matching query string (case-insensitive substring match).
+
+        Args:
+            query (str): The search query.
+
+        Returns:
+            set: A set of matching PGN items.
+        """
         query = query.lower()
         results = set()
 
@@ -250,7 +297,14 @@ class DADescriber:
         return sorted(list(results))
 
     def resolve_address(self, query):
-        """Find addresses matching query string (case-insensitive substring match)."""
+        """Find addresses matching query string (case-insensitive substring match).
+
+        Args:
+            query (str): The search query.
+
+        Returns:
+            set: A set of matching address items.
+        """
         query = query.lower()
         results = set()
 
@@ -575,7 +629,15 @@ class DADescriber:
         return value
 
     def describe_diagnostic_message(self, data, description):
-        """Helper to parse DM1/DM2 style diagnostic messages."""
+        """Helper to parse DM1/DM2 style diagnostic messages.
+
+        Args:
+            data (list): The message data bytes.
+            description (dict): The dictionary to append parsed values to.
+            
+        Returns:
+            None
+        """
         if len(data) >= 2:
             lamp_status = data[0]
 

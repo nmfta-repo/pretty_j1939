@@ -28,13 +28,34 @@ ENUM_RANGE_LINE_RE = (
 
 class SheetWrapper:
     def __init__(self, sheet):
+        """  init   operation.
+        
+        Args:
+            sheet: The sheet parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         self.sheet = sheet
 
     @property
     def nrows(self):
+        """Nrows operation.
+        
+        Returns:
+            The result of the operation.
+        """
         raise NotImplementedError()
 
     def row_values(self, row_num):
+        """Row values operation.
+        
+        Args:
+            row_num: The row num parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         raise NotImplementedError()
 
     def _clean_value(self, v):
@@ -52,30 +73,72 @@ class SheetWrapper:
 class XlsSheetWrapper(SheetWrapper):
     @property
     def nrows(self):
+        """Nrows operation.
+        
+        Returns:
+            The result of the operation.
+        """
         return self.sheet.nrows
 
     def row_values(self, row_num):
+        """Row values operation.
+        
+        Args:
+            row_num: The row num parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         row = self.sheet.row_values(row_num)
         return [self._clean_value(v) for v in row]
 
 
 class XlsxSheetWrapper(SheetWrapper):
     def __init__(self, sheet):
+        """  init   operation.
+        
+        Args:
+            sheet: The sheet parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         super().__init__(sheet)
         # Cache all rows as a list of tuples of values for performance
         self._rows = list(sheet.values)
 
     @property
     def nrows(self):
+        """Nrows operation.
+        
+        Returns:
+            The result of the operation.
+        """
         return len(self._rows)
 
     def row_values(self, row_num):
+        """Row values operation.
+        
+        Args:
+            row_num: The row num parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         row = list(self._rows[row_num])
         return [self._clean_value(v) for v in row]
 
 
 class J1939daConverter:
     def __init__(self, digital_annex_xls_list):
+        """  init   operation.
+        
+        Args:
+            digital_annex_xls_list: The digital annex xls list parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         defusedxml.defuse_stdlib()
         self.j1939db = OrderedDict()
         self.digital_annex_xls_list = []
@@ -187,6 +250,14 @@ class J1939daConverter:
 
     def process_spns_and_pgns_tab(self, sheet):
         
+        """Process spns and pgns tab operation.
+        
+        Args:
+            sheet: The sheet parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         self.j1939db.update({"J1939PGNdb": OrderedDict()})
         j1939_pgn_db = self.j1939db.get("J1939PGNdb")
         self.j1939db.update({"J1939SPNdb": OrderedDict()})
@@ -259,6 +330,15 @@ class J1939daConverter:
         return
 
     def get_any_header_column(self, header_row, header_texts):
+        """Gets any header column.
+        
+        Args:
+            header_row: The header row parameter.
+            header_texts: The header texts parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         if not isinstance(header_texts, list):
             header_texts = [header_texts]
         for t in header_texts:
@@ -269,6 +349,14 @@ class J1939daConverter:
         return -1
 
     def get_header_row(self, sheet):
+        """Gets header row.
+        
+        Args:
+            sheet: The sheet parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         header_row_num = self.lookup_header_row(sheet)
 
         header_row = sheet.row_values(header_row_num)
@@ -281,6 +369,14 @@ class J1939daConverter:
     def lookup_header_row(self, sheet):
         # search for a row containing known headers
         # look in first 10 rows
+        """Lookup header row operation.
+        
+        Args:
+            sheet: The sheet parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         for i in range(min(10, sheet.nrows)):
             row = sheet.row_values(i)
             # Use exact match for headers after cleaning
@@ -323,6 +419,14 @@ class J1939daConverter:
         return 0
 
     def process_any_source_addresses_sheet(self, sheet):
+        """Process any source addresses sheet operation.
+        
+        Args:
+            sheet: The sheet parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         if self.j1939db.get("J1939SATabledb") is None:
             self.j1939db.update({"J1939SATabledb": OrderedDict()})
         j1939_sa_tabledb = self.j1939db.get("J1939SATabledb")
@@ -380,6 +484,14 @@ class J1939daConverter:
         return
 
     def process_manufacturers_sheet(self, sheet):
+        """Process manufacturers sheet operation.
+        
+        Args:
+            sheet: The sheet parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         if sheet is None:
             return
         if self.j1939db.get("J1939Manufacturerdb") is None:
@@ -411,6 +523,14 @@ class J1939daConverter:
                     continue
 
     def process_industry_groups_sheet(self, sheet):
+        """Process industry groups sheet operation.
+        
+        Args:
+            sheet: The sheet parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         if sheet is None:
             return
         if self.j1939db.get("J1939IndustryGroupdb") is None:
@@ -442,6 +562,15 @@ class J1939daConverter:
                     continue
 
     def process_vehicle_systems_sheet(self, sheet, ig_val=None):
+        """Process vehicle systems sheet operation.
+        
+        Args:
+            sheet: The sheet parameter.
+            ig_val: The ig val parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         if sheet is None:
             return
         if self.j1939db.get("J1939VehicleSystemdb") is None:
@@ -477,6 +606,16 @@ class J1939daConverter:
                     continue
 
     def process_functions_sheet(self, sheet, ig_val=None, vs_val=None):
+        """Process functions sheet operation.
+        
+        Args:
+            sheet: The sheet parameter.
+            ig_val: The ig val parameter.
+            vs_val: The vs val parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         if sheet is None:
             return
         if self.j1939db.get("J1939Functiondb") is None:
@@ -545,6 +684,14 @@ class J1939daConverter:
                     continue
 
     def convert(self, output_file):
+        """Convert operation.
+        
+        Args:
+            output_file: The output file parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         self.j1939db = OrderedDict()
         sheet_name = ["SPNs & PGNs", "SPs & PGs"]
         pgn_spn_sheet = self.find_first_sheet_by_name(sheet_name)
@@ -632,6 +779,14 @@ class J1939daConverter:
         return
 
     def find_first_sheet_by_name(self, sheet_names):
+        """Find first sheet by name operation.
+        
+        Args:
+            sheet_names: The sheet names parameter.
+        
+        Returns:
+            The result of the operation.
+        """
         if not isinstance(sheet_names, list):
             sheet_names = [sheet_names]
         for sheet_name in sheet_names:
@@ -646,6 +801,11 @@ class J1939daConverter:
 
 
 def main():
+    """Main operation.
+    
+    Returns:
+        The result of the operation.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-f",

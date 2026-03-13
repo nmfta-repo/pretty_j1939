@@ -64,7 +64,14 @@ class HighPerformanceRenderer:
 
     @staticmethod
     def load_theme(theme_name_or_path):
-        """Loads a theme dictionary from a name or file path."""
+        """Loads a theme dictionary from a name or file path.
+
+        Args:
+            theme_name_or_path (str): The theme name or path to a JSON file.
+
+        Returns:
+            dict: The loaded theme dictionary.
+        """
         theme_dict = HighPerformanceRenderer.DEFAULT_THEME.copy()
         if theme_name_or_path is None:
             return theme_dict
@@ -112,7 +119,17 @@ class HighPerformanceRenderer:
 
     @staticmethod
     def format_can_line(timestamp, interface, can_id, data_bytes):
-        """Formats a CAN message into the standardized candump format."""
+        """Formats a CAN message into the standardized candump format.
+
+        Args:
+            timestamp (float): The timestamp of the message.
+            interface (str): The CAN interface name.
+            can_id (int): The CAN identifier.
+            data_bytes (bytes): The CAN message data payload.
+
+        Returns:
+            str: The formatted CAN line.
+        """
         if hasattr(data_bytes, "hex"):
             data_hex = data_bytes.hex().upper()
         else:
@@ -198,6 +215,15 @@ class HighPerformanceRenderer:
 
         performance optimization: use manual string building with pre-calculated ANSI sequences
         instead of rich.Text/Console. This reduces line-processing time by over 90%.
+
+        Args:
+            description (dict): The dictionary containing J1939 descriptions.
+            indent (bool, optional): Whether to indent the output. Defaults to False.
+            can_line (str, optional): The raw CAN line string. Defaults to None.
+            highlight (bool, optional): Whether to highlight the output. Defaults to False.
+
+        Returns:
+            str: The rendered ANSI string.
         """
         # Filter internal metadata
         filtered_desc = {k: v for k, v in description.items() if not k.startswith("_")}
@@ -265,7 +291,12 @@ class HighPerformanceRenderer:
         """
         Renders a J1939 network summary into a colorized Mermaid-style graph.
 
-        Returns a string (potentially with ANSI color codes).
+        Args:
+            summary_data (dict): The J1939 network summary data.
+            indent (bool, optional): Whether to indent the output. Defaults to False.
+
+        Returns:
+            str: The rendered graph string (potentially with ANSI color codes).
         """
         if not summary_data:
             return ""
