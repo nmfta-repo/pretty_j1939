@@ -25,9 +25,9 @@ try:
 except ImportError:
     can = None
 
-from ..core import describe
-from ..core.parse import parse_j1939_id
-from ..core.render import HighPerformanceRenderer, NUM_IN_PARENS_RE
+from . import describe
+from .parse import parse_j1939_id
+from .render import HighPerformanceRenderer, NUM_IN_PARENS_RE
 
 
 class J1939Runner:

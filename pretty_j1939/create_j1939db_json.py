@@ -1,10 +1,10 @@
-from ..core import da_parsers
+from . import da_parsers
 #
 # Copyright (c) 2019-2026 National Motor Freight Traffic Association Inc. All Rights Reserved.
 # See the file "LICENSE" for the full license governing this code.
 #
 from collections import OrderedDict
-from ..core import describe
+from . import describe
 import unidecode
 import sys
 

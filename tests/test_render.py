@@ -4,7 +4,7 @@
 #
 
 import pytest
-from pretty_j1939.core.render import HighPerformanceRenderer
+from pretty_j1939.render import HighPerformanceRenderer
 
 def test_render_no_color():
     renderer = HighPerformanceRenderer(color_system=None)

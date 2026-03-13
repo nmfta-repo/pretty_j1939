@@ -3,7 +3,7 @@ import can
 import curses
 from unittest.mock import patch, MagicMock
 
-from pretty_j1939.cli.viewer import hex_to_curses_basic, MessageState, UIState, J1939Viewer
+from pretty_j1939.viewer import hex_to_curses_basic, MessageState, UIState, J1939Viewer
 
 
 def test_hex_to_curses_basic():
@@ -76,7 +76,7 @@ class MockWindow:
 
 @pytest.fixture
 def mock_curses():
-    with patch("pretty_j1939.cli.viewer.curses") as mock:
+    with patch("pretty_j1939.viewer.curses") as mock:
         mock.color_pair.side_effect = lambda x: x * 256
         mock.A_NORMAL = 0
         mock.A_BOLD = 1

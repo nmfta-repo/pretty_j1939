@@ -5,13 +5,13 @@
 from unittest.mock import patch, MagicMock
 import pytest
 import bitstring
-import pretty_j1939.core.describe
-from pretty_j1939.core.describe import get_describer
+import pretty_j1939.describe
+from pretty_j1939.describe import get_describer
 
 
 def test_config_dir_fallback():
     """Verify that get_default_da_json correctly looks in the user config directory."""
-    from pretty_j1939.core.describe import get_default_da_json
+    from pretty_j1939.describe import get_default_da_json
 
     # Mock os.path.exists to return False for local file but True for config file
     # Mock os.environ to provide APPDATA (Windows)
@@ -1113,7 +1113,7 @@ def test_indicator_string_returns():
     # The user feedback says: "Ensure the tool accurately presents these as strings to the user rather than processing them as numerical values."
     # In describe_message_data, they ARE presented as strings.
     # But let's check if get_spn_value itself should return them as strings or if the sentinels are enough.
-    from pretty_j1939.core.describe import SPECIFIC_VAL, RESERVED_VAL, ERROR_VAL
+    from pretty_j1939.describe import SPECIFIC_VAL, RESERVED_VAL, ERROR_VAL
 
     assert val == SPECIFIC_VAL
 

@@ -1,6 +1,6 @@
 import pytest
 import bitstring
-from pretty_j1939.core.describe import get_describer
+from pretty_j1939.describe import get_describer
 
 
 def test_light_controls_decoding():

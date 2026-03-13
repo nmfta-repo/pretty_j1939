@@ -1,6 +1,6 @@
 import bitstring
 import pytest
-from pretty_j1939.core.describe import get_describer
+from pretty_j1939.describe import get_describer
 
 
 def test_isotp_out_of_order_sequence():

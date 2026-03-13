@@ -5,8 +5,8 @@
 
 import unittest
 from collections import OrderedDict
-from pretty_j1939.tools.create_j1939db_json import J1939daConverter, SheetWrapper
-from pretty_j1939.core import da_parsers
+from pretty_j1939.create_j1939db_json import J1939daConverter, SheetWrapper
+from pretty_j1939 import da_parsers
 
 
 class TestJ1939daConverter(unittest.TestCase):
@@ -116,7 +116,7 @@ class TestJ1939daConverter(unittest.TestCase):
 
 class TestDADescriberDefaults(unittest.TestCase):
     def test_j1939_indicator_ranges(self):
-        from pretty_j1939.core.describe import get_describer
+        from pretty_j1939.describe import get_describer
         import bitstring
 
         # DB with 1, 2, 3, 4 byte SPNs on different PGNs to avoid any caching
@@ -205,7 +205,7 @@ class TestDADescriberDefaults(unittest.TestCase):
         self.assertIn("Parameter specific", res["S4"])
 
     def test_continuous_indicator_ranges(self):
-        from pretty_j1939.core.describe import get_describer
+        from pretty_j1939.describe import get_describer
         import bitstring
 
         # DB with Accelerator (91) and Brake (521) pedal positions
