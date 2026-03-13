@@ -69,11 +69,8 @@ def is_spn_error(value, length):
     if length >= 64:
         return False
     if length < 8:
-        if length <= 1:
-            return False
-        return value == (1 << length) - 2
-    ib = get_spn_indicator_byte(value, length)
-    return ib == 0xFE
+        return length > 1 and value == (1 << length) - 2
+    return get_spn_indicator_byte(value, length) == 0xFE
 
 
 def is_spn_na(value, length):
@@ -89,12 +86,9 @@ def is_spn_na(value, length):
     if length >= 64:
         return False
     if length < 8:
-        if length <= 1:
-            return False
-        return value == (1 << length) - 1
+        return length > 1 and value == (1 << length) - 1
     # Standard J1939: 0xFF in the MSB indicates Not Available for lengths >= 8
-    ib = get_spn_indicator_byte(value, length)
-    return ib == 0xFF
+    return get_spn_indicator_byte(value, length) == 0xFF
 
 
 def is_spn_specific(value, length):
@@ -109,8 +103,7 @@ def is_spn_specific(value, length):
     """
     if length < 8 or length >= 64:
         return False
-    ib = get_spn_indicator_byte(value, length)
-    return ib == 0xFB
+    return get_spn_indicator_byte(value, length) == 0xFB
 
 
 def is_spn_reserved(value, length):
@@ -125,8 +118,7 @@ def is_spn_reserved(value, length):
     """
     if length < 8 or length >= 64:
         return False
-    ib = get_spn_indicator_byte(value, length)
-    return 0xFC <= ib <= 0xFD
+    return 0xFC <= get_spn_indicator_byte(value, length) <= 0xFD
 
 
 ERROR_VAL = float("inf")  # Internal sentinel for Error
