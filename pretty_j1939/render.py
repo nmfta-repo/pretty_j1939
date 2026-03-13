@@ -12,6 +12,8 @@ from io import StringIO
 from rich.console import Console
 from rich.theme import Theme
 
+__all__ = ["HighPerformanceRenderer"]
+
 NUM_IN_PARENS_RE = re.compile(r"(\()([^)]*[0-9/x][^)]*)(\))")
 
 

@@ -9,6 +9,34 @@ import xlrd
 import openpyxl
 import asteval
 
+__all__ = [
+    "secure_open_workbook",
+    "get_pgn_data_len",
+    "get_spn_len",
+    "get_spn_delimiter",
+    "just_numeric_expr",
+    "get_spn_units",
+    "get_spn_resolution",
+    "asteval_eval",
+    "get_spn_offset",
+    "get_operational_hilo",
+    "get_spn_start_bit",
+    "is_enum_line",
+    "get_enum_lines",
+    "is_enum_lines_binary",
+    "get_enum_line_range",
+    "match_single_enum_line",
+    "get_enum_line_description",
+    "create_bit_object_from_description",
+    "is_spn_likely_bitmapped",
+    "fix_omittedlen_spns",
+    "is_length_variable",
+    "remove_startbitsunknown_spns",
+    "remove_underspecd_spns",
+    "sort_spns_by_order",
+    "all_spns_positioned",
+]
+
 ENUM_SINGLE_LINE_RE = r"[ ]*([0-9bxXA-F]+)[ ]*[-=:]?[ ]*(.*)"
 ENUM_RANGE_LINE_RE = (
     r"[ ]*([0-9bxXA-F]+)[ ]*(\-|to|thru)[ ]*([0-9bxXA-F]+)[ ]+[-=:]?[ ]*(.*)"

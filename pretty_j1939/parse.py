@@ -3,6 +3,21 @@
 # See the file "LICENSE" for the full license governing this code.
 #
 
+__all__ = [
+    "parse_j1939_id",
+    "is_connection_management_message",
+    "is_connection_management_pgn",
+    "is_data_transfer_message",
+    "is_data_transfer_pgn",
+    "is_ack_message",
+    "is_ack_pgn",
+    "is_transport_message",
+    "is_transport_pgn",
+    "is_bam_rts_cts_message",
+    "is_spn_bitencoded",
+    "is_spn_numerical_values",
+]
+
 DA_MASK = 0x0000FF00
 SA_MASK = 0x000000FF
 PF_MASK = 0x00FF0000
