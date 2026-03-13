@@ -130,11 +130,7 @@ class J1939Runner:
             try:
                 self.write_f = open(args.write, "w")
             except Exception as e:
-                print(
-                    f"Error: Failed to open output file '{args.write}': {e}",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+                raise RuntimeError(f"Error: Failed to open output file '{args.write}': {e}")
 
     def _resolve_pgns(self, inputs):
         if not inputs:
@@ -153,11 +149,7 @@ class J1939Runner:
                 # Resolve via database
                 matches = self.describe_obj.da_describer.resolve_pgn(item)
                 if not matches:
-                    print(
-                        f"Error: '{item}' did not match any PGN in the database.",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
+                    raise ValueError(f"Error: '{item}' did not match any PGN in the database.")
                 print(
                     f"Resolving PGN filter '{item}' to PGNs: {', '.join(map(str, matches))}",
                     file=sys.stderr,
@@ -180,11 +172,7 @@ class J1939Runner:
             except ValueError:
                 matches = self.describe_obj.da_describer.resolve_address(item)
                 if not matches:
-                    print(
-                        f"Error: '{item}' did not match any {category} in the database.",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
+                    raise ValueError(f"Error: '{item}' did not match any {category} in the database.")
                 print(
                     f"Resolving {category} filter '{item}' to addresses: {', '.join(map(str, matches))}",
                     file=sys.stderr,
@@ -557,8 +545,7 @@ class J1939Runner:
 
     def _run_from_can_interface(self):
         if can is None:
-            print("Error: 'python-can' is not installed", file=sys.stderr)
-            sys.exit(1)
+            raise RuntimeError("Error: 'python-can' is not installed")
         
         bus = None
         try:
@@ -578,14 +565,11 @@ class J1939Runner:
             print(f"Connected to {bus.__class__.__name__}: {bus.channel_info}")
             self.process_messages(bus, self.can_filters)
         except can.CanError as e:
-            print(f"CAN error: {e}", file=sys.stderr)
+            err_msg = f"CAN error: {e}"
             if "Unknown interface" in str(e):
                 backends = sorted(list(can.interfaces.BACKENDS.keys()))
-                print(
-                    f"Available interfaces: {', '.join(backends)}",
-                    file=sys.stderr,
-                )
-            sys.exit(1)
+                err_msg += f"\nAvailable interfaces: {', '.join(backends)}"
+            raise RuntimeError(err_msg)
         finally:
             if bus:
                 try:
@@ -601,17 +585,9 @@ class J1939Runner:
             try:
                 f = open(self.args.candump, "r")
             except FileNotFoundError:
-                print(
-                    f"Error: file '{self.args.candump}' not found",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
+                raise RuntimeError(f"Error: file '{self.args.candump}' not found")
         else:
-            print(
-                "Error: must specify either a log file or an interface (-i)",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+            raise ValueError("Error: must specify either a log file or an interface (-i)")
 
         try:
             self.process_messages(f, self.can_filters)
@@ -626,8 +602,7 @@ class J1939Runner:
             else:
                 self._run_from_candump()
         except KeyboardInterrupt:
-            print("\nInterrupted by user", file=sys.stderr)
-            sys.exit(0)
+            raise
         finally:
             final_descriptions = self.describe_obj.cleanup()
             for desc in final_descriptions:
@@ -924,20 +899,27 @@ def main():
     h_ca_list = _parse_list_args(args.highlight_ca)
 
     # Note: CAN level filters will be populated inside J1939Runner after string resolution
-    runner = J1939Runner(
-        args,
-        extra_kwargs,
-        can_filters,
-        pgn_list,
-        sa_list,
-        da_list,
-        ca_list,
-        highlight_pgns=h_pgn_list,
-        highlight_sas=h_sa_list,
-        highlight_das=h_da_list,
-        highlight_cas=h_ca_list,
-    )
-    runner.run()
+    try:
+        runner = J1939Runner(
+            args,
+            extra_kwargs,
+            can_filters,
+            pgn_list,
+            sa_list,
+            da_list,
+            ca_list,
+            highlight_pgns=h_pgn_list,
+            highlight_sas=h_sa_list,
+            highlight_das=h_da_list,
+            highlight_cas=h_ca_list,
+        )
+        runner.run()
+    except KeyboardInterrupt:
+        print("\nInterrupted by user", file=sys.stderr)
+        sys.exit(0)
+    except (RuntimeError, ValueError) as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
