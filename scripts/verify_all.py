@@ -2,7 +2,7 @@
 # Copyright (c) 2026 National Motor Freight Traffic Association Inc. All Rights Reserved.
 # See the file "LICENSE" for the full license governing this code.
 #
-import subprocess
+import subprocess  # nosec: B404 - informational only. verify_all.py is only meant to be run on a developer machine against developer-provided input files. Developer assumes all risks.
 import sys
 import os
 
@@ -10,6 +10,7 @@ import os
 def run_test(name, cmd, expected_output=None):
     print(f"--- Running Test: {name} ---")
     try:
+        # nosec: B602 - shell=True is used for complex commands with pipes; inputs are hardcoded. verify_all.py is only meant to be run on a developer machine against developer-provided input files. Developer assumes all risks.
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=300)
         if result.returncode != 0:
             print(f"FAIL: {name} (Return code {result.returncode})")
@@ -127,9 +128,11 @@ def main():
         import pytest
     except ImportError:
         print("pytest not found. Installing test dependencies...")
+        # nosec: B603 - hardcoded list of command arguments; no untrusted input. verify_all.py is only meant to be run on a developer machine against developer-provided input files. Developer assumes all risks.
         subprocess.run([sys.executable, "-m", "pip", "install", ".[test]"], check=True, timeout=300)
 
     # Use sys.executable -m pytest to ensure we use the same python and include CWD in sys.path
+    # nosec: B603 - hardcoded list of command arguments; no untrusted input. verify_all.py is only meant to be run on a developer machine against developer-provided input files. Developer assumes all risks.
     res = subprocess.run([sys.executable, "-m", "pytest"], timeout=300)
     if res.returncode != 0:
         success = False
