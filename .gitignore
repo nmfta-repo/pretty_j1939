@@ -34,3 +34,6 @@ MANIFEST
 # ignore any testing resources in tmp/ so no one accidentally commits DAs or logs
 tmp/
 .coverage
+.desloppify
+scorecard.png
+.gemini
