@@ -2,7 +2,7 @@
 # Copyright (c) 2026 National Motor Freight Traffic Association Inc. All Rights Reserved.
 # See the file "LICENSE" for the full license governing this code.
 #
-import pretty_j1939.describe
+import pretty_j1939.core.describe
 import bitstring
 import os
 import sys
@@ -41,7 +41,7 @@ def test_basic_library_usage(tmp_path):
     db_path.write_text(json.dumps(db))
 
     # Initialize the describer
-    describe = pretty_j1939.describe.get_describer(da_json=str(db_path))
+    describe = pretty_j1939.core.describe.get_describer(da_json=str(db_path))
 
     # Describe a frame (EEC1 from Engine #1)
     message_id = bitstring.Bits(hex="0CF00400")
@@ -71,7 +71,7 @@ def test_dm1_library_usage(tmp_path):
     db_path = tmp_path / "J1939db.json"
     db_path.write_text(json.dumps(db))
 
-    describe = pretty_j1939.describe.get_describer(da_json=str(db_path))
+    describe = pretty_j1939.core.describe.get_describer(da_json=str(db_path))
 
     # DM1 message
     message_id = bitstring.Bits(hex="18FECA00")
@@ -90,7 +90,7 @@ def test_dm1_library_usage(tmp_path):
 
 def test_fallback_library_usage():
     print("Running test_fallback_library_usage...")
-    describe_obj = pretty_j1939.describe.get_describer()
+    describe_obj = pretty_j1939.core.describe.get_describer()
     print(f"Using DA JSON: {describe_obj.da_describer.da_json}")
     assert describe_obj.da_describer.da_json is not None
     print("test_fallback_library_usage PASSED")
@@ -98,7 +98,7 @@ def test_fallback_library_usage():
 
 def test_bytes_input_usage():
     """Verify that the describer accepts bytes directly."""
-    describer = pretty_j1939.describe.get_describer()
+    describer = pretty_j1939.core.describe.get_describer()
     # EEC1 from SA 0
     can_id = 0x0CF00400
     can_data = b"\x00\x41\xff\x20\x48\x14\x00\xf0"
@@ -110,13 +110,13 @@ def test_bytes_input_usage():
 
 def test_renderer_usage():
     """Verify renderer initialization and usage as shown in README."""
-    import pretty_j1939.render
+    import pretty_j1939.core.render
 
-    describer = pretty_j1939.describe.get_describer()
+    describer = pretty_j1939.core.describe.get_describer()
 
     # Initialize renderer with theme and describer for label resolution
-    theme = pretty_j1939.render.HighPerformanceRenderer.load_theme("darcula")
-    renderer = pretty_j1939.render.HighPerformanceRenderer(
+    theme = pretty_j1939.core.render.HighPerformanceRenderer.load_theme("darcula")
+    renderer = pretty_j1939.core.render.HighPerformanceRenderer(
         theme_dict=theme, color_system="truecolor", da_describer=describer.da_describer
     )
 
@@ -133,7 +133,7 @@ def test_renderer_usage():
 
 def test_j1939_tp_reassembly_usage():
     """Verify J1939-TP BAM reassembly example."""
-    describer = pretty_j1939.describe.get_describer()
+    describer = pretty_j1939.core.describe.get_describer()
 
     # Connection Management (BAM) - PGN 61444 (EEC1), 14 bytes, 2 packets
     # PGN 61444 is 0x00F004. In BAM CM (bytes 5,6,7): 04 F0 00
@@ -150,11 +150,11 @@ def test_j1939_tp_reassembly_usage():
 
 def test_summary_generation_usage():
     """Verify network summary generation as shown in README."""
-    import pretty_j1939.render
+    import pretty_j1939.core.render
 
-    describer = pretty_j1939.describe.get_describer()
+    describer = pretty_j1939.core.describe.get_describer()
     # Pass da_describer to renderer to get labels in summary
-    renderer = pretty_j1939.render.HighPerformanceRenderer(
+    renderer = pretty_j1939.core.render.HighPerformanceRenderer(
         da_describer=describer.da_describer
     )
 

@@ -1,5 +1,5 @@
 import pytest
-from pretty_j1939.describe import J1939TransportTracker
+from pretty_j1939.core.describe import J1939TransportTracker
 
 
 def test_j1939_tp_bam_reassembly():

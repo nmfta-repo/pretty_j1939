@@ -6,7 +6,7 @@ import pytest
 import sys
 import os
 from io import StringIO
-from pretty_j1939.__main__ import main
+from pretty_j1939.cli.__main__ import main
 from unittest.mock import patch
 
 
@@ -41,7 +41,7 @@ def test_cli_stdin():
     """Verify CLI reading from stdin via '-'."""
     # Using PGN 61444 (EEC1) which is in the default database
     stdin_data = "(1612543138.000000) vcan0 0CF00400#0041FF20481400F0\n"
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
 
     stdout, stderr, code = run_cli(
         ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
@@ -55,7 +55,7 @@ def test_cli_short_format():
     """Verify CLI parsing of 'ID#DATA' format without timestamps/interface."""
     # Using PGN 61444 (EEC1)
     stdin_data = "0CF00400#0041FF20481400F0\n"
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
 
     stdout, stderr, code = run_cli(
         ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
@@ -70,7 +70,7 @@ def test_cli_timestamp_format():
     stdin_data = (
         "Timestamp: 1612543138.000000 ID: 0CF00400 DL: 8 00 41 FF 20 48 14 00 F0\n"
     )
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
 
     stdout, stderr, code = run_cli(
         ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
@@ -83,7 +83,7 @@ def test_cli_timestamp_format():
 def test_cli_indexed_format():
     """Verify CLI parsing of indexed candump format."""
     stdin_data = "1 (1612543138.000000) vcan0 0CF00400#0041FF20481400F0\n"
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
 
     stdout, stderr, code = run_cli(
         ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
@@ -96,7 +96,7 @@ def test_cli_indexed_format():
 def test_cli_interface_format():
     """Verify CLI parsing of 'interface ID#DATA' format."""
     stdin_data = "vcan0 0CF00400#0041FF20481400F0\n"
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
 
     stdout, stderr, code = run_cli(
         ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
@@ -114,7 +114,7 @@ def test_cli_filter_pgn():
         f.write("(1612543138.000000) vcan0 0CF00400#0041FF20481400F0\n")
 
     # Explicitly use the project's database to avoid environment-specific failures
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     try:
         stdout, stderr, code = run_cli(
             [log_file, "--filter-pgn", "61444", "--da-json", db_path, "--json"]
@@ -134,7 +134,7 @@ def test_cli_filter_sa_string():
         f.write("(1612543138.000000) vcan0 0CF00400#0041FF20481400F0\n")
 
     # Explicitly use the project's database to avoid environment-specific failures
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     # "engine" resolves to 0 and 1 in the standard database
     try:
         stdout, stderr, code = run_cli(
@@ -156,7 +156,7 @@ def test_cli_highlight_pgn():
         f.write("(1612543138.000000) vcan0 0CF00400#0041FF20481400F0\n")
 
     # Explicitly use the project's database to avoid environment-specific failures
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     try:
         stdout, stderr, code = run_cli(
             [
@@ -180,7 +180,7 @@ def test_cli_highlight_pgn():
 def test_cli_invalid_filter():
     """Verify CLI failure on invalid filter string."""
     # Explicitly use the project's database to avoid environment-specific failures
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     stdout, stderr, code = run_cli(
         [
             "tests/test_tp_frames.txt",
@@ -197,7 +197,7 @@ def test_cli_invalid_filter():
 def test_cli_summary_default_hide():
     """Verify summary is hidden by default for <= 8 messages."""
     stdin_data = "0CF00400#0041FF20481400F0\n" * 8
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     stdout, stderr, code = run_cli(
         ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
@@ -208,7 +208,7 @@ def test_cli_summary_default_hide():
 def test_cli_summary_default_show():
     """Verify summary is shown by default for > 8 messages."""
     stdin_data = "0CF00400#0041FF20481400F0\n" * 9
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     stdout, stderr, code = run_cli(
         ["-", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
@@ -219,7 +219,7 @@ def test_cli_summary_default_show():
 def test_cli_summary_override_show():
     """Verify --summary override always shows summary."""
     stdin_data = "0CF00400#0041FF20481400F0\n"
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     stdout, stderr, code = run_cli(
         ["-", "--summary", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
@@ -230,7 +230,7 @@ def test_cli_summary_override_show():
 def test_cli_summary_override_hide():
     """Verify --no-summary override always hides summary."""
     stdin_data = "0CF00400#0041FF20481400F0\n" * 10
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     stdout, stderr, code = run_cli(
         ["-", "--no-summary", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
@@ -372,7 +372,7 @@ def test_cli_uds_isotp_reassembly():
     filler = "0CF00400#0000000000000000\n"
     stdin_data += filler * 10
 
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     stdout, stderr, code = run_cli(
         ["-", "--no-summary", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
@@ -465,7 +465,7 @@ def test_cli_interleaved_tp_sessions():
     ]
     stdin_data = "\n".join(stdin_lines) + "\n"
 
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     stdout, stderr, code = run_cli(
         ["-", "--no-summary", "--da-json", db_path, "--json"], stdin_content=stdin_data
     )
@@ -485,7 +485,7 @@ def test_cli_dynamic_name_tracking():
         " (1) can0 18EEFF80#3930A002000302A0\n" " (2) can0 0CF00480#0000002048000000\n"
     )
 
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     stdout, stderr, code = run_cli(
         ["-", "--no-summary", "--da-json", db_path, "--json"],
         stdin_content=candump_data,
@@ -513,7 +513,7 @@ def test_cli_multi_packet_dm2():
         " (3) can0 18EBFF00#02000402FFFFFFFF\n"
     )
 
-    db_path = os.path.join("pretty_j1939", "J1939db.json")
+    db_path = os.path.join("pretty_j1939", "core", "J1939db.json")
     stdout, stderr, code = run_cli(
         ["-", "--no-summary", "--da-json", db_path, "--json"],
         stdin_content=candump_data,
@@ -673,7 +673,7 @@ class DummyArgs:
 
 def get_test_runner():
     args = DummyArgs()
-    args.da_json = os.path.join("pretty_j1939", "J1939db.json")
+    args.da_json = os.path.join("pretty_j1939", "core", "J1939db.json")
     args.pgn = True
     args.spn = True
     args.link = False
@@ -689,10 +689,10 @@ def get_test_runner():
     args.write = None
     args.summary = False
 
-    from pretty_j1939.__main__ import J1939Runner
+    from pretty_j1939.cli.__main__ import J1939Runner
 
     runner = J1939Runner(
-        args=args,
+        cli_args=args,
         extra_kwargs={},
         can_filters=[],
         pgn_list=[],
@@ -700,6 +700,7 @@ def get_test_runner():
         da_list=[],
         ca_list=[],
     )
+
     return runner
 
 

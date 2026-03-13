@@ -24,8 +24,8 @@ except ImportError:
 if TYPE_CHECKING:
     import can
 
-from .describe import get_describer
-from .render import HighPerformanceRenderer, NUM_IN_PARENS_RE
+from ..core.describe import get_describer
+from ..core.render import HighPerformanceRenderer, NUM_IN_PARENS_RE
 
 logger = logging.getLogger("pretty_j1939.viewer")
 

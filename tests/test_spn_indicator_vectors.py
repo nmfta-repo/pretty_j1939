@@ -1,6 +1,6 @@
 import pytest
 import bitstring
-from pretty_j1939.describe import get_describer
+from pretty_j1939.core.describe import get_describer
 
 
 def run_vector_test(length, start_bit, vector_str):

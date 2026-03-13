@@ -1,5 +1,5 @@
 import pytest
-from pretty_j1939.describe import get_describer
+from pretty_j1939.core.describe import get_describer
 
 
 def run_decode_test(length, start_bit, payload_hex):

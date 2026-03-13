@@ -1,5 +1,5 @@
 import pytest
-from pretty_j1939.parse import parse_j1939_id, is_bam_rts_cts_message
+from pretty_j1939.core.parse import parse_j1939_id, is_bam_rts_cts_message
 
 
 def test_parse_j1939_id_pdu1():
@@ -38,7 +38,7 @@ def test_is_bam_rts_cts_message():
 
 
 def test_is_spn_numerical_values():
-    from pretty_j1939.parse import is_spn_numerical_values
+    from pretty_j1939.core.parse import is_spn_numerical_values
 
     assert is_spn_numerical_values("rpm") is True
     assert is_spn_numerical_values("km/h") is True

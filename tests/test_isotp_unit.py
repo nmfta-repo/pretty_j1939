@@ -1,5 +1,5 @@
 import pytest
-from pretty_j1939.isotp import IsoTpTracker
+from pretty_j1939.core.isotp import IsoTpTracker
 
 
 def test_isotp_reassembly_58_bytes():
