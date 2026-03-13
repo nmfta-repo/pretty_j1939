@@ -164,64 +164,14 @@ class J1939Viewer:
 
     # --- Layout Logic ---
 
-    def _format_value(self, key: str, val: Any) -> str:
-        """Applies fixed-width limits to floating point numbers ONLY, preserving units."""
-        s = str(val)
-        if key in ("Bytes", "Transport Data"):
-            return s
-
-        # Detect floating point with optional units: e.g. "12.5 [deg]"
-        t = s.strip()
-        if t and "." in t:
-            # Split into numeric part and everything else (like units)
-            # Find first space or bracket to isolate the number
-            split_idx = -1
-            for i, char in enumerate(t):
-                if char in (" ", "["):
-                    split_idx = i
-                    break
-
-            num_part = t[:split_idx] if split_idx != -1 else t
-            rest_part = t[split_idx:] if split_idx != -1 else ""
-
-            # Verify num_part is actually numeric
-            if num_part.replace(".", "", 1).isdigit() or (
-                num_part.startswith(("-", "+"))
-                and num_part[1:].replace(".", "", 1).isdigit()
-            ):
-                # Pad/truncate ONLY the numeric part to prevent jitter
-                formatted_num = (
-                    f"{num_part[:BOUNCE_BUFFER_WIDTH]:<{BOUNCE_BUFFER_WIDTH}}"
-                )
-                return f"{formatted_num}{rest_part}"
-
-        return s
-
-    def _iterate_pretty_fields(
-        self, state: MessageState
-    ) -> Generator[Tuple[str, str, bool, bool, bool], None, None]:
-        """Engine for field layout. Yields (key, value, is_changed, is_bytes, is_first_on_line)."""
-        is_first = True
-        for k, v in state.description.items():
-            if k.startswith("_") or k == "Bytes":
-                continue
-
-            val_str = self._format_value(k, v)
-            is_changed = (
-                self.ui.highlight_changes
-                and k in state.previous_description
-                and state.previous_description[k] != v
-            )
-
-            yield k, val_str, is_changed, (k == "Transport Data"), is_first
-            is_first = False
-
     def _calculate_required_rows(self, state: MessageState) -> int:
         """Calculates how many screen rows a message's 'Pretty' output requires."""
         curr_x, num_rows = PRETTY_COL_OFFSET, 1
         max_x = self.screen_w - 1
 
-        for k, v_str, _, _, is_first in self._iterate_pretty_fields(state):
+        for k, v_str, _, _, is_first in HighPerformanceRenderer.iterate_pretty_fields(
+            state.description, state.previous_description, self.ui.highlight_changes
+        ):
             kv_len = len(str(k)) + len(v_str) + 2  # "key: value"
             sep_len = 0 if is_first else 2  # ", "
 
@@ -400,8 +350,8 @@ class J1939Viewer:
         curr_x, curr_y = PRETTY_COL_OFFSET, screen_row
         prev_desc = state.previous_description
 
-        for k, v_str, is_changed, is_bytes, is_first in self._iterate_pretty_fields(
-            state
+        for k, v_str, is_changed, is_bytes, is_first in HighPerformanceRenderer.iterate_pretty_fields(
+            state.description, state.previous_description, self.ui.highlight_changes
         ):
             kv_len = len(str(k)) + len(v_str) + 2
             sep_len = 0 if is_first else 2

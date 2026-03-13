@@ -9,6 +9,7 @@ import os
 import sys
 import importlib.resources
 from io import StringIO
+from typing import Any, Generator, Tuple
 from rich.console import Console
 from rich.theme import Theme
 
@@ -18,6 +19,8 @@ NUM_IN_PARENS_RE = re.compile(r"(\()([^)]*[0-9/x][^)]*)(\))")
 
 
 class HighPerformanceRenderer:
+    BOUNCE_BUFFER_WIDTH = 15
+
     DEFAULT_THEME = {
         "keys": "#3465a4",
         "strings": "default",
@@ -28,6 +31,61 @@ class HighPerformanceRenderer:
         "normal_bytes": "default",
         "highlight": "#ffffff",
     }
+
+    @staticmethod
+    def format_value(key: str, val: Any) -> str:
+        """Applies fixed-width limits to floating point numbers ONLY, preserving units."""
+        s = str(val)
+        if key in ("Bytes", "Transport Data"):
+            return s
+
+        # Detect floating point with optional units: e.g. "12.5 [deg]"
+        t = s.strip()
+        if t and "." in t:
+            # Split into numeric part and everything else (like units)
+            # Find first space or bracket to isolate the number
+            split_idx = -1
+            for i, char in enumerate(t):
+                if char in (" ", "["):
+                    split_idx = i
+                    break
+
+            num_part = t[:split_idx] if split_idx != -1 else t
+            rest_part = t[split_idx:] if split_idx != -1 else ""
+
+            # Verify num_part is actually numeric
+            if num_part.replace(".", "", 1).isdigit() or (
+                num_part.startswith(("-", "+"))
+                and num_part[1:].replace(".", "", 1).isdigit()
+            ):
+                # Pad/truncate ONLY the numeric part to prevent jitter
+                formatted_num = (
+                    f"{num_part[:HighPerformanceRenderer.BOUNCE_BUFFER_WIDTH]:<{HighPerformanceRenderer.BOUNCE_BUFFER_WIDTH}}"
+                )
+                return f"{formatted_num}{rest_part}"
+
+        return s
+
+    @staticmethod
+    def iterate_pretty_fields(
+        description: dict, previous_description: dict = None, highlight_changes: bool = False
+    ) -> Generator[Tuple[str, str, bool, bool, bool], None, None]:
+        """Engine for field layout. Yields (key, value, is_changed, is_bytes, is_first_on_line)."""
+        is_first = True
+        for k, v in description.items():
+            if k.startswith("_") or k == "Bytes":
+                continue
+
+            val_str = HighPerformanceRenderer.format_value(k, v)
+            is_changed = (
+                highlight_changes
+                and previous_description is not None
+                and k in previous_description
+                and previous_description[k] != v
+            )
+
+            yield k, val_str, is_changed, (k == "Transport Data"), is_first
+            is_first = False
 
     def __init__(self, theme_dict=None, color_system="truecolor", da_describer=None):
         self.color_system = color_system
