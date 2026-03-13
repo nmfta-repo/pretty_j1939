@@ -6,6 +6,7 @@
 import unittest
 from collections import OrderedDict
 from pretty_j1939.create_j1939db_json import J1939daConverter, SheetWrapper
+from pretty_j1939 import da_parsers
 
 
 class TestJ1939daConverter(unittest.TestCase):
@@ -31,84 +32,84 @@ class TestJ1939daConverter(unittest.TestCase):
 
     def test_get_pgn_data_len(self):
         self.assertEqual(
-            J1939daConverter.get_pgn_data_len(8), "8"
+            da_parsers.get_pgn_data_len(8), "8"
         )  # If integer, returns string of int
         self.assertEqual(
-            J1939daConverter.get_pgn_data_len("8 bytes"), "64"
+            da_parsers.get_pgn_data_len("8 bytes"), "64"
         )  # If "bytes" in string, converts to bits
-        self.assertEqual(J1939daConverter.get_pgn_data_len("Variable"), "Variable")
-        self.assertEqual(J1939daConverter.get_pgn_data_len(None), "")
-        self.assertEqual(J1939daConverter.get_pgn_data_len(""), "")
+        self.assertEqual(da_parsers.get_pgn_data_len("Variable"), "Variable")
+        self.assertEqual(da_parsers.get_pgn_data_len(None), "")
+        self.assertEqual(da_parsers.get_pgn_data_len(""), "")
 
     def test_get_spn_len(self):
-        self.assertEqual(J1939daConverter.get_spn_len(16), 16)
-        self.assertEqual(J1939daConverter.get_spn_len("2 bytes"), 16)
-        self.assertEqual(J1939daConverter.get_spn_len("8 bits"), 8)
-        self.assertEqual(J1939daConverter.get_spn_len("Variable"), "Variable")
-        self.assertEqual(J1939daConverter.get_spn_len("max 255 bytes"), "Variable")
-        self.assertEqual(J1939daConverter.get_spn_len(None), "Variable")
+        self.assertEqual(da_parsers.get_spn_len(16), 16)
+        self.assertEqual(da_parsers.get_spn_len("2 bytes"), 16)
+        self.assertEqual(da_parsers.get_spn_len("8 bits"), 8)
+        self.assertEqual(da_parsers.get_spn_len("Variable"), "Variable")
+        self.assertEqual(da_parsers.get_spn_len("max 255 bytes"), "Variable")
+        self.assertEqual(da_parsers.get_spn_len(None), "Variable")
 
     def test_get_spn_delimiter(self):
-        self.assertEqual(J1939daConverter.get_spn_delimiter("delimiter *"), b"*")
-        self.assertEqual(J1939daConverter.get_spn_delimiter("NULL delimiter"), b"\x00")
-        self.assertIsNone(J1939daConverter.get_spn_delimiter("fixed length"))
+        self.assertEqual(da_parsers.get_spn_delimiter("delimiter *"), b"*")
+        self.assertEqual(da_parsers.get_spn_delimiter("NULL delimiter"), b"\x00")
+        self.assertIsNone(da_parsers.get_spn_delimiter("fixed length"))
 
     def test_just_numeric_expr(self):
-        self.assertEqual(J1939daConverter.just_numeric_expr("123.45 km"), "123.45")
-        self.assertEqual(J1939daConverter.just_numeric_expr("-10 to 50"), "-1050")
-        self.assertEqual(J1939daConverter.just_numeric_expr("4/5"), "4/5")
+        self.assertEqual(da_parsers.just_numeric_expr("123.45 km"), "123.45")
+        self.assertEqual(da_parsers.just_numeric_expr("-10 to 50"), "-1050")
+        self.assertEqual(da_parsers.just_numeric_expr("4/5"), "4/5")
 
     def test_get_spn_resolution(self):
-        self.assertEqual(J1939daConverter.get_spn_resolution("0.125 rpm/bit"), 0.125)
-        self.assertEqual(J1939daConverter.get_spn_resolution("1 states"), 1.0)
-        self.assertEqual(J1939daConverter.get_spn_resolution("bit-mapped"), 0)
-        self.assertEqual(J1939daConverter.get_spn_resolution("1/128 km/bit"), 1 / 128)
-        self.assertEqual(J1939daConverter.get_spn_resolution("5 microsiemens/mm"), 5.0)
+        self.assertEqual(da_parsers.get_spn_resolution("0.125 rpm/bit"), 0.125)
+        self.assertEqual(da_parsers.get_spn_resolution("1 states"), 1.0)
+        self.assertEqual(da_parsers.get_spn_resolution("bit-mapped"), 0)
+        self.assertEqual(da_parsers.get_spn_resolution("1/128 km/bit"), 1 / 128)
+        self.assertEqual(da_parsers.get_spn_resolution("5 microsiemens/mm"), 5.0)
 
     def test_get_spn_offset(self):
-        self.assertEqual(J1939daConverter.get_spn_offset("-125"), -125.0)
-        self.assertEqual(J1939daConverter.get_spn_offset("0"), 0.0)
-        self.assertEqual(J1939daConverter.get_spn_offset("not defined"), 0)
+        self.assertEqual(da_parsers.get_spn_offset("-125"), -125.0)
+        self.assertEqual(da_parsers.get_spn_offset("0"), 0.0)
+        self.assertEqual(da_parsers.get_spn_offset("not defined"), 0)
 
     def test_get_operational_hilo(self):
         self.assertEqual(
-            J1939daConverter.get_operational_hilo("0 to 250.5", "km", 16), (0.0, 250.5)
+            da_parsers.get_operational_hilo("0 to 250.5", "km", 16), (0.0, 250.5)
         )
         self.assertEqual(
-            J1939daConverter.get_operational_hilo("0 to 2000 km", "m", 16),
+            da_parsers.get_operational_hilo("0 to 2000 km", "m", 16),
             (0.0, 2000000.0),
         )
         self.assertEqual(
-            J1939daConverter.get_operational_hilo("not defined", "units", 8), (-1, -1)
+            da_parsers.get_operational_hilo("not defined", "units", 8), (-1, -1)
         )
         # Default range for bit-fields
-        self.assertEqual(J1939daConverter.get_operational_hilo("", "", 2), (0, 3))
+        self.assertEqual(da_parsers.get_operational_hilo("", "", 2), (0, 3))
 
     def test_get_spn_start_bit(self):
         # Byte.Bit format
-        self.assertEqual(J1939daConverter.get_spn_start_bit("1.1"), [0])
-        self.assertEqual(J1939daConverter.get_spn_start_bit("1.5"), [4])
-        self.assertEqual(J1939daConverter.get_spn_start_bit("2.1"), [8])
+        self.assertEqual(da_parsers.get_spn_start_bit("1.1"), [0])
+        self.assertEqual(da_parsers.get_spn_start_bit("1.5"), [4])
+        self.assertEqual(da_parsers.get_spn_start_bit("2.1"), [8])
         # Byte range format (non-contiguous bytes: 4 and 6)
-        self.assertEqual(J1939daConverter.get_spn_start_bit("4-6"), [24, 40])
+        self.assertEqual(da_parsers.get_spn_start_bit("4-6"), [24, 40])
         # Discrete bits
-        self.assertEqual(J1939daConverter.get_spn_start_bit("1.1, 1.3"), [0, 2])
+        self.assertEqual(da_parsers.get_spn_start_bit("1.1, 1.3"), [0, 2])
         # Variable/Complex (returns -1)
-        self.assertEqual(J1939daConverter.get_spn_start_bit("a+0"), [-1])
+        self.assertEqual(da_parsers.get_spn_start_bit("a+0"), [-1])
 
     def test_get_enum_line_description(self):
         self.assertEqual(
-            J1939daConverter.get_enum_line_description("00 - deactivate_x000d_"),
+            da_parsers.get_enum_line_description("00 - deactivate_x000d_"),
             "deactivate",
         )
         self.assertEqual(
-            J1939daConverter.get_enum_line_description("01 = activate"), "activate"
+            da_parsers.get_enum_line_description("01 = activate"), "activate"
         )
         self.assertEqual(
-            J1939daConverter.get_enum_line_description("10: reserved"), "reserved"
+            da_parsers.get_enum_line_description("10: reserved"), "reserved"
         )
         self.assertEqual(
-            J1939daConverter.get_enum_line_description("0-100 -- normal range"),
+            da_parsers.get_enum_line_description("0-100 -- normal range"),
             "normal range",
         )
 
@@ -277,94 +278,94 @@ class TestDADescriberDefaults(unittest.TestCase):
 
 
 class TestIsEnumLine(unittest.TestCase):
-    """Tests for J1939daConverter.is_enum_line."""
+    """Tests for da_parsers.is_enum_line."""
 
     def test_decimal_enum_line(self):
-        self.assertTrue(J1939daConverter.is_enum_line("00 Override disabled"))
-        self.assertTrue(J1939daConverter.is_enum_line("01 Speed control"))
-        self.assertTrue(J1939daConverter.is_enum_line("1 something"))
+        self.assertTrue(da_parsers.is_enum_line("00 Override disabled"))
+        self.assertTrue(da_parsers.is_enum_line("01 Speed control"))
+        self.assertTrue(da_parsers.is_enum_line("1 something"))
 
     def test_binary_enum_line(self):
-        self.assertTrue(J1939daConverter.is_enum_line("00b Off"))
-        self.assertTrue(J1939daConverter.is_enum_line("01b On"))
+        self.assertTrue(da_parsers.is_enum_line("00b Off"))
+        self.assertTrue(da_parsers.is_enum_line("01b On"))
 
     def test_hex_enum_line(self):
-        self.assertTrue(J1939daConverter.is_enum_line("0xF0 Reserved"))
+        self.assertTrue(da_parsers.is_enum_line("0xF0 Reserved"))
 
     def test_range_enum_line(self):
-        self.assertTrue(J1939daConverter.is_enum_line("2-15 Reserved"))
+        self.assertTrue(da_parsers.is_enum_line("2-15 Reserved"))
 
     def test_bit_state_header(self):
-        self.assertTrue(J1939daConverter.is_enum_line("Bit State descriptions"))
-        self.assertTrue(J1939daConverter.is_enum_line("bit states:"))
+        self.assertTrue(da_parsers.is_enum_line("Bit State descriptions"))
+        self.assertTrue(da_parsers.is_enum_line("bit states:"))
 
     def test_non_enum_line(self):
-        self.assertFalse(J1939daConverter.is_enum_line("This is a description"))
-        self.assertFalse(J1939daConverter.is_enum_line(""))
-        self.assertFalse(J1939daConverter.is_enum_line("The engine speed is measured"))
+        self.assertFalse(da_parsers.is_enum_line("This is a description"))
+        self.assertFalse(da_parsers.is_enum_line(""))
+        self.assertFalse(da_parsers.is_enum_line("The engine speed is measured"))
 
 
 class TestMatchSingleEnumLine(unittest.TestCase):
-    """Tests for J1939daConverter.match_single_enum_line."""
+    """Tests for da_parsers.match_single_enum_line."""
 
     def test_simple_decimal(self):
-        match = J1939daConverter.match_single_enum_line("00 Override disabled")
+        match = da_parsers.match_single_enum_line("00 Override disabled")
         self.assertIsNotNone(match)
         self.assertEqual(match.groups()[0], "00")
 
     def test_with_equals(self):
-        match = J1939daConverter.match_single_enum_line("01 = activate")
+        match = da_parsers.match_single_enum_line("01 = activate")
         self.assertIsNotNone(match)
         self.assertEqual(match.groups()[0], "01")
 
     def test_with_dash_separator(self):
-        match = J1939daConverter.match_single_enum_line("02 -- reserved")
+        match = da_parsers.match_single_enum_line("02 -- reserved")
         self.assertIsNotNone(match)
         self.assertEqual(match.groups()[0], "02")
 
     def test_binary_value(self):
-        match = J1939daConverter.match_single_enum_line("00b Off")
+        match = da_parsers.match_single_enum_line("00b Off")
         self.assertIsNotNone(match)
         self.assertEqual(match.groups()[0], "00b")
 
     def test_hex_value(self):
-        match = J1939daConverter.match_single_enum_line("0xFF Not available")
+        match = da_parsers.match_single_enum_line("0xFF Not available")
         self.assertIsNotNone(match)
         self.assertEqual(match.groups()[0], "0xFF")
 
 
 class TestGetEnumLineRange(unittest.TestCase):
-    """Tests for J1939daConverter.get_enum_line_range."""
+    """Tests for da_parsers.get_enum_line_range."""
 
     def test_decimal_range_with_dash(self):
-        result = J1939daConverter.get_enum_line_range("2-15 Reserved")
+        result = da_parsers.get_enum_line_range("2-15 Reserved")
         self.assertIsNotNone(result)
         self.assertEqual(result, ("2", "15"))
 
     def test_decimal_range_with_to(self):
-        result = J1939daConverter.get_enum_line_range("4 to 7 SAE reserved")
+        result = da_parsers.get_enum_line_range("4 to 7 SAE reserved")
         self.assertIsNotNone(result)
         self.assertEqual(result, ("4", "7"))
 
     def test_hex_range(self):
-        result = J1939daConverter.get_enum_line_range("0x10-0x1F Reserved")
+        result = da_parsers.get_enum_line_range("0x10-0x1F Reserved")
         self.assertIsNotNone(result)
         self.assertEqual(result, ("0x10", "0x1F"))
 
     def test_single_value_not_a_range(self):
-        result = J1939daConverter.get_enum_line_range("00 Override disabled")
+        result = da_parsers.get_enum_line_range("00 Override disabled")
         self.assertIsNone(result)
 
     def test_binary_start_decimal_end_is_range(self):
         # "0b" starts with "0" which matches the guard regex [01b] for both
         # groups[0] and groups[2] ("15" starts with "1"), so the guard
         # doesn't reject this as a non-range
-        result = J1939daConverter.get_enum_line_range("0b-15 some text")
+        result = da_parsers.get_enum_line_range("0b-15 some text")
         self.assertEqual(result, ("0b", "15"))
 
 
 class TestGetEnumLines(unittest.TestCase):
-    """Tests for J1939daConverter.get_enum_lines."""
+    """Tests for da_parsers.get_enum_lines."""
 
     def test_simple_enum_description(self):
         description = [
@@ -373,7 +374,7 @@ class TestGetEnumLines(unittest.TestCase):
             "02 Torque control",
             "03 Speed/Torque limit control",
         ]
-        result = J1939daConverter.get_enum_lines(description)
+        result = da_parsers.get_enum_lines(description)
         self.assertEqual(len(result), 4)
         self.assertIn("00 Override disabled", result[0])
         self.assertIn("01 Speed control", result[1])
@@ -385,7 +386,7 @@ class TestGetEnumLines(unittest.TestCase):
             "01 Speed control",
             "02 Torque control",
         ]
-        result = J1939daConverter.get_enum_lines(description)
+        result = da_parsers.get_enum_lines(description)
         self.assertEqual(len(result), 3)
 
     def test_blocklist_filtering(self):
@@ -395,7 +396,7 @@ class TestGetEnumLines(unittest.TestCase):
             "3 ASCII space characters pad this field",
             "02 Torque control",
         ]
-        result = J1939daConverter.get_enum_lines(description)
+        result = da_parsers.get_enum_lines(description)
         # "3 ASCII space characters" is in the blocklist so should be excluded
         self.assertTrue(all("ASCII space" not in line for line in result))
 
@@ -407,7 +408,7 @@ class TestGetEnumLines(unittest.TestCase):
             "00 Override disabled",
             "01 Speed control",
         ]
-        result = J1939daConverter.get_enum_lines(description)
+        result = da_parsers.get_enum_lines(description)
         self.assertEqual(len(result), 3)
 
     def test_bit_state_header_included_as_enum_line(self):
@@ -417,7 +418,7 @@ class TestGetEnumLines(unittest.TestCase):
             "01 On",
             "10 Error",
         ]
-        result = J1939daConverter.get_enum_lines(description)
+        result = da_parsers.get_enum_lines(description)
         # The "Bit State" header line matches is_enum_line (starts with "bit state")
         # and match_single_enum_line ('B' is in regex class [A-F]). After add_enum_line
         # strips the "Bit State" substring via regex, the remaining " descriptions:"
@@ -427,55 +428,55 @@ class TestGetEnumLines(unittest.TestCase):
 
 
 class TestIsEnumLinesBinary(unittest.TestCase):
-    """Tests for J1939daConverter.is_enum_lines_binary."""
+    """Tests for da_parsers.is_enum_lines_binary."""
 
     def test_binary_lines(self):
         lines = ["00b Off", "01b On", "10b Error", "11b Not Available"]
-        self.assertTrue(J1939daConverter.is_enum_lines_binary(lines))
+        self.assertTrue(da_parsers.is_enum_lines_binary(lines))
 
     def test_decimal_lines(self):
         lines = ["00 Off", "01 On", "02 Error", "03 Not Available"]
-        self.assertFalse(J1939daConverter.is_enum_lines_binary(lines))
+        self.assertFalse(da_parsers.is_enum_lines_binary(lines))
 
     def test_hex_lines(self):
         lines = ["0x00 Off", "0x01 On"]
-        self.assertFalse(J1939daConverter.is_enum_lines_binary(lines))
+        self.assertFalse(da_parsers.is_enum_lines_binary(lines))
 
 
 class TestGetEnumLineDescription(unittest.TestCase):
-    """Tests for J1939daConverter.get_enum_line_description."""
+    """Tests for da_parsers.get_enum_line_description."""
 
     def test_decimal_with_dash(self):
-        result = J1939daConverter.get_enum_line_description(
+        result = da_parsers.get_enum_line_description(
             "00 Override disabled - disable any existing control."
         )
         self.assertEqual(result, "override disabled - disable any existing control.")
 
     def test_decimal_with_equals(self):
-        result = J1939daConverter.get_enum_line_description("01 = activate")
+        result = da_parsers.get_enum_line_description("01 = activate")
         self.assertEqual(result, "activate")
 
     def test_range_description(self):
-        result = J1939daConverter.get_enum_line_description("2-15 Reserved")
+        result = da_parsers.get_enum_line_description("2-15 Reserved")
         self.assertEqual(result, "reserved")
 
     def test_sae_and_iso_preserved(self):
-        result = J1939daConverter.get_enum_line_description("00 sae reserved value")
+        result = da_parsers.get_enum_line_description("00 sae reserved value")
         self.assertEqual(result, "SAE reserved value")
-        result = J1939daConverter.get_enum_line_description("01 iso defined protocol")
+        result = da_parsers.get_enum_line_description("01 iso defined protocol")
         self.assertEqual(result, "ISO defined protocol")
 
     def test_xml_artifact_cleanup(self):
-        result = J1939daConverter.get_enum_line_description("00 deactivate_x000d_")
+        result = da_parsers.get_enum_line_description("00 deactivate_x000d_")
         self.assertEqual(result, "deactivate")
 
     def test_lowercase_conversion(self):
-        result = J1939daConverter.get_enum_line_description("01 Speed Control Mode")
+        result = da_parsers.get_enum_line_description("01 Speed Control Mode")
         self.assertEqual(result, "speed control mode")
 
 
 class TestIsSpnLikelyBitmapped(unittest.TestCase):
-    """Tests for J1939daConverter.is_spn_likely_bitmapped."""
+    """Tests for da_parsers.is_spn_likely_bitmapped."""
 
     def test_bitmapped_description(self):
         description = (
@@ -484,20 +485,20 @@ class TestIsSpnLikelyBitmapped(unittest.TestCase):
             "02 Torque control\n"
             "03 Speed/Torque limit control"
         )
-        self.assertTrue(J1939daConverter.is_spn_likely_bitmapped(description))
+        self.assertTrue(da_parsers.is_spn_likely_bitmapped(description))
 
     def test_not_bitmapped_numeric(self):
         description = "Engine speed in RPM. Range 0 to 8031.875."
-        self.assertFalse(J1939daConverter.is_spn_likely_bitmapped(description))
+        self.assertFalse(da_parsers.is_spn_likely_bitmapped(description))
 
     def test_not_bitmapped_two_values(self):
         # Only 2 enum lines, need > 2
         description = "00 Off\n01 On"
-        self.assertFalse(J1939daConverter.is_spn_likely_bitmapped(description))
+        self.assertFalse(da_parsers.is_spn_likely_bitmapped(description))
 
 
 class TestCreateBitObjectFromDescription(unittest.TestCase):
-    """Tests for J1939daConverter.create_bit_object_from_description.
+    """Tests for da_parsers.create_bit_object_from_description.
 
     These tests verify the end-to-end pipeline that produces J1939BitDecodings
     entries from SPN description text, using descriptions similar to those
@@ -514,7 +515,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
             "03 (Speed/Torque limit control) and the torque limit to a high value (FAh)."
         )
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(len(bit_object), 4)
         self.assertIn("0", bit_object)
@@ -530,7 +531,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
         """Test SPN description with binary values (like 2-bit status fields)."""
         description = "00b Off\n" "01b On\n" "10b Error\n" "11b Not Available"
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(len(bit_object), 4)
         self.assertEqual(bit_object["0"], "off")
@@ -546,7 +547,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
             "2-15 Reserved"
         )
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(len(bit_object), 16)
         self.assertEqual(bit_object["0"], "1000 ms transmission rate")
@@ -558,7 +559,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
         """Test SPN description with hex values."""
         description = "0x00 Disabled\n" "0x01 Enabled\n" "0xFF Not Available"
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(len(bit_object), 3)
         self.assertEqual(bit_object["0"], "disabled")
@@ -569,7 +570,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
         """Test hex range expansion."""
         description = "0x00 Off\n" "0x01 On\n" "0x02-0x0F Reserved"
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(len(bit_object), 16)
         self.assertEqual(bit_object["0"], "off")
@@ -581,7 +582,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
         """Test binary range expansion."""
         description = "00b Off\n" "01b On\n" "10b-11b Reserved"
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(len(bit_object), 4)
         self.assertEqual(bit_object["0"], "off")
@@ -599,7 +600,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
             "03 (Speed/Torque limit control) and the torque limit to a high value (FAh)."
         )
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(len(bit_object), 4)
         self.assertIn("override disabled", bit_object["0"])
@@ -616,7 +617,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
             "03 This speed control is available for applications requiring additional compensation."
         )
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(len(bit_object), 4)
         self.assertIn("rapid transition", bit_object["0"])
@@ -633,7 +634,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
             "03 Low priority = used to indicate non-critical function."
         )
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(len(bit_object), 4)
         self.assertIn("highest priority", bit_object["0"])
@@ -649,7 +650,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
             "2-15 Reserved"
         )
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(bit_object["0"], "1000 ms transmission rate")
         self.assertEqual(bit_object["1"], "500 ms transmission rate")
@@ -661,14 +662,14 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
     def test_empty_description_produces_empty_object(self):
         """Empty or non-enum descriptions should produce empty bit objects."""
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description("", bit_object)
+        da_parsers.create_bit_object_from_description("", bit_object)
         self.assertEqual(len(bit_object), 0)
 
     def test_numeric_description_produces_empty_object(self):
         """Purely numeric SPN descriptions should not produce bit objects."""
         description = "Engine speed in RPM. Range 0 to 8031.875."
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
         self.assertEqual(len(bit_object), 0)
 
     def test_mixed_preamble_and_enums(self):
@@ -682,7 +683,7 @@ class TestCreateBitObjectFromDescription(unittest.TestCase):
             "03 Engine shutting down"
         )
         bit_object = OrderedDict()
-        J1939daConverter.create_bit_object_from_description(description, bit_object)
+        da_parsers.create_bit_object_from_description(description, bit_object)
 
         self.assertEqual(len(bit_object), 4)
         self.assertEqual(bit_object["0"], "engine off")
