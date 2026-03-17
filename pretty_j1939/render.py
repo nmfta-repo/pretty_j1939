@@ -9,13 +9,18 @@ import os
 import sys
 import importlib.resources
 from io import StringIO
+from typing import Any, Generator, Tuple
 from rich.console import Console
 from rich.theme import Theme
+
+__all__ = ["HighPerformanceRenderer"]
 
 NUM_IN_PARENS_RE = re.compile(r"(\()([^)]*[0-9/x][^)]*)(\))")
 
 
 class HighPerformanceRenderer:
+    BOUNCE_BUFFER_WIDTH = 15
+
     DEFAULT_THEME = {
         "keys": "#3465a4",
         "strings": "default",
@@ -26,6 +31,61 @@ class HighPerformanceRenderer:
         "normal_bytes": "default",
         "highlight": "#ffffff",
     }
+
+    @staticmethod
+    def format_value(key: str, val: Any) -> str:
+        """Applies fixed-width limits to floating point numbers ONLY, preserving units."""
+        s = str(val)
+        if key in ("Bytes", "Transport Data"):
+            return s
+
+        # Detect floating point with optional units: e.g. "12.5 [deg]"
+        t = s.strip()
+        if t and "." in t:
+            # Split into numeric part and everything else (like units)
+            # Find first space or bracket to isolate the number
+            split_idx = -1
+            for i, char in enumerate(t):
+                if char in (" ", "["):
+                    split_idx = i
+                    break
+
+            num_part = t[:split_idx] if split_idx != -1 else t
+            rest_part = t[split_idx:] if split_idx != -1 else ""
+
+            # Verify num_part is actually numeric
+            if num_part.replace(".", "", 1).isdigit() or (
+                num_part.startswith(("-", "+"))
+                and num_part[1:].replace(".", "", 1).isdigit()
+            ):
+                # Pad/truncate ONLY the numeric part to prevent jitter
+                formatted_num = f"{num_part[:HighPerformanceRenderer.BOUNCE_BUFFER_WIDTH]:<{HighPerformanceRenderer.BOUNCE_BUFFER_WIDTH}}"
+                return f"{formatted_num}{rest_part}"
+
+        return s
+
+    @staticmethod
+    def iterate_pretty_fields(
+        description: dict,
+        previous_description: dict = None,
+        highlight_changes: bool = False,
+    ) -> Generator[Tuple[str, str, bool, bool, bool], None, None]:
+        """Engine for field layout. Yields (key, value, is_changed, is_bytes, is_first_on_line)."""
+        is_first = True
+        for k, v in description.items():
+            if k.startswith("_") or k == "Bytes":
+                continue
+
+            val_str = HighPerformanceRenderer.format_value(k, v)
+            is_changed = (
+                highlight_changes
+                and previous_description is not None
+                and k in previous_description
+                and previous_description[k] != v
+            )
+
+            yield k, val_str, is_changed, (k == "Transport Data"), is_first
+            is_first = False
 
     def __init__(self, theme_dict=None, color_system="truecolor", da_describer=None):
         self.color_system = color_system
@@ -47,6 +107,8 @@ class HighPerformanceRenderer:
             # Pre-calculate ANSI sequences for high-performance manual string building
             self.ansi_esc = {}
             for style_name in self.theme_dict.keys():
+                if style_name in ("default", "reset"):
+                    continue
                 style = console.get_style(style_name)
                 codes = style._make_ansi_codes(console.color_system)
                 self.ansi_esc[style_name] = f"\x1b[{codes}m" if codes else ""
@@ -54,13 +116,22 @@ class HighPerformanceRenderer:
             self.ansi_esc["default"] = "\x1b[0m"
             self.ansi_esc["reset"] = "\x1b[0m"
         else:
-            self.ansi_esc = {k: "" for k in self.theme_dict.keys()}
+            self.ansi_esc = {
+                k: "" for k in self.theme_dict.keys() if k not in ("default", "reset")
+            }
             self.ansi_esc["default"] = ""
             self.ansi_esc["reset"] = ""
 
     @staticmethod
     def load_theme(theme_name_or_path):
-        """Loads a theme dictionary from a name or file path."""
+        """Loads a theme dictionary from a name or file path.
+
+        Args:
+            theme_name_or_path (str): The theme name or path to a JSON file.
+
+        Returns:
+            dict: The loaded theme dictionary.
+        """
         theme_dict = HighPerformanceRenderer.DEFAULT_THEME.copy()
         if theme_name_or_path is None:
             return theme_dict
@@ -86,8 +157,8 @@ class HighPerformanceRenderer:
                         ) as f:
                             theme_dict.update(json.load(f))
                             theme_path = None
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to load built-in theme {theme_path}: {e}")
 
         if theme_path and os.path.exists(theme_path):
             try:
@@ -108,12 +179,101 @@ class HighPerformanceRenderer:
 
     @staticmethod
     def format_can_line(timestamp, interface, can_id, data_bytes):
-        """Formats a CAN message into the standardized candump format."""
+        """Formats a CAN message into the standardized candump format.
+
+        Args:
+            timestamp (float): The timestamp of the message.
+            interface (str): The CAN interface name.
+            can_id (int): The CAN identifier.
+            data_bytes (bytes): The CAN message data payload.
+
+        Returns:
+            str: The formatted CAN line.
+        """
         if hasattr(data_bytes, "hex"):
             data_hex = data_bytes.hex().upper()
         else:
             data_hex = "".join(f"{b:02X}" for b in data_bytes)
         return f"({timestamp:17.6f}) {interface} {can_id:08X}#{data_hex}"
+
+    def _render_json_output(self, filtered_desc, indent, can_line):
+        json_str = json.dumps(
+            filtered_desc,
+            indent=4 if indent else None,
+            separators=(",", ":") if not indent else None,
+        )
+        if can_line:
+            if indent:
+                spacer = (
+                    " " * (len(can_line) - 3) + " ; "
+                    if can_line.endswith(" ; ")
+                    else " " * len(can_line)
+                )
+                lines = json_str.splitlines()
+                res = can_line + lines[0]
+                for line in lines[1:]:
+                    res += "\n" + spacer + line
+                return res
+            else:
+                return can_line + json_str
+        return json_str
+
+    def _format_bytes_value(self, value, highlight):
+        res_parts = ['"']
+        clean_value = value[2:] if value.lower().startswith("0x") else value
+        esc = self.ansi_esc
+        h_style = esc.get("highlight", "") if highlight else ""
+        reset = esc["default"]
+
+        last_style = None
+        batch = []
+        for i in range(0, len(clean_value), 2):
+            byte = clean_value[i : i + 2]
+            if byte == "00":
+                style = "zero_bytes"
+            elif byte == "FF" or byte == "ff":
+                style = "disabled_bytes"
+            else:
+                byte_int = int(byte, 16)
+                style = "ascii_bytes" if 32 <= byte_int <= 126 else "normal_bytes"
+
+            if style == last_style:
+                batch.append(byte)
+            else:
+                if batch:
+                    effective_style = h_style if highlight else esc[last_style]
+                    res_parts.append(f'{effective_style}{"".join(batch)}')
+                batch = [byte]
+                last_style = style
+        if batch:
+            effective_style = h_style if highlight else esc[last_style]
+            res_parts.append(f'{effective_style}{"".join(batch)}')
+        res_parts.append(f'{reset}"')
+        return "".join(res_parts)
+
+    def _format_other_value(self, value, highlight):
+        res_parts = []
+        val_json = json.dumps(value)
+        esc = self.ansi_esc
+        h_style = esc.get("highlight", "") if highlight else ""
+        reset = esc["default"]
+
+        # performance optimization: fast-path check for parentheses
+        if "(" in val_json:
+            last_end = 0
+            style_str = h_style if highlight else esc["strings"]
+            style_num = h_style if highlight else esc["numbers"]
+            res_parts.append(style_str)
+            for match in NUM_IN_PARENS_RE.finditer(val_json):
+                res_parts.append(val_json[last_end : match.start(2)])
+                res_parts.append(f"{style_num}{match.group(2)}{style_str}")
+                last_end = match.end(2)
+            res_parts.append(val_json[last_end:])
+            res_parts.append(reset)
+        else:
+            style_str = h_style if highlight else esc["strings"]
+            res_parts.append(f"{style_str}{val_json}{reset}")
+        return "".join(res_parts)
 
     def render(self, description, indent=False, can_line=None, highlight=False):
         """
@@ -121,28 +281,21 @@ class HighPerformanceRenderer:
 
         performance optimization: use manual string building with pre-calculated ANSI sequences
         instead of rich.Text/Console. This reduces line-processing time by over 90%.
+
+        Args:
+            description (dict): The dictionary containing J1939 descriptions.
+            indent (bool, optional): Whether to indent the output. Defaults to False.
+            can_line (str, optional): The raw CAN line string. Defaults to None.
+            highlight (bool, optional): Whether to highlight the output. Defaults to False.
+
+        Returns:
+            str: The rendered ANSI string.
         """
         # Filter internal metadata
         filtered_desc = {k: v for k, v in description.items() if not k.startswith("_")}
 
         if not self.color_system:
-            if indent:
-                json_str = json.dumps(filtered_desc, indent=4)
-                if can_line:
-                    spacer = (
-                        " " * (len(can_line) - 3) + " ; "
-                        if can_line.endswith(" ; ")
-                        else " " * len(can_line)
-                    )
-                    lines = json_str.splitlines()
-                    res = can_line + lines[0]
-                    for line in lines[1:]:
-                        res += "\n" + spacer + line
-                    return res
-                return json_str
-            else:
-                json_str = json.dumps(filtered_desc, separators=(",", ":"))
-                return (can_line + json_str) if can_line else json_str
+            return self._render_json_output(filtered_desc, indent, can_line)
 
         res_parts = []
         if can_line:
@@ -187,52 +340,9 @@ class HighPerformanceRenderer:
                 or "Manufacturer Specific Information" in key
                 or "Manufacturer Defined Usage" in key
             ):
-                clean_value = value[2:] if value.lower().startswith("0x") else value
-                res_parts.append('"')
-
-                last_style = None
-                batch = []
-                for i in range(0, len(clean_value), 2):
-                    byte = clean_value[i : i + 2]
-                    if byte == "00":
-                        style = "zero_bytes"
-                    elif byte == "FF" or byte == "ff":
-                        style = "disabled_bytes"
-                    else:
-                        byte_int = int(byte, 16)
-                        style = (
-                            "ascii_bytes" if 32 <= byte_int <= 126 else "normal_bytes"
-                        )
-
-                    if style == last_style:
-                        batch.append(byte)
-                    else:
-                        if batch:
-                            effective_style = h_style if highlight else esc[last_style]
-                            res_parts.append(f'{effective_style}{"".join(batch)}')
-                        batch = [byte]
-                        last_style = style
-                if batch:
-                    effective_style = h_style if highlight else esc[last_style]
-                    res_parts.append(f'{effective_style}{"".join(batch)}')
-                res_parts.append(f'{reset}"')
+                res_parts.append(self._format_bytes_value(value, highlight))
             else:
-                val_json = json.dumps(value)
-                # performance optimization: fast-path check for parentheses
-                if "(" in val_json:
-                    last_end = 0
-                    style_str = h_style if highlight else esc["strings"]
-                    style_num = h_style if highlight else esc["numbers"]
-                    res_parts.append(style_str)
-                    for match in NUM_IN_PARENS_RE.finditer(val_json):
-                        res_parts.append(val_json[last_end : match.start(2)])
-                        res_parts.append(f"{style_num}{match.group(2)}{style_str}")
-                        last_end = match.end(2)
-                    res_parts.append(val_json[last_end:])
-                    res_parts.append(reset)
-                else:
-                    style_str = h_style if highlight else esc["strings"]
-                    res_parts.append(f"{style_str}{val_json}{reset}")
+                res_parts.append(self._format_other_value(value, highlight))
 
             first = False
 
@@ -247,26 +357,75 @@ class HighPerformanceRenderer:
         """
         Renders a J1939 network summary into a colorized Mermaid-style graph.
 
-        Returns a string (potentially with ANSI color codes).
+        Args:
+            summary_data (dict): The J1939 network summary data.
+            indent (bool, optional): Whether to indent the output. Defaults to False.
+
+        Returns:
+            str: The rendered graph string (potentially with ANSI color codes).
         """
         if not summary_data:
             return ""
 
-        def get_node_id(addr):
-            return "All" if addr == 255 else f"N{addr}"
+        # Map (address, name) to a unique node ID and label
+        addr_name_to_id = {}
+        nodes = {}  # node_id -> label
 
-        def get_node_label(addr):
-            if self.da_describer:
-                fmt, name = self.da_describer.get_formatted_address_and_name(addr)
+        def get_id(addr, name):
+            if addr == 255:
+                return "All"
+            key = (addr, name)
+            if key in addr_name_to_id:
+                return addr_name_to_id[key]
+
+            if name:
+                # Create a unique ID using address and a snippet of name
+                slug = re.sub(r"[^a-zA-Z0-9]", "", name)[:8]
+                new_id = f"N{addr}_{slug}"
+            else:
+                new_id = f"N{addr}"
+
+            # Ensure uniqueness
+            base_id = new_id
+            count = 1
+            while new_id in addr_name_to_id.values():
+                new_id = f"{base_id}_{count}"
+                count += 1
+
+            addr_name_to_id[key] = new_id
+            return new_id
+
+        def get_label(addr, name):
+            if addr == 255:
+                return "All(255)"
+            fmt = "({:3d})".format(addr)
+            if name:
                 return f"{name}{fmt.replace(' ', '')}"
+            if self.da_describer:
+                fmt, label_name = self.da_describer.get_formatted_address_and_name(addr)
+                return f"{label_name}{fmt.replace(' ', '')}"
             return f"{addr}"
 
-        nodes = set()
         edges = []
-        for (sa, da), data in sorted(summary_data.items()):
-            nodes.add(sa)
-            nodes.add(da)
-            src, dst = get_node_id(sa), get_node_id(da)
+
+        def summary_key_func(k):
+            # k is (sa, da, sa_name, da_name) or (sa, da)
+            # handle None values for sorting by converting to empty string
+            return [(x if x is not None else "") for x in k]
+
+        for key, data in sorted(
+            summary_data.items(), key=lambda x: summary_key_func(x[0])
+        ):
+            if len(key) == 4:
+                sa, da, sa_name, da_name = key
+            else:
+                sa, da = key
+                sa_name = da_name = None
+
+            src = get_id(sa, sa_name)
+            dst = get_id(da, da_name)
+            nodes[src] = get_label(sa, sa_name)
+            nodes[dst] = get_label(da, da_name)
 
             sent_pgns = []
             req_pgns = []
@@ -301,13 +460,15 @@ class HighPerformanceRenderer:
         sep = "\n" if indent else "; "
         m_parts.append(sep)
 
-        for i, addr in enumerate(sorted(list(nodes))):
+        # Render nodes
+        for i, (node_id, label) in enumerate(sorted(nodes.items())):
             prefix = "    " if indent else ""
-            m_parts.append(f"{prefix}{esc['numbers']}{get_node_id(addr)}{reset}")
-            m_parts.append(f"{esc['strings']}[\"{get_node_label(addr)}\"]{reset}")
+            m_parts.append(f"{prefix}{esc['numbers']}{node_id}{reset}")
+            m_parts.append(f"{esc['strings']}[\"{label}\"]{reset}")
             if i < len(nodes) - 1 or edges:
                 m_parts.append(sep)
 
+        # Render edges
         for i, (src, arrow, label, dst) in enumerate(edges):
             prefix = "    " if indent else ""
             m_parts.append(f"{prefix}{esc['numbers']}{src}{reset}")
@@ -342,6 +503,9 @@ class HighPerformanceRenderer:
                 m_parts.append(sep)
 
         res = "".join(m_parts)
+
+        if not self.color_system:
+            return json.dumps({"Summary": res}, indent=4 if indent else None)
 
         if indent:
             final_parts = []

@@ -17,28 +17,35 @@ def die(message):
 def run_command(command, input_data=None):
     try:
         result = subprocess.run(
-            command, input=input_data, capture_output=True, text=True, check=True
+            command,
+            input=input_data,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=300,
         )
         return result
     except subprocess.CalledProcessError as e:
-        print(f"Error output:\n{e.stderr}", file=sys.stderr)
+        print(f"Error output:{e.stderr}", file=sys.stderr)
         die(f"Command failed with exit code {e.returncode}")
 
 
 def parse_decoding(output_text):
-    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\-_]|\[[0-?]*[ -/]*[@-~])")
     clean_text = ansi_escape.sub("", output_text)
 
     decoded_messages = []
     for line in clean_text.splitlines():
-        if ";" in line:
-            parts = line.split(";", 1)
-            json_str = parts[1].strip()
+        if " ; {" in line:
+            parts = line.rsplit(" ; {", 1)
+            json_str = "{" + parts[1].strip()
             try:
                 data = json.loads(json_str)
                 if "PGN" in data:
                     decoded_messages.append(data)
-            except (json.JSONDecodeError, IndexError):
+            except (json.JSONDecodeError, IndexError) as e:
+                print(f"Skipping malformed JSON in decoding: {e}", file=sys.stderr)
+                print(f"  Line was: {line}", file=sys.stderr)
                 continue
     return decoded_messages
 
@@ -120,23 +127,24 @@ def compare_decodings(old_messages, new_messages):
     return changes
 
 
-def main():
+def setup_directories():
+    """Create temporary and output directories."""
     tmp_dir = Path("tmp")
     official_dir = tmp_dir / "official"
-    official_dir.mkdir(exist_ok=True)
+    official_dir.mkdir(parents=True, exist_ok=True)
     output_base = Path("test_outputs")
     output_base.mkdir(exist_ok=True)
+    return tmp_dir, official_dir, output_base
 
-    python_exe = sys.executable
 
-    # Phase 1: Create JSON DAs from official XLS/XLSX
-    # Avoid collisions by including extension in json name
-    xls_files = list(official_dir.glob("*.xls")) + list(official_dir.glob("*.xlsx"))
+def create_json_das_from_official_xls(official_dir, python_exe):
+    """Create JSON DAs from official XLS/XLSX files."""
     print("--- Phase 1: Creating Official JSON DAs ---")
+    xls_files = list(official_dir.glob("*.xls")) + list(official_dir.glob("*.xlsx"))
     official_jsons = []
     for xls_file in xls_files:
-        # Use filename with extension to avoid collision between J1939DA_DEC2020.xls and .xlsx
         json_file = xls_file.parent / (xls_file.name + ".json")
+        clean_json_file = xls_file.parent / (xls_file.stem + ".json")
         cmd = [
             python_exe,
             "-m",
@@ -148,16 +156,22 @@ def main():
         ]
         print(f"Generating {json_file.name}...")
         run_command(cmd)
+        if json_file != clean_json_file:
+            print(f"Generating {clean_json_file.name}...")
+            cmd[-1] = str(clean_json_file)
+            run_command(cmd)
         official_jsons.append(json_file)
+    return official_jsons
 
-    # Phase 1.5: Regression Sweep for _x000d_ artifacts
-    print("\n--- Phase 1.5: Regression Sweep for _x000d_ artifacts ---")
+
+def regression_sweep_xml_artifacts(official_jsons):
+    """Regression sweep for XML artifacts."""
+    print("--- Phase 1.5: Regression Sweep for XML artifacts ---")
     artifact_found = False
     for json_file in official_jsons:
         with open(json_file, "r", encoding="utf-8") as f:
             content = f.read()
-            # Case-insensitive search for _x000d_
-            matches = re.findall(r"_x000[dD]_", content)
+            matches = re.findall(r"_x[0-9a-fA-F]{4}_", content)
             if matches:
                 print(
                     f"  [FAIL] Artifacts found in {json_file.name}: {len(matches)} occurrences."
@@ -165,21 +179,72 @@ def main():
                 artifact_found = True
             else:
                 print(f"  [PASS] No artifacts in {json_file.name}")
-
     if not artifact_found:
         print("  All official JSONs are clean of _x000d_ artifacts.")
 
-    # Find other JSON DAs in tmp/
-    other_jsons = [f for f in tmp_dir.glob("*.json") if f.is_file()]
 
-    groups = {"OFFICIAL": sorted(official_jsons), "OTHER": sorted(other_jsons)}
+def regression_sweep_missing_j1939_bit_decodings(official_jsons):
+    """Regression sweep for missing J1939BitDecodings."""
+    print("--- Phase 1.6: Regression Sweep for J1939BitDecodings ---")
+    bit_decodings_missing = False
+    for json_file in official_jsons:
+        with open(json_file, "r", encoding="utf-8") as f:
+            da = json.load(f)
+            bit_decodings = da.get("J1939BitDecodings", {})
+            if len(bit_decodings) == 0:
+                print(f"  [FAIL] No J1939BitDecodings in {json_file.name}")
+                bit_decodings_missing = True
+            else:
+                print(
+                    f"  [PASS] {json_file.name} has {len(bit_decodings)} bit decodings"
+                )
+    if bit_decodings_missing:
+        die("  FAILED: Some official JSONs are missing J1939BitDecodings entries.")
+    elif official_jsons:
+        print("  All official JSONs have J1939BitDecodings entries.")
 
-    log_files = sorted(list(tmp_dir.glob("*.log")) + list(Path("tests").glob("*.log")))
-    argument_sets = [["--candata", "--link"]]
 
-    results = {}  # group -> log -> args_slug -> da_name -> messages
+def regression_sweep_name_mapping_dictionaries(official_jsons):
+    """Regression sweep for NAME mapping dictionaries."""
+    print("--- Phase 1.7: Regression Sweep for NAME mapping dictionaries ---")
+    name_maps_missing = False
+    for json_file in official_jsons:
+        with open(json_file, "r", encoding="utf-8") as f:
+            da = json.load(f)
+            missing_in_this_file = []
+            for map_key in [
+                "J1939Manufacturerdb",
+                "J1939IndustryGroupdb",
+                "J1939Functiondb",
+                "J1939VehicleSystemdb",
+            ]:
+                if len(da.get(map_key, {})) == 0:
+                    missing_in_this_file.append(map_key)
+            if missing_in_this_file:
+                print(
+                    f"  [FAIL] {json_file.name} is missing populated maps: {', '.join(missing_in_this_file)}"
+                )
+                name_maps_missing = True
+            else:
+                mfr_count = len(da.get("J1939Manufacturerdb"))
+                ig_count = len(da.get("J1939IndustryGroupdb"))
+                func_count = len(da.get("J1939Functiondb"))
+                vs_count = len(da.get("J1939VehicleSystemdb"))
+                print(
+                    f"  [PASS] {json_file.name} has NAME maps: Mfr={mfr_count}, IG={ig_count}, Func={func_count}, VS={vs_count}"
+                )
+    if name_maps_missing:
+        print(
+            "  WARNING: Some official JSONs are missing some NAME mapping dictionaries."
+        )
+    elif official_jsons:
+        print("  All official JSONs have populated NAME mapping dictionaries.")
 
-    print("\n--- Phase 2: Running Decodings ---")
+
+def run_decodings(groups, log_files, argument_sets, output_base, python_exe):
+    """Run decodings for different groups and argument sets."""
+    print("--- Phase 2: Running Decodings ---")
+    results = {}
     for group_name, da_list in groups.items():
         if not da_list:
             continue
@@ -211,18 +276,21 @@ def main():
 
                     msgs = parse_decoding(res.stdout)
                     results[group_name][log.name][args_slug][da_json.name] = msgs
+    return results
 
-    # Phase 3: Detailed Comparison WITHIN Groups
-    print("\n--- Phase 3: Intra-Group Comparison ---")
+
+def compare_decodings_within_groups(results):
+    """Compare decodings within the same group."""
+    print("--- Phase 3: Intra-Group Comparison ---")
     for group_name, log_data in results.items():
-        print(f"\n===== GROUP: {group_name} =====")
+        print(f"===== GROUP: {group_name} =====")
         for log_name, arg_data in log_data.items():
             for args_slug, da_data in arg_data.items():
                 da_names = sorted(da_data.keys())
                 if len(da_names) < 2:
                     continue
 
-                print(f"\nLOG: {log_name} ({args_slug})")
+                print(f"LOG: {log_name} ({args_slug})")
                 for i in range(len(da_names) - 1):
                     old_da = da_names[i]
                     new_da = da_names[i + 1]
@@ -263,7 +331,41 @@ def main():
                     else:
                         print(f"  {old_da} -> {new_da}: [STABLE]")
 
-    print(f"\nAll decoding outputs saved in '{output_base}/'.")
+
+def main():
+    """Main function."""
+    tmp_dir, official_dir, output_base = setup_directories()
+    python_exe = sys.executable
+
+    official_jsons = create_json_das_from_official_xls(official_dir, python_exe)
+    regression_sweep_xml_artifacts(official_jsons)
+    regression_sweep_missing_j1939_bit_decodings(official_jsons)
+    regression_sweep_name_mapping_dictionaries(official_jsons)
+
+    other_jsons = [f for f in tmp_dir.glob("*.json") if f.is_file()]
+    groups = {"OFFICIAL": sorted(official_jsons), "OTHER": sorted(other_jsons)}
+    log_files = sorted(list(tmp_dir.glob("*.log")) + list(Path("tests").glob("*.log")))
+    argument_sets = [["--candata", "--link"]]
+
+    results = run_decodings(groups, log_files, argument_sets, output_base, python_exe)
+    compare_decodings_within_groups(results)
+
+    print("--- Phase 4: Final One-for-One Verification ---")
+    xls_json = official_dir / "J1939DA_DEC2020.xls.json"
+    xlsx_json = official_dir / "J1939DA_DEC2020.xlsx.json"
+    if xls_json.exists() and xlsx_json.exists():
+        with open(xls_json, "r") as f:
+            xls_data = json.load(f)
+        with open(xlsx_json, "r") as f:
+            xlsx_data = json.load(f)
+        if xls_data == xlsx_data:
+            print("  [PASS] J1939DA_DEC2020.xls.json and .xlsx.json match precisely.")
+        else:
+            print("  [FAIL] J1939DA_DEC2020.xls.json and .xlsx.json differ!")
+    else:
+        print("  [SKIP] One or both DEC2020 JSONs missing for final verification.")
+
+    print(f"All decoding outputs saved in '{output_base}/'.")
 
 
 if __name__ == "__main__":
