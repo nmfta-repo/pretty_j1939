@@ -1,3 +1,16 @@
+# 0.0.5
+* added a curses-based terminal viewer for real-time
+* expanded support for various logfile formats (including candump with timestamps)
+* track J1939 NAMEs and label SA/DA names dynamically based on Address Claimed messages
+* fixed warnings and maintained compatibility with older database schemas
+* improved Not Available (NA) and Error indicator detection for all SPN lengths
+* improved decoding of edge cases in ISO-TP and J1939 Transport Layer reassembly
+* expanded default J1939 database with more PGNs and SPNs
+* optimized rendering performance with `HighPerformanceRenderer`
+* automated summary generation for large logfiles
+* added Digital Annex (DA) parsing support to `create_j1939db_json.py`
+* extensive codebase refactoring and significant increase in test coverage
+
 # 0.0.4
 * restore support for old J1939db.json schema
 

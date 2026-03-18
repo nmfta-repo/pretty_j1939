@@ -170,6 +170,30 @@ pretty_j1939 example.candump.txt --filter-ca 11
 ```
 
 
+### Curses Viewer
+
+For interactive, real-time analysis, the package includes a curses-based terminal viewer. It provides a live-updating table of J1939 messages with color-coded fields and detailed decoding.
+
+Launch the viewer with the `viewer` subcommand:
+
+```bash
+pretty_j1939 viewer -i vcan0
+```
+
+Key features of the viewer:
+- **Interactive Scrolling:** Use arrow keys or Page Up/Down to navigate the message history.
+- **Bytes Column:** Displays the raw hex data alongside the decoded PGN and SA/DA information.
+- **Real-time Decoding:** Messages are decoded instantly as they arrive, including transport reassembly.
+- **Theming:** Supports multiple color themes (e.g., `darcula`, `monokai`, `synthwave`) via the `--theme` flag.
+- **Search/Filter:** Press `/` to enter a search term (PGN label or address name) to filter the visible list in real-time.
+
+You can also use the viewer on log files:
+
+```bash
+pretty_j1939 viewer example.candump.txt
+```
+
+
 ### Highlighting
 
 You can highlight specific messages based on J1939 fields. Highlighting overrides the default theme colors for the entire line with a high-contrast style.

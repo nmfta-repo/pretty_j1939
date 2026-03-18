@@ -12,10 +12,13 @@ import os
 import json
 import re
 import importlib.resources
+import logging
 from io import StringIO
 from rich.console import Console
 from rich.theme import Theme
 from rich.text import Text
+
+logger = logging.getLogger(__name__)
 
 try:
     import can
@@ -24,15 +27,13 @@ except ImportError:
 
 from . import describe
 from .parse import parse_j1939_id
-from .render import HighPerformanceRenderer
-
-NUM_IN_PARENS_RE = re.compile(r"(\()([^)]*[0-9/x][^)]*)(\))")
+from .render import HighPerformanceRenderer, NUM_IN_PARENS_RE
 
 
 class J1939Runner:
     def __init__(
         self,
-        args,
+        cli_args,
         extra_kwargs,
         can_filters,
         pgn_list,
@@ -44,7 +45,7 @@ class J1939Runner:
         highlight_das=None,
         highlight_cas=None,
     ):
-        self.args = args
+        self.args = cli_args
         self.extra_kwargs = extra_kwargs
         self.can_filters = can_filters
         self.pgn_list = pgn_list
@@ -57,8 +58,9 @@ class J1939Runner:
         self.highlight_cas = highlight_cas or []
 
         self.summary_data = {}
+        self.message_count = 0
 
-        self.theme_dict = HighPerformanceRenderer.load_theme(args.theme)
+        self.theme_dict = HighPerformanceRenderer.load_theme(cli_args.theme)
 
         self.custom_theme = Theme(self.theme_dict)
         # fixed dimensions and disabled legacy windows detection to avoid frequent
@@ -81,16 +83,16 @@ class J1939Runner:
         )
 
         self.describe_obj = describe.get_describer(
-            da_json=args.da_json,
-            describe_pgns=args.pgn,
-            describe_spns=args.spn,
-            describe_link_layer=args.link,
-            describe_transport_layer=args.transport,
-            real_time=args.real_time,
-            include_transport_rawdata=args.candata,
-            include_na=args.include_na,
-            include_raw_data=args.include_raw_data,
-            enable_isotp=args.enable_isotp,
+            da_json=cli_args.da_json,
+            describe_pgns=cli_args.pgn,
+            describe_spns=cli_args.spn,
+            describe_link_layer=cli_args.link,
+            describe_transport_layer=cli_args.transport,
+            real_time=cli_args.real_time,
+            include_transport_rawdata=cli_args.candata,
+            include_na=cli_args.include_na,
+            include_raw_data=cli_args.include_raw_data,
+            enable_isotp=cli_args.enable_isotp,
         )
 
         self.renderer = HighPerformanceRenderer(
@@ -99,8 +101,8 @@ class J1939Runner:
             da_describer=self.describe_obj.da_describer,
         )
 
-        self.should_colorize = args.color == "always" or (
-            args.color == "auto" and sys.stdout.isatty()
+        self.should_colorize = cli_args.color == "always" or (
+            cli_args.color == "auto" and sys.stdout.isatty()
         )
 
         # Resolve string-based filters/highlights
@@ -124,116 +126,110 @@ class J1939Runner:
         self._generate_can_filters()
 
         self.write_f = None
-        if args.write:
+        if cli_args.write:
             try:
-                self.write_f = open(args.write, "w")
+                self.write_f = open(cli_args.write, "w")
             except Exception as e:
-                print(
-                    f"Error: Failed to open output file '{args.write}': {e}",
-                    file=sys.stderr,
+                raise RuntimeError(
+                    f"Error: Failed to open output file '{cli_args.write}': {e}"
                 )
-                sys.exit(1)
 
-    def _resolve_pgns(self, inputs):
-        if not inputs:
+    def _resolve_pgns(self, raw_inputs):
+        if not raw_inputs:
             return []
         resolved = set()
-        for item in inputs:
-            if isinstance(item, int):
-                resolved.add(item)
+        for pgn_input in raw_inputs:
+            if isinstance(pgn_input, int):
+                resolved.add(pgn_input)
                 continue
 
             # Check if it's a numeric string
             try:
-                val = int(item, 16) if item.startswith("0x") else int(item)
-                resolved.add(val)
+                pgn_val = (
+                    int(pgn_input, 16) if pgn_input.startswith("0x") else int(pgn_input)
+                )
+                resolved.add(pgn_val)
             except ValueError:
                 # Resolve via database
-                matches = self.describe_obj.da_describer.resolve_pgn(item)
+                matches = self.describe_obj.da_describer.resolve_pgn(pgn_input)
                 if not matches:
-                    print(
-                        f"Error: '{item}' did not match any PGN in the database.",
-                        file=sys.stderr,
+                    raise ValueError(
+                        f"Error: '{pgn_input}' did not match any PGN in the database."
                     )
-                    sys.exit(1)
                 print(
-                    f"Resolving PGN filter '{item}' to PGNs: {', '.join(map(str, matches))}",
+                    f"Resolving PGN filter '{pgn_input}' to PGNs: {', '.join(map(str, matches))}",
                     file=sys.stderr,
                 )
                 resolved.update(matches)
         return list(resolved)
 
-    def _resolve_addrs(self, inputs, category):
-        if not inputs:
+    def _resolve_addrs(self, raw_inputs, category):
+        if not raw_inputs:
             return []
         resolved = set()
-        for item in inputs:
-            if isinstance(item, int):
-                resolved.add(item)
+        for addr_input in raw_inputs:
+            if isinstance(addr_input, int):
+                resolved.add(addr_input)
                 continue
 
             try:
-                val = int(item, 16) if item.startswith("0x") else int(item)
-                resolved.add(val)
+                addr_val = (
+                    int(addr_input, 16)
+                    if addr_input.startswith("0x")
+                    else int(addr_input)
+                )
+                resolved.add(addr_val)
             except ValueError:
-                matches = self.describe_obj.da_describer.resolve_address(item)
+                matches = self.describe_obj.da_describer.resolve_address(addr_input)
                 if not matches:
-                    print(
-                        f"Error: '{item}' did not match any {category} in the database.",
-                        file=sys.stderr,
+                    raise ValueError(
+                        f"Error: '{addr_input}' did not match any {category} in the database."
                     )
-                    sys.exit(1)
                 print(
-                    f"Resolving {category} filter '{item}' to addresses: {', '.join(map(str, matches))}",
+                    f"Resolving {category} filter '{addr_input}' to addresses: {', '.join(map(str, matches))}",
                     file=sys.stderr,
                 )
                 resolved.update(matches)
         return list(resolved)
 
-    def _generate_can_filters(self):
-        """Generate CAN-level filters from J1939 filter criteria."""
-        if not (self.pgn_list or self.sa_list or self.da_list or self.ca_list):
-            return
-
-        from itertools import product
-
+    def _get_pgn_filters(self):
         pgn_filters = []
-        for val in self.pgn_list:
-            pf = (val >> 8) & 0xFF
+        for pgn_val in self.pgn_list:
+            pf = (pgn_val >> 8) & 0xFF
             if pf < 240:
-                pgn_filters.append(((val << 8), 0x03FF0000))
+                pgn_filters.append(((pgn_val << 8), 0x03FF0000))
             else:
-                pgn_filters.append(((val << 8), 0x03FFFF00))
+                pgn_filters.append(((pgn_val << 8), 0x03FFFF00))
+        return pgn_filters
 
-        sa_filters = [(val, 0x000000FF) for val in self.sa_list]
-        da_filters = [((val << 8), 0x0000FF00) for val in self.da_list]
+    def _get_sa_filters(self):
+        return [(sa_val, 0x000000FF) for sa_val in self.sa_list]
 
-        if not self.can_filters:
-            self.can_filters = []
+    def _get_da_filters(self):
+        return [((da_val << 8), 0x0000FF00) for da_val in self.da_list]
+
+    def _add_filter(self, can_id, can_mask):
+        self.can_filters.append(
+            {"can_id": can_id, "can_mask": can_mask, "extended": True}
+        )
+
+    def _add_combined_filters(self, pgn_filters, sa_filters, da_filters):
+        from itertools import product
 
         tmp_pgn_filters = pgn_filters if pgn_filters else [(0, 0)]
         tmp_sa_filters = sa_filters if sa_filters else [(0, 0)]
         tmp_da_filters = da_filters if da_filters else [(0, 0)]
 
-        def add_filter(pf, sf, df):
-            self.can_filters.append(
-                {
-                    "can_id": pf[0] | sf[0] | df[0],
-                    "can_mask": pf[1] | sf[1] | df[1],
-                    "extended": True,
-                }
-            )
-
         if not self.ca_list:
             for pf, sf, df in product(tmp_pgn_filters, tmp_sa_filters, tmp_da_filters):
-                add_filter(pf, sf, df)
+                self._add_filter(pf[0] | sf[0] | df[0], pf[1] | sf[1] | df[1])
         else:
-            for c in self.ca_list:
-                # 1. Match SA == c
+            for controller_addr in self.ca_list:
+                # 1. Match SA == controller_addr
                 sas_to_use = (
-                    [(c, 0x000000FF)]
+                    [(controller_addr, 0x000000FF)]
                     if any(
-                        s_mask == 0 or (c & s_mask) == (s_val & s_mask)
+                        s_mask == 0 or (controller_addr & s_mask) == (s_val & s_mask)
                         for s_val, s_mask in tmp_sa_filters
                     )
                     else []
@@ -242,12 +238,13 @@ class J1939Runner:
                     for pf, sf, df in product(
                         tmp_pgn_filters, sas_to_use, tmp_da_filters
                     ):
-                        add_filter(pf, sf, df)
-                # 2. Match DA == c
+                        self._add_filter(pf[0] | sf[0] | df[0], pf[1] | sf[1] | df[1])
+                # 2. Match DA == controller_addr
                 das_to_use = (
-                    [((c << 8), 0x0000FF00)]
+                    [((controller_addr << 8), 0x0000FF00)]
                     if any(
-                        d_mask == 0 or ((c << 8) & d_mask) == (d_val & d_mask)
+                        d_mask == 0
+                        or ((controller_addr << 8) & d_mask) == (d_val & d_mask)
                         for d_val, d_mask in tmp_da_filters
                     )
                     else []
@@ -256,19 +253,43 @@ class J1939Runner:
                     for pf, sf, df in product(
                         tmp_pgn_filters, tmp_sa_filters, das_to_use
                     ):
-                        add_filter(pf, sf, df)
+                        self._add_filter(pf[0] | sf[0] | df[0], pf[1] | sf[1] | df[1])
 
-        # Include transport PGNs if PGN filtering is active
-        if self.pgn_list:
-            for tp_pgn in [60416, 60160, 59392]:
-                tp_pf = (tp_pgn << 8, 0x03FF0000)
-                if not self.ca_list:
-                    for _, sf, df in product([(0, 0)], tmp_sa_filters, tmp_da_filters):
-                        add_filter(tp_pf, sf, df)
-                else:
-                    for c in self.ca_list:
-                        add_filter(tp_pf, (c, 0x000000FF), (0, 0))
-                        add_filter(tp_pf, (0, 0), ((c << 8), 0x0000FF00))
+    def _add_transport_pgn_filters(self, sa_filters, da_filters):
+        from itertools import product
+
+        if not self.pgn_list:
+            return
+
+        tmp_sa_filters = sa_filters if sa_filters else [(0, 0)]
+        tmp_da_filters = da_filters if da_filters else [(0, 0)]
+
+        for tp_pgn in [60416, 60160, 59392]:
+            tp_pf = (tp_pgn << 8, 0x03FF0000)
+            if not self.ca_list:
+                for _, sf, df in product([(0, 0)], tmp_sa_filters, tmp_da_filters):
+                    self._add_filter(tp_pf[0] | sf[0] | df[0], tp_pf[1] | sf[1] | df[1])
+            else:
+                for controller_addr in self.ca_list:
+                    self._add_filter(tp_pf[0] | controller_addr, tp_pf[1] | 0x000000FF)
+                    self._add_filter(
+                        tp_pf[0] | (controller_addr << 8), tp_pf[1] | 0x0000FF00
+                    )
+
+    def _generate_can_filters(self):
+        """Generate CAN-level filters from J1939 filter criteria."""
+        if not (self.pgn_list or self.sa_list or self.da_list or self.ca_list):
+            return
+
+        pgn_filters = self._get_pgn_filters()
+        sa_filters = self._get_sa_filters()
+        da_filters = self._get_da_filters()
+
+        if not self.can_filters:
+            self.can_filters = []
+
+        self._add_combined_filters(pgn_filters, sa_filters, da_filters)
+        self._add_transport_pgn_filters(sa_filters, da_filters)
 
     def render_description(
         self,
@@ -309,190 +330,292 @@ class J1939Runner:
             description, indent=indent, can_line=can_line, highlight=highlight
         )
 
-    def process_messages(self, source, filters=None):
-        for item in source:
-            try:
-                timestamp = 0.0
+    def _parse_verbose_candump_line(self, candump_line):
+        timestamp = 0.0
+        interface = "can"
+        message_id = None
+        message_data = None
+
+        parts = candump_line.split()
+        try:
+            if "Timestamp:" in parts:
+                ts_idx = parts.index("Timestamp:") + 1
+                timestamp = float(parts[ts_idx])
+            id_idx = parts.index("ID:") + 1
+            msg_id_str = parts[id_idx]
+            dl_idx = parts.index("DL:") + 1
+            length = int(parts[dl_idx])
+            data_start_idx = dl_idx + 1
+            data_hex_list = parts[data_start_idx : data_start_idx + length]
+            data_hex_str = "0x" + "".join(data_hex_list)
+            message_id = bitstring.Bits(hex=msg_id_str)
+            message_data = bitstring.Bits(hex=data_hex_str)
+            return timestamp, interface, message_id, message_data
+        except (ValueError, IndexError) as e:
+            logger.debug(f"Skipping malformed message due to decoding error: {e}")
+            return None
+
+    def _parse_standard_candump_line(self, candump_line):
+        candump_line = candump_line.split(";", 1)[0]
+        candump_line = re.sub(r"\(\s+", "(", candump_line)
+        candump_line = re.sub(r"\s+\)", ")", candump_line)
+        parts = candump_line.split()
+        if not parts:
+            return None
+        if parts[0].isdigit() and len(parts) > 1 and parts[1].startswith("("):
+            parts = parts[1:]
+
+        if len(parts) < 1:
+            return None
+        try:
+            timestamp = 0.0
+            interface = "can"
+
+            # Check for 'interface ID [length] data' format
+            brackets_idx = -1
+            for i, p in enumerate(parts):
+                if p.startswith("[") and p.endswith("]"):
+                    brackets_idx = i
+                    break
+
+            if brackets_idx != -1 and brackets_idx > 0:
+                msg_id_str = parts[brackets_idx - 1]
+                try:
+                    length_str = parts[brackets_idx][1:-1]
+                    if length_str.isdigit():
+                        length = int(length_str)
+                        data_hex_list = parts[
+                            brackets_idx + 1 : brackets_idx + 1 + length
+                        ]
+                        msg_data_str = "".join(data_hex_list)
+                        message_id = bitstring.Bits(hex=msg_id_str)
+                        message_data = bitstring.Bits(hex=msg_data_str)
+
+                        if brackets_idx >= 2:
+                            interface = parts[brackets_idx - 2]
+                        if (
+                            brackets_idx >= 3
+                            and parts[brackets_idx - 3].startswith("(")
+                            and parts[brackets_idx - 3].endswith(")")
+                        ):
+                            timestamp = float(parts[brackets_idx - 3][1:-1])
+                        return timestamp, interface, message_id, message_data
+                except (ValueError, bitstring.CreationError):
+                    pass
+
+            if len(parts) >= 3 and parts[0].startswith("(") and parts[0].endswith(")"):
+                timestamp = float(parts[0][1:-1])
+                interface = parts[1]
+                message = parts[2]
+            elif len(parts) >= 2:
+                interface = parts[0]
+                message = parts[1]
+            else:
+                message = parts[0]
                 interface = "can"
 
-                if isinstance(item, str):
-                    candump_line = item
-                    if not candump_line.strip():
+            if "#" not in message:
+                return None
+            msg_id_str, msg_data_str = message.split("#", 1)
+            message_id = bitstring.Bits(hex=msg_id_str)
+            message_data = bitstring.Bits(hex=msg_data_str)
+            return timestamp, interface, message_id, message_data
+        except (ValueError, IndexError, bitstring.CreationError) as e:
+            logger.debug(f"Skipping candump line due to decoding error: {e}")
+            return None
+
+    def _parse_candump_line(self, candump_line):
+        if not candump_line.strip():
+            return None
+
+        if candump_line.strip().startswith("Timestamp:"):
+            return self._parse_verbose_candump_line(candump_line)
+        else:
+            return self._parse_standard_candump_line(candump_line)
+
+    def _parse_can_message(self, item):
+        message_id = bitstring.Bits(uint=item.arbitration_id, length=32)
+        message_data = bitstring.Bits(bytes=item.data)
+        timestamp = item.timestamp
+        interface = str(item.channel)
+        return timestamp, interface, message_id, message_data
+
+    def _matches_can_filters(self, message_id_uint, filters):
+        if not filters:
+            return True
+        for f in filters:
+            if (message_id_uint & f["can_mask"]) == (f["can_id"] & f["can_mask"]):
+                return True
+        return False
+
+    def _matches_j1939_filters(self, description):
+        if not (self.pgn_list or self.sa_list or self.da_list or self.ca_list):
+            return True
+
+        msg_pgn = description.get("_pgn")
+        msg_sa = description.get("_sa")
+        msg_da = description.get("_da")
+
+        if self.pgn_list and msg_pgn not in self.pgn_list:
+            return False
+        if self.sa_list and msg_sa not in self.sa_list:
+            return False
+        if self.da_list and msg_da not in self.da_list:
+            return False
+        if self.ca_list and msg_sa not in self.ca_list and msg_da not in self.ca_list:
+            return False
+
+        return True
+
+    def _check_highlight(self, description):
+        if not (
+            self.highlight_pgns
+            or self.highlight_sas
+            or self.highlight_das
+            or self.highlight_cas
+        ):
+            return False
+
+        msg_pgn = description.get("_pgn")
+        msg_sa = description.get("_sa")
+        msg_da = description.get("_da")
+
+        if (
+            (self.highlight_pgns and msg_pgn in self.highlight_pgns)
+            or (self.highlight_sas and msg_sa in self.highlight_sas)
+            or (self.highlight_das and msg_da in self.highlight_das)
+            or (
+                self.highlight_cas
+                and (msg_sa in self.highlight_cas or msg_da in self.highlight_cas)
+            )
+        ):
+            return True
+
+        return False
+
+    def _render_and_output(
+        self,
+        timestamp,
+        interface,
+        message_id,
+        message_data,
+        candump_line,
+        description,
+        is_highlight,
+    ):
+        can_prefix = None
+        if self.args.candata:
+            if self.args.candata == "candump":
+                prefix_content = f"({timestamp:17.6f}) {interface} {message_id.hex.upper()}#{message_data.hex.upper()}"
+            else:
+                prefix_content = candump_line.split(";", 1)[0].rstrip()
+
+            can_prefix = prefix_content.ljust(80) + " ; "
+
+        desc_line = self.render_description(
+            description,
+            indent=self.args.format,
+            can_line=can_prefix,
+            highlight=is_highlight,
+        )
+        if len(desc_line) > 0:
+            print(desc_line, flush=True)
+
+        if self.write_f:
+            prefix_f = (
+                f"({timestamp:17.6f}) {interface} {message_id.hex.upper()}#{message_data.hex.upper()}".ljust(
+                    80
+                )
+                + " ; "
+            )
+            desc_f = self.render_description(
+                description,
+                indent=self.args.format,
+                can_line=prefix_f,
+                force_colorize=False,
+                highlight=is_highlight,
+            )
+            if len(desc_f) > 0:
+                self.write_f.write(desc_f + "\n")
+                self.write_f.flush()
+
+    def process_messages(self, message_source, filters=None):
+        for message_item in message_source:
+            try:
+                if isinstance(message_item, str):
+                    parsed_item = self._parse_candump_line(message_item)
+                    if not parsed_item:
                         continue
-
-                    if candump_line.strip().startswith("Timestamp:"):
-                        parts = candump_line.split()
-                        try:
-                            if "Timestamp:" in parts:
-                                ts_idx = parts.index("Timestamp:") + 1
-                                timestamp = float(parts[ts_idx])
-                            id_idx = parts.index("ID:") + 1
-                            msg_id_str = parts[id_idx]
-                            dl_idx = parts.index("DL:") + 1
-                            length = int(parts[dl_idx])
-                            data_start_idx = dl_idx + 1
-                            data_hex_list = parts[
-                                data_start_idx : data_start_idx + length
-                            ]
-                            data_hex_str = "0x" + "".join(data_hex_list)
-                            message_id = bitstring.Bits(hex=msg_id_str)
-                            message_data = bitstring.Bits(hex=data_hex_str)
-                        except (ValueError, IndexError):
-                            continue
-                    else:
-                        parts = candump_line.split()
-                        if not parts:
-                            continue
-                        # Handle optional leading index (e.g. "1 (1612543138.000000) ...")
-                        if (
-                            parts[0].isdigit()
-                            and len(parts) > 1
-                            and parts[1].startswith("(")
-                        ):
-                            parts = parts[1:]
-
-                        if len(parts) < 3:
-                            continue
-                        try:
-                            if parts[0].startswith("(") and parts[0].endswith(")"):
-                                timestamp = float(parts[0][1:-1])
-                                interface = parts[1]
-                                message = parts[2]
-                            else:
-                                interface = parts[0]
-                                message = parts[1]
-                            if "#" not in message:
-                                continue
-                            msg_id_str, msg_data_str = message.split("#", 1)
-                            message_id = bitstring.Bits(hex=msg_id_str)
-                            message_data = bitstring.Bits(hex=msg_data_str)
-                        except (ValueError, IndexError):
-                            continue
-                elif can and isinstance(item, can.Message):
-                    message_id = bitstring.Bits(uint=item.arbitration_id, length=32)
-                    message_data = bitstring.Bits(bytes=item.data)
-                    timestamp = item.timestamp
-                    interface = str(item.channel)
-                    candump_line = str(item)
+                    timestamp, interface, message_id, message_data = parsed_item
+                    candump_line = message_item
+                elif can and isinstance(message_item, can.Message):
+                    timestamp, interface, message_id, message_data = (
+                        self._parse_can_message(message_item)
+                    )
+                    candump_line = str(message_item)
                 else:
                     continue
             except (IndexError, ValueError):
-                if isinstance(item, str):
-                    print("Warning: error in line '%s'" % item, file=sys.stderr)
+                if isinstance(message_item, str):
+                    print("Warning: error in line '%s'" % message_item, file=sys.stderr)
                 continue
 
             message_id_uint = message_id.uint
 
-            if filters:
-                matched = False
-                for f in filters:
-                    if (message_id_uint & f["can_mask"]) == (
-                        f["can_id"] & f["can_mask"]
-                    ):
-                        matched = True
-                        break
-                if not matched:
-                    continue
+            if not self._matches_can_filters(message_id_uint, filters):
+                continue
 
             description = self.describe_obj(message_data, message_id_uint)
             if not description:
                 continue
 
-            if self.pgn_list or self.sa_list or self.da_list or self.ca_list:
-                msg_pgn = description.get("_pgn")
-                msg_sa = description.get("_sa")
-                msg_da = description.get("_da")
+            self.message_count += 1
 
-                if self.pgn_list and msg_pgn not in self.pgn_list:
-                    continue
-                if self.sa_list and msg_sa not in self.sa_list:
-                    continue
-                if self.da_list and msg_da not in self.da_list:
-                    continue
-                if (
-                    self.ca_list
-                    and msg_sa not in self.ca_list
-                    and msg_da not in self.ca_list
-                ):
-                    continue
+            if not self._matches_j1939_filters(description):
+                continue
 
-            is_highlight = False
-            if (
-                self.highlight_pgns
-                or self.highlight_sas
-                or self.highlight_das
-                or self.highlight_cas
-            ):
-                msg_pgn = description.get("_pgn")
-                msg_sa = description.get("_sa")
-                msg_da = description.get("_da")
+            is_highlight = self._check_highlight(description)
 
-                if (
-                    (self.highlight_pgns and msg_pgn in self.highlight_pgns)
-                    or (self.highlight_sas and msg_sa in self.highlight_sas)
-                    or (self.highlight_das and msg_da in self.highlight_das)
-                    or (
-                        self.highlight_cas
-                        and (
-                            msg_sa in self.highlight_cas or msg_da in self.highlight_cas
-                        )
-                    )
-                ):
-                    is_highlight = True
-
-            can_prefix = None
-            if self.args.candata:
-                if self.args.candata == "candump":
-                    prefix_content = f"({timestamp:17.6f}) {interface} {message_id.hex.upper()}#{message_data.hex.upper()}"
-                else:
-                    prefix_content = candump_line.rstrip()
-
-                can_prefix = prefix_content.ljust(80) + " ; "
-
-            desc_line = self.render_description(
+            self._render_and_output(
+                timestamp,
+                interface,
+                message_id,
+                message_data,
+                candump_line,
                 description,
-                indent=self.args.format,
-                can_line=can_prefix,
-                highlight=is_highlight,
+                is_highlight,
             )
-            if len(desc_line) > 0:
-                print(desc_line, flush=True)
-
-            if self.write_f:
-                prefix_f = (
-                    f"({timestamp:17.6f}) {interface} {message_id.hex.upper()}#{message_data.hex.upper()}".ljust(
-                        80
-                    )
-                    + " ; "
-                )
-                desc_f = self.render_description(
-                    description,
-                    indent=self.args.format,
-                    can_line=prefix_f,
-                    force_colorize=False,
-                    highlight=is_highlight,
-                )
-                if len(desc_f) > 0:
-                    self.write_f.write(desc_f + "\n")
-                    self.write_f.flush()
 
     def print_summary(self):
-        summary_data = self.describe_obj.get_summary()
-        if not self.args.summary or not summary_data:
+        # Default behavior: if <= 8 lines of input were given, do not print a summary.
+        # Treat command-line presence of --summary or --no-summary as an override.
+        should_show = self.args.summary
+        if should_show is None:
+            should_show = self.message_count > 8
+
+        if not should_show:
             return
 
-        res = self.renderer.render_summary(summary_data, indent=self.args.format)
-        if res:
-            if self.args.candata:
-                res = "\n".join(f"; {line}" for line in res.splitlines())
+        summary_data = self.describe_obj.get_summary()
+        if not summary_data:
+            return
 
-            print(res, file=sys.stdout)
+        rendered_summary = self.renderer.render_summary(
+            summary_data, indent=self.args.format
+        )
+        if rendered_summary:
+            if self.args.candata:
+                rendered_summary = "\n".join(
+                    f"; {line}" for line in rendered_summary.splitlines()
+                )
+
+            print(rendered_summary, file=sys.stdout)
             if self.write_f:
-                f_summary = res
+                f_summary = rendered_summary
                 if self.should_colorize:
                     # Strip ANSI codes for file output
                     ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-                    f_summary = ansi_escape.sub("", res)
+                    f_summary = ansi_escape.sub("", rendered_summary)
 
                 # If not already prefixed (it would be if candata was true)
                 if not self.args.candata:
@@ -502,80 +625,81 @@ class J1939Runner:
 
                 self.write_f.write(f_summary + "\n")
 
-    def run(self):
+    def _run_from_can_interface(self):
+        if can is None:
+            raise RuntimeError("Error: 'python-can' is not installed")
+
         bus = None
         try:
-            if self.args.interface:
-                if can is None:
-                    print("Error: 'python-can' is not installed", file=sys.stderr)
-                    sys.exit(1)
-                try:
-                    bus_kwargs = {
-                        "interface": self.args.interface,
-                        "channel": self.args.channel,
-                        "bitrate": self.args.bitrate,
-                        **self.extra_kwargs,
-                    }
-                    # Filter out None values to let python-can use its defaults
-                    bus_kwargs = {k: v for k, v in bus_kwargs.items() if v is not None}
+            bus_kwargs = {
+                "interface": self.args.interface,
+                "channel": self.args.channel,
+                "bitrate": self.args.bitrate,
+                **self.extra_kwargs,
+            }
+            # Filter out None values to let python-can use its defaults
+            bus_kwargs = {k: v for k, v in bus_kwargs.items() if v is not None}
 
-                    if self.can_filters:
-                        bus_kwargs["can_filters"] = self.can_filters
+            if self.can_filters:
+                bus_kwargs["can_filters"] = self.can_filters
 
-                    bus = can.Bus(**bus_kwargs)
-                    print(f"Connected to {bus.__class__.__name__}: {bus.channel_info}")
-                    self.process_messages(bus, self.can_filters)
-                except can.CanError as e:
-                    print(f"CAN error: {e}", file=sys.stderr)
-                    if "Unknown interface" in str(e):
-                        backends = sorted(list(can.interfaces.BACKENDS.keys()))
-                        print(
-                            f"Available interfaces: {', '.join(backends)}",
-                            file=sys.stderr,
-                        )
-                    sys.exit(1)
-            else:
-                f = None
-                if self.args.candump == "-":
-                    f = sys.stdin
-                elif self.args.candump:
-                    try:
-                        f = open(self.args.candump, "r")
-                    except FileNotFoundError:
-                        print(
-                            f"Error: file '{self.args.candump}' not found",
-                            file=sys.stderr,
-                        )
-                        sys.exit(1)
-                else:
-                    print(
-                        "Error: must specify either a log file or an interface (-i)",
-                        file=sys.stderr,
-                    )
-                    sys.exit(1)
-
-                try:
-                    self.process_messages(f, self.can_filters)
-                finally:
-                    if f is not None and f is not sys.stdin:
-                        f.close()
-        except KeyboardInterrupt:
-            print("\nInterrupted by user", file=sys.stderr)
-            sys.exit(0)
+            bus = can.Bus(**bus_kwargs)
+            print(f"Connected to {bus.__class__.__name__}: {bus.channel_info}")
+            self.process_messages(bus, self.can_filters)
+        except can.CanError as e:
+            err_msg = f"CAN error: {e}"
+            if "Unknown interface" in str(e):
+                backends = sorted(list(can.interfaces.BACKENDS.keys()))
+                err_msg += f"\nAvailable interfaces: {', '.join(backends)}"
+            raise RuntimeError(err_msg)
         finally:
             if bus:
                 try:
                     bus.shutdown()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to shutdown bus cleanly: {e}")
+
+    def _run_from_candump(self):
+        candump_file = None
+        if self.args.candump == "-":
+            candump_file = sys.stdin
+        elif self.args.candump:
+            try:
+                candump_file = open(self.args.candump, "r")
+            except FileNotFoundError:
+                raise RuntimeError(f"Error: file '{self.args.candump}' not found")
+        else:
+            raise ValueError(
+                "Error: must specify either a log file or an interface (-i)"
+            )
+
+        try:
+            self.process_messages(candump_file, self.can_filters)
+        finally:
+            if candump_file is not None and candump_file is not sys.stdin:
+                candump_file.close()
+
+    def run(self):
+        try:
+            if self.args.interface:
+                self._run_from_can_interface()
+            else:
+                self._run_from_candump()
+        except KeyboardInterrupt:
+            raise
+        finally:
+            final_descriptions = self.describe_obj.cleanup()
+            for desc in final_descriptions:
+                desc_line = self.render_description(desc, indent=self.args.format)
+                if len(desc_line) > 0:
+                    print(desc_line, flush=True)
+
             self.print_summary()
             if self.write_f:
                 self.write_f.close()
 
 
-def get_parser():
-    parser = argparse.ArgumentParser(description="pretty-printing J1939 candump logs")
-
+def _add_input_options(parser):
     input_group = parser.add_argument_group("Input and Interface Options")
     input_group.add_argument(
         "candump",
@@ -601,6 +725,8 @@ def get_parser():
         help="Bitrate to use for the python-can interface",
     )
 
+
+def _add_filter_options(parser):
     filter_group = parser.add_argument_group("Filtering Options")
     filter_group.add_argument(
         "--filter",
@@ -628,6 +754,8 @@ def get_parser():
         help="Comma or space separated Controller Application filters (matches either SA or DA; supports string lookup)",
     )
 
+
+def _add_highlight_options(parser):
     highlight_group = parser.add_argument_group("Highlighting Options")
     highlight_group.add_argument(
         "--highlight-pgn",
@@ -654,6 +782,8 @@ def get_parser():
         help="Comma or space separated Controller Application addresses to highlight (supports string lookup). Requires --color.",
     )
 
+
+def _add_database_options(parser):
     da_group = parser.add_argument_group("Database Options")
     da_group.add_argument(
         "--da-json",
@@ -662,6 +792,8 @@ def get_parser():
         help='absolute path to the input JSON DA (default: "%(default)s")',
     )
 
+
+def _add_display_options(parser):
     display_group = parser.add_argument_group("Display and Verbosity Options")
     display_group.add_argument(
         "--pgn",
@@ -719,10 +851,10 @@ def get_parser():
     display_group.add_argument(
         "--summary",
         action="store_true",
-        help="(default) Print summary at end",
+        default=None,
+        help="(default) Print summary at end if more than 8 lines of input",
     )
     display_group.add_argument("--no-summary", dest="summary", action="store_false")
-    parser.set_defaults(summary=True)
 
     display_group.add_argument(
         "--real-time",
@@ -758,6 +890,8 @@ def get_parser():
     )
     parser.set_defaults(enable_isotp=True)
 
+
+def _add_output_options(parser):
     output_group = parser.add_argument_group("Output and Formatting Options")
     output_group.add_argument(
         "--candata",
@@ -774,12 +908,42 @@ def get_parser():
         "--write",
         help="Write plain-text output to file (uses --candata=candump)",
     )
+
+
+def get_parser():
+    parser = argparse.ArgumentParser(description="pretty-printing J1939 candump logs")
+    _add_input_options(parser)
+    _add_filter_options(parser)
+    _add_highlight_options(parser)
+    _add_database_options(parser)
+    _add_display_options(parser)
+    _add_output_options(parser)
     return parser
 
 
+def _parse_list_args(arg_list):
+    new_list = []
+    if arg_list:
+        for item in arg_list:
+            for sub_item in item.replace(",", " ").split():
+                new_list.append(sub_item)
+    return new_list
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "viewer":
+        from .viewer import main as viewer_main
+
+        sys.argv.pop(1)
+        try:
+            viewer_main()
+        except ImportError as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+        return
+
     parser = get_parser()
-    args, unknown_args = parser.parse_known_args()
+    cli_args, unknown_args = parser.parse_known_args()
 
     extra_kwargs = {}
     for arg in unknown_args:
@@ -791,15 +955,15 @@ def main():
                 extra_kwargs[arg[2:].replace("-", "_")] = True
 
     can_filters = []
-    if args.filter:
-        for filt in args.filter:
-            if ":" in filt:
-                can_id, can_mask = filt.split(":", 1)
+    if cli_args.filter:
+        for filter_str in cli_args.filter:
+            if ":" in filter_str:
+                can_id, can_mask = filter_str.split(":", 1)
                 can_filters.append(
                     {"can_id": int(can_id, 16), "can_mask": int(can_mask, 16)}
                 )
-            elif "~" in filt:
-                can_id, can_mask = filt.split("~", 1)
+            elif "~" in filter_str:
+                can_id, can_mask = filter_str.split("~", 1)
                 can_filters.append(
                     {
                         "can_id": int(can_id, 16),
@@ -808,69 +972,38 @@ def main():
                     }
                 )
 
-    pgn_list, pgn_filters = [], []
-    if args.filter_pgn:
-        for p in args.filter_pgn:
-            for sub_p in p.replace(",", " ").split():
-                pgn_list.append(sub_p)
+    pgn_list = _parse_list_args(cli_args.filter_pgn)
+    sa_list = _parse_list_args(cli_args.filter_sa)
+    da_list = _parse_list_args(cli_args.filter_da)
+    ca_list = _parse_list_args(cli_args.filter_ca)
 
-    sa_list = []
-    if args.filter_sa:
-        for s in args.filter_sa:
-            for sub_s in s.replace(",", " ").split():
-                sa_list.append(sub_s)
-
-    da_list = []
-    if args.filter_da:
-        for d in args.filter_da:
-            for sub_d in d.replace(",", " ").split():
-                da_list.append(sub_d)
-
-    ca_list = []
-    if args.filter_ca:
-        for c in args.filter_ca:
-            for sub_c in c.replace(",", " ").split():
-                ca_list.append(sub_c)
-
-    h_pgn_list = []
-    if args.highlight_pgn:
-        for p in args.highlight_pgn:
-            for sub_p in p.replace(",", " ").split():
-                h_pgn_list.append(sub_p)
-
-    h_sa_list = []
-    if args.highlight_sa:
-        for s in args.highlight_sa:
-            for sub_s in s.replace(",", " ").split():
-                h_sa_list.append(sub_s)
-
-    h_da_list = []
-    if args.highlight_da:
-        for d in args.highlight_da:
-            for sub_d in d.replace(",", " ").split():
-                h_da_list.append(sub_d)
-
-    h_ca_list = []
-    if args.highlight_ca:
-        for c in args.highlight_ca:
-            for sub_c in c.replace(",", " ").split():
-                h_ca_list.append(sub_c)
+    h_pgn_list = _parse_list_args(cli_args.highlight_pgn)
+    h_sa_list = _parse_list_args(cli_args.highlight_sa)
+    h_da_list = _parse_list_args(cli_args.highlight_da)
+    h_ca_list = _parse_list_args(cli_args.highlight_ca)
 
     # Note: CAN level filters will be populated inside J1939Runner after string resolution
-    runner = J1939Runner(
-        args,
-        extra_kwargs,
-        can_filters,
-        pgn_list,
-        sa_list,
-        da_list,
-        ca_list,
-        highlight_pgns=h_pgn_list,
-        highlight_sas=h_sa_list,
-        highlight_das=h_da_list,
-        highlight_cas=h_ca_list,
-    )
-    runner.run()
+    try:
+        runner = J1939Runner(
+            cli_args,
+            extra_kwargs,
+            can_filters,
+            pgn_list,
+            sa_list,
+            da_list,
+            ca_list,
+            highlight_pgns=h_pgn_list,
+            highlight_sas=h_sa_list,
+            highlight_das=h_da_list,
+            highlight_cas=h_ca_list,
+        )
+        runner.run()
+    except KeyboardInterrupt:
+        print("\nInterrupted by user", file=sys.stderr)
+        sys.exit(0)
+    except (RuntimeError, ValueError, OSError) as e:
+        print(f"{type(e).__name__}: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
