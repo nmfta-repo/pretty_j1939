@@ -30,7 +30,7 @@ logger = logging.getLogger("pretty_j1939.viewer")
 # --- Constants ---
 PRETTY_COL_OFFSET = 50
 WRAP_INDENT = 4
-BOUNCE_BUFFER_WIDTH = 15
+BOUNCE_BUFFER_WIDTH = 25
 REFRESH_RATE_MS = 0.001
 
 # --- Utility Functions ---
@@ -121,6 +121,21 @@ class J1939Viewer:
 
         self.run()
 
+    def _safe_addstr(self, *args, win=None):
+        """Wrapper for addstr that handles null characters."""
+        if not args:
+            return
+        target = win if win else self.stdscr
+        # Support both (str), (str, attr), (y, x, str) and (y, x, str, attr)
+        new_args = list(args)
+        for i, arg in enumerate(new_args):
+            if isinstance(arg, str):
+                new_args[i] = arg.replace("\x00", ".")
+        try:
+            target.addstr(*new_args)
+        except Exception:
+            pass
+
     def _init_curses(self):
         """Sets up curses modes and color pairs."""
         self.stdscr.nodelay(True)
@@ -167,10 +182,20 @@ class J1939Viewer:
         curr_x, num_rows = PRETTY_COL_OFFSET, 1
         max_x = self.screen_w - 1
 
-        for k, v_str, _, _, is_first in HighPerformanceRenderer.iterate_pretty_fields(
+        for (
+            k,
+            v_str,
+            _,
+            _,
+            is_first,
+        ) in HighPerformanceRenderer.iterate_pretty_fields(
             state.description, state.previous_description, self.ui.highlight_changes
         ):
-            kv_len = len(str(k)) + len(v_str) + 2  # "key: value"
+            # Sanitize for curses (must match _draw_pretty_column)
+            k = str(k).replace("\x00", ".")
+            v_str = str(v_str).replace("\x00", ".")
+
+            kv_len = len(k) + len(v_str) + 2  # "key: value"
             sep_len = 0 if is_first else 2  # ", "
 
             if not is_first and curr_x + sep_len + kv_len > max_x:
@@ -195,7 +220,7 @@ class J1939Viewer:
         elif self.ui.selection_cursor is not None:
             text += f" [SELECT: {len(self.ui.marked_ids)} marked]"
 
-        self.stdscr.addstr(0, 0, text[: self.screen_w], curses.A_BOLD)
+        self._safe_addstr(0, 0, text[: self.screen_w], curses.A_BOLD)
 
     def _draw_message_row(self, key: int, start_row: int):
         """Draws a single ID's data across one or more rows."""
@@ -264,9 +289,9 @@ class J1939Viewer:
                 else f"0x{state.msg.arbitration_id:03X}"
             )
 
-            self.stdscr.addstr(screen_row, 0, f"{state.count:<8}", attr_base)
-            self.stdscr.addstr(screen_row, 8, f"{round(state.dt, 2):<8.3f}", attr_base)
-            self.stdscr.addstr(screen_row, 16, f"{marker}{id_hex:<11}", attr_base)
+            self._safe_addstr(screen_row, 0, f"{state.count:<8}", attr_base)
+            self._safe_addstr(screen_row, 8, f"{round(state.dt, 2):<8.3f}", attr_base)
+            self._safe_addstr(screen_row, 16, f"{marker}{id_hex:<11}", attr_base)
 
     def _get_byte_attr(
         self,
@@ -318,13 +343,16 @@ class J1939Viewer:
             attr = self._get_byte_attr(
                 byte_str, is_diff, is_hover, is_marked, attr_base
             )
-            self.stdscr.addstr(screen_row, curr_x, byte_str, attr)
+            self._safe_addstr(screen_row, curr_x, byte_str, attr)
             curr_x += 2
 
         if len(data_hex) > 16:
-            self.stdscr.addstr(screen_row, curr_x, "..", attr_base)
+            self._safe_addstr(screen_row, curr_x, "..", attr_base)
 
     def _draw_pretty_value(self, curr_y, curr_x, v_str, val_attr):
+        # Sanitize string for curses
+        v_str = str(v_str).replace("\x00", ".")
+
         # Apply numeric colorization if using default color and parens are present
         if val_attr == curses.color_pair(3) and "(" in v_str:
             last_end = 0
@@ -334,7 +362,7 @@ class J1939Viewer:
                 room = self.screen_w - 1 - curr_x
                 if room <= 0:
                     break
-                self.stdscr.addstr(curr_y, curr_x, pre[:room], val_attr)
+                self._safe_addstr(curr_y, curr_x, pre[:room], val_attr)
                 curr_x += len(pre[:room])
 
                 # Number itself
@@ -342,7 +370,7 @@ class J1939Viewer:
                 room = self.screen_w - 1 - curr_x
                 if room <= 0:
                     break
-                self.stdscr.addstr(
+                self._safe_addstr(
                     curr_y, curr_x, num_part[:room], curses.color_pair(2)
                 )
                 curr_x += len(num_part[:room])
@@ -353,12 +381,12 @@ class J1939Viewer:
             post = v_str[last_end:]
             room = self.screen_w - 1 - curr_x
             if room > 0:
-                self.stdscr.addstr(curr_y, curr_x, post[:room], val_attr)
+                self._safe_addstr(curr_y, curr_x, post[:room], val_attr)
                 curr_x += len(post[:room])
         else:
             room = self.screen_w - 1 - curr_x
             if room > 0:
-                self.stdscr.addstr(curr_y, curr_x, v_str[:room], val_attr)
+                self._safe_addstr(curr_y, curr_x, v_str[:room], val_attr)
                 curr_x += len(v_str[:room])
         return curr_x
 
@@ -382,38 +410,46 @@ class J1939Viewer:
         ) in HighPerformanceRenderer.iterate_pretty_fields(
             state.description, state.previous_description, self.ui.highlight_changes
         ):
-            kv_len = len(str(k)) + len(v_str) + 2
+            # Sanitize for curses
+            k = str(k).replace("\x00", ".")
+            v_str = str(v_str).replace("\x00", ".")
+
+            kv_len = len(k) + len(v_str) + 2
             sep_len = 0 if is_first else 2
 
             if not is_first and curr_x + sep_len + kv_len > self.screen_w - 1:
                 curr_y += 1
-                curr_x = PRETTY_COL_OFFSET + WRAP_INDENT
+                curr_x = PRETTY_COL_OFFSET + WRAP_INDENT + kv_len
                 sep_len, is_first = 0, True
+            else:
+                curr_x += sep_len + kv_len
+                is_first = False
 
             if curr_y >= self.screen_h:
                 break
             if curr_y < 1:
-                curr_x += sep_len + kv_len
                 continue
+
+            # Calculate where to start drawing this field
+            draw_x = curr_x - kv_len
 
             # Draw separator
             if sep_len:
-                self.stdscr.addstr(
+                self._safe_addstr(
                     curr_y,
-                    curr_x,
+                    draw_x - 2,
                     ", ",
                     attr_base if (is_hover or is_marked) else curses.color_pair(3),
                 )
-                curr_x += 2
 
             # Draw Key
-            self.stdscr.addstr(
+            self._safe_addstr(
                 curr_y,
-                curr_x,
+                draw_x,
                 f"{k}: ",
                 attr_base if (is_hover or is_marked) else curses.color_pair(1),
             )
-            curr_x += len(k) + 2
+            draw_x += len(k) + 2
 
             # Draw Value
             if is_bytes and k in prev_desc and len(v_str) == len(str(prev_desc[k])):
@@ -430,16 +466,16 @@ class J1939Viewer:
                             else curses.color_pair(3)
                         )
                     )
-                    if curr_x + 2 < self.screen_w:
-                        self.stdscr.addstr(curr_y, curr_x, pair, attr)
-                        curr_x += 2
+                    if draw_x + 2 < self.screen_w:
+                        self._safe_addstr(curr_y, draw_x, pair, attr)
+                        draw_x += 2
             else:
                 val_attr = (
                     attr_base
                     if (is_hover or is_marked)
                     else (curses.color_pair(5) if is_changed else curses.color_pair(3))
                 )
-                curr_x = self._draw_pretty_value(curr_y, curr_x, v_str, val_attr)
+                self._draw_pretty_value(curr_y, draw_x, v_str, val_attr)
 
     def _redraw_all(self):
         """Full screen refresh."""
@@ -457,7 +493,7 @@ class J1939Viewer:
         curses.curs_set(1)
         self.stdscr.move(self.screen_h - 1, 0)
         self.stdscr.clrtoeol()
-        self.stdscr.addstr(self.screen_h - 1, 0, prompt)
+        self._safe_addstr(self.screen_h - 1, 0, prompt)
         self.stdscr.refresh()
 
         result = ""
@@ -473,7 +509,7 @@ class J1939Viewer:
                     result = result[:-1]
                     self.stdscr.move(self.screen_h - 1, len(prompt))
                     self.stdscr.clrtoeol()
-                    self.stdscr.addstr(result)
+                    self._safe_addstr(result)
             elif 32 <= ch <= 126:
                 result += chr(ch)
             time.sleep(0.01)
@@ -510,7 +546,7 @@ class J1939Viewer:
         win = curses.newwin(h, w, y, x)
         win.box()
         for i, line in enumerate(lines):
-            win.addstr(i + 2, 2, line[: w - 4])
+            self._safe_addstr(i + 2, 2, line[: w - 4], win=win)
         win.refresh()
         while self.stdscr.getch() == -1:
             time.sleep(0.01)
@@ -652,7 +688,8 @@ class J1939Viewer:
         state.description = new_desc
         new_rows = self._calculate_required_rows(state)
 
-        if new_rows != state.num_rows:
+        # Allow growth, but never shrink - prevents UI 'bouncing'
+        if new_rows > state.num_rows:
             state.num_rows = new_rows
             self._redraw_all()
         else:
