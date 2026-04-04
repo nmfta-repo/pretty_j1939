@@ -26,6 +26,7 @@ except ImportError:
     can = None
 
 from . import describe
+from .describe import get_describer, J1939Filter
 from .parse import parse_j1939_id
 from .render import HighPerformanceRenderer, NUM_IN_PARENS_RE
 
@@ -48,14 +49,6 @@ class J1939Runner:
         self.args = cli_args
         self.extra_kwargs = extra_kwargs
         self.can_filters = can_filters
-        self.pgn_list = pgn_list
-        self.sa_list = sa_list
-        self.da_list = da_list
-        self.ca_list = ca_list
-        self.highlight_pgns = highlight_pgns or []
-        self.highlight_sas = highlight_sas or []
-        self.highlight_das = highlight_das or []
-        self.highlight_cas = highlight_cas or []
 
         self.summary_data = {}
         self.message_count = 0
@@ -82,7 +75,7 @@ class J1939Runner:
             legacy_windows=False,
         )
 
-        self.describe_obj = describe.get_describer(
+        self.describe_obj = get_describer(
             da_json=cli_args.da_json,
             describe_pgns=cli_args.pgn,
             describe_spns=cli_args.spn,
@@ -105,25 +98,20 @@ class J1939Runner:
             cli_args.color == "auto" and sys.stdout.isatty()
         )
 
-        # Resolve string-based filters/highlights
-        self.pgn_list = self._resolve_pgns(pgn_list)
-        self.sa_list = self._resolve_addrs(sa_list, "Source Address")
-        self.da_list = self._resolve_addrs(da_list, "Destination Address")
-        self.ca_list = self._resolve_addrs(ca_list, "Controller Application")
-
-        self.highlight_pgns = self._resolve_pgns(highlight_pgns)
-        self.highlight_sas = self._resolve_addrs(
-            highlight_sas, "Source Address highlight"
+        # Initialize J1939 filters and highlights
+        self.filter = J1939Filter(
+            self.describe_obj.da_describer, pgn_list, sa_list, da_list, ca_list
         )
-        self.highlight_das = self._resolve_addrs(
-            highlight_das, "Destination Address highlight"
-        )
-        self.highlight_cas = self._resolve_addrs(
-            highlight_cas, "Controller Application highlight"
+        self.highlight_filter = J1939Filter(
+            self.describe_obj.da_describer,
+            highlight_pgns,
+            highlight_sas,
+            highlight_das,
+            highlight_cas,
         )
 
         # Generate J1939 CAN-level filters
-        self._generate_can_filters()
+        self.can_filters = self.filter.generate_can_filters(self.can_filters)
 
         self.write_f = None
         if cli_args.write:
@@ -133,163 +121,6 @@ class J1939Runner:
                 raise RuntimeError(
                     f"Error: Failed to open output file '{cli_args.write}': {e}"
                 )
-
-    def _resolve_pgns(self, raw_inputs):
-        if not raw_inputs:
-            return []
-        resolved = set()
-        for pgn_input in raw_inputs:
-            if isinstance(pgn_input, int):
-                resolved.add(pgn_input)
-                continue
-
-            # Check if it's a numeric string
-            try:
-                pgn_val = (
-                    int(pgn_input, 16) if pgn_input.startswith("0x") else int(pgn_input)
-                )
-                resolved.add(pgn_val)
-            except ValueError:
-                # Resolve via database
-                matches = self.describe_obj.da_describer.resolve_pgn(pgn_input)
-                if not matches:
-                    raise ValueError(
-                        f"Error: '{pgn_input}' did not match any PGN in the database."
-                    )
-                print(
-                    f"Resolving PGN filter '{pgn_input}' to PGNs: {', '.join(map(str, matches))}",
-                    file=sys.stderr,
-                )
-                resolved.update(matches)
-        return list(resolved)
-
-    def _resolve_addrs(self, raw_inputs, category):
-        if not raw_inputs:
-            return []
-        resolved = set()
-        for addr_input in raw_inputs:
-            if isinstance(addr_input, int):
-                resolved.add(addr_input)
-                continue
-
-            try:
-                addr_val = (
-                    int(addr_input, 16)
-                    if addr_input.startswith("0x")
-                    else int(addr_input)
-                )
-                resolved.add(addr_val)
-            except ValueError:
-                matches = self.describe_obj.da_describer.resolve_address(addr_input)
-                if not matches:
-                    raise ValueError(
-                        f"Error: '{addr_input}' did not match any {category} in the database."
-                    )
-                print(
-                    f"Resolving {category} filter '{addr_input}' to addresses: {', '.join(map(str, matches))}",
-                    file=sys.stderr,
-                )
-                resolved.update(matches)
-        return list(resolved)
-
-    def _get_pgn_filters(self):
-        pgn_filters = []
-        for pgn_val in self.pgn_list:
-            pf = (pgn_val >> 8) & 0xFF
-            if pf < 240:
-                pgn_filters.append(((pgn_val << 8), 0x03FF0000))
-            else:
-                pgn_filters.append(((pgn_val << 8), 0x03FFFF00))
-        return pgn_filters
-
-    def _get_sa_filters(self):
-        return [(sa_val, 0x000000FF) for sa_val in self.sa_list]
-
-    def _get_da_filters(self):
-        return [((da_val << 8), 0x0000FF00) for da_val in self.da_list]
-
-    def _add_filter(self, can_id, can_mask):
-        self.can_filters.append(
-            {"can_id": can_id, "can_mask": can_mask, "extended": True}
-        )
-
-    def _add_combined_filters(self, pgn_filters, sa_filters, da_filters):
-        from itertools import product
-
-        tmp_pgn_filters = pgn_filters if pgn_filters else [(0, 0)]
-        tmp_sa_filters = sa_filters if sa_filters else [(0, 0)]
-        tmp_da_filters = da_filters if da_filters else [(0, 0)]
-
-        if not self.ca_list:
-            for pf, sf, df in product(tmp_pgn_filters, tmp_sa_filters, tmp_da_filters):
-                self._add_filter(pf[0] | sf[0] | df[0], pf[1] | sf[1] | df[1])
-        else:
-            for controller_addr in self.ca_list:
-                # 1. Match SA == controller_addr
-                sas_to_use = (
-                    [(controller_addr, 0x000000FF)]
-                    if any(
-                        s_mask == 0 or (controller_addr & s_mask) == (s_val & s_mask)
-                        for s_val, s_mask in tmp_sa_filters
-                    )
-                    else []
-                )
-                if sas_to_use:
-                    for pf, sf, df in product(
-                        tmp_pgn_filters, sas_to_use, tmp_da_filters
-                    ):
-                        self._add_filter(pf[0] | sf[0] | df[0], pf[1] | sf[1] | df[1])
-                # 2. Match DA == controller_addr
-                das_to_use = (
-                    [((controller_addr << 8), 0x0000FF00)]
-                    if any(
-                        d_mask == 0
-                        or ((controller_addr << 8) & d_mask) == (d_val & d_mask)
-                        for d_val, d_mask in tmp_da_filters
-                    )
-                    else []
-                )
-                if das_to_use:
-                    for pf, sf, df in product(
-                        tmp_pgn_filters, tmp_sa_filters, das_to_use
-                    ):
-                        self._add_filter(pf[0] | sf[0] | df[0], pf[1] | sf[1] | df[1])
-
-    def _add_transport_pgn_filters(self, sa_filters, da_filters):
-        from itertools import product
-
-        if not self.pgn_list:
-            return
-
-        tmp_sa_filters = sa_filters if sa_filters else [(0, 0)]
-        tmp_da_filters = da_filters if da_filters else [(0, 0)]
-
-        for tp_pgn in [60416, 60160, 59392]:
-            tp_pf = (tp_pgn << 8, 0x03FF0000)
-            if not self.ca_list:
-                for _, sf, df in product([(0, 0)], tmp_sa_filters, tmp_da_filters):
-                    self._add_filter(tp_pf[0] | sf[0] | df[0], tp_pf[1] | sf[1] | df[1])
-            else:
-                for controller_addr in self.ca_list:
-                    self._add_filter(tp_pf[0] | controller_addr, tp_pf[1] | 0x000000FF)
-                    self._add_filter(
-                        tp_pf[0] | (controller_addr << 8), tp_pf[1] | 0x0000FF00
-                    )
-
-    def _generate_can_filters(self):
-        """Generate CAN-level filters from J1939 filter criteria."""
-        if not (self.pgn_list or self.sa_list or self.da_list or self.ca_list):
-            return
-
-        pgn_filters = self._get_pgn_filters()
-        sa_filters = self._get_sa_filters()
-        da_filters = self._get_da_filters()
-
-        if not self.can_filters:
-            self.can_filters = []
-
-        self._add_combined_filters(pgn_filters, sa_filters, da_filters)
-        self._add_transport_pgn_filters(sa_filters, da_filters)
 
     def render_description(
         self,
@@ -449,49 +280,20 @@ class J1939Runner:
         return False
 
     def _matches_j1939_filters(self, description):
-        if not (self.pgn_list or self.sa_list or self.da_list or self.ca_list):
-            return True
-
-        msg_pgn = description.get("_pgn")
-        msg_sa = description.get("_sa")
-        msg_da = description.get("_da")
-
-        if self.pgn_list and msg_pgn not in self.pgn_list:
-            return False
-        if self.sa_list and msg_sa not in self.sa_list:
-            return False
-        if self.da_list and msg_da not in self.da_list:
-            return False
-        if self.ca_list and msg_sa not in self.ca_list and msg_da not in self.ca_list:
-            return False
-
-        return True
+        return self.filter.matches(description)
 
     def _check_highlight(self, description):
+        # highlight_filter logic is: if any criteria match, it's a highlight.
+        # J1939Filter.matches() returns True if NO criteria are set.
+        # So we need to ensure highlight_filter actually has something set.
         if not (
-            self.highlight_pgns
-            or self.highlight_sas
-            or self.highlight_das
-            or self.highlight_cas
+            self.highlight_filter.pgn_list
+            or self.highlight_filter.sa_list
+            or self.highlight_filter.da_list
+            or self.highlight_filter.ca_list
         ):
             return False
-
-        msg_pgn = description.get("_pgn")
-        msg_sa = description.get("_sa")
-        msg_da = description.get("_da")
-
-        if (
-            (self.highlight_pgns and msg_pgn in self.highlight_pgns)
-            or (self.highlight_sas and msg_sa in self.highlight_sas)
-            or (self.highlight_das and msg_da in self.highlight_das)
-            or (
-                self.highlight_cas
-                and (msg_sa in self.highlight_cas or msg_da in self.highlight_cas)
-            )
-        ):
-            return True
-
-        return False
+        return self.highlight_filter.matches(description, any_match=True)
 
     def _render_and_output(
         self,

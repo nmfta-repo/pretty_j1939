@@ -130,6 +130,196 @@ NA_NAN = float("nan")
 EMPTY_BITS = bitstring.Bits(bytes=b"")
 
 
+class J1939Filter:
+    """Handles J1939-specific filtering and CAN-level filter generation."""
+
+    def __init__(
+        self,
+        da_describer,
+        pgn_list=None,
+        sa_list=None,
+        da_list=None,
+        ca_list=None,
+    ):
+        self.da_describer = da_describer
+        self.pgn_list = self._resolve_pgns(pgn_list)
+        self.sa_list = self._resolve_addrs(sa_list, "Source Address")
+        self.da_list = self._resolve_addrs(da_list, "Destination Address")
+        self.ca_list = self._resolve_addrs(ca_list, "Controller Application")
+
+    def _resolve_pgns(self, raw_inputs):
+        if not raw_inputs:
+            return []
+        resolved = set()
+        for pgn_input in raw_inputs:
+            if isinstance(pgn_input, int):
+                resolved.add(pgn_input)
+                continue
+
+            # Check if it's a numeric string
+            try:
+                pgn_val = (
+                    int(pgn_input, 16) if pgn_input.startswith("0x") else int(pgn_input)
+                )
+                resolved.add(pgn_val)
+            except ValueError:
+                # Resolve via database
+                matches = self.da_describer.resolve_pgn(pgn_input)
+                if not matches:
+                    raise ValueError(
+                        f"Error: '{pgn_input}' did not match any PGN in the database."
+                    )
+                print(
+                    f"Resolving PGN filter '{pgn_input}' to PGNs: {', '.join(map(str, matches))}",
+                    file=sys.stderr,
+                )
+                resolved.update(matches)
+        return list(resolved)
+
+    def _resolve_addrs(self, raw_inputs, category):
+        if not raw_inputs:
+            return []
+        resolved = set()
+        for addr_input in raw_inputs:
+            if isinstance(addr_input, int):
+                resolved.add(addr_input)
+                continue
+
+            try:
+                addr_val = (
+                    int(addr_input, 16)
+                    if addr_input.startswith("0x")
+                    else int(addr_input)
+                )
+                resolved.add(addr_val)
+            except ValueError:
+                matches = self.da_describer.resolve_address(addr_input)
+                if not matches:
+                    raise ValueError(
+                        f"Error: '{addr_input}' did not match any {category} in the database."
+                    )
+                print(
+                    f"Resolving {category} filter '{addr_input}' to addresses: {', '.join(map(str, matches))}",
+                    file=sys.stderr,
+                )
+                resolved.update(matches)
+        return list(resolved)
+
+    def matches(self, description, any_match=False):
+        """Checks if a message description matches the filter criteria."""
+        if not (self.pgn_list or self.sa_list or self.da_list or self.ca_list):
+            return True
+
+        msg_pgn = description.get("_pgn")
+        msg_sa = description.get("_sa")
+        msg_da = description.get("_da")
+
+        if any_match:
+            if self.pgn_list and msg_pgn in self.pgn_list:
+                return True
+            if self.sa_list and msg_sa in self.sa_list:
+                return True
+            if self.da_list and msg_da in self.da_list:
+                return True
+            if self.ca_list and (msg_sa in self.ca_list or msg_da in self.ca_list):
+                return True
+            return False
+        else:
+            if self.pgn_list and msg_pgn not in self.pgn_list:
+                return False
+            if self.sa_list and msg_sa not in self.sa_list:
+                return False
+            if self.da_list and msg_da not in self.da_list:
+                return False
+            if (
+                self.ca_list
+                and msg_sa not in self.ca_list
+                and msg_da not in self.ca_list
+            ):
+                return False
+            return True
+
+    def generate_can_filters(self, initial_filters=None):
+        """Generate CAN-level filters from J1939 filter criteria."""
+        if not (self.pgn_list or self.sa_list or self.da_list or self.ca_list):
+            return initial_filters
+
+        can_filters = list(initial_filters) if initial_filters else []
+
+        pgn_filters = []
+        for pgn_val in self.pgn_list:
+            pf = (pgn_val >> 8) & 0xFF
+            if pf < 240:
+                pgn_filters.append(((pgn_val << 8), 0x03FF0000))
+            else:
+                pgn_filters.append(((pgn_val << 8), 0x03FFFF00))
+
+        sa_filters = [(sa_val, 0x000000FF) for sa_val in self.sa_list]
+        da_filters = [((da_val << 8), 0x0000FF00) for da_val in self.da_list]
+
+        from itertools import product
+
+        tmp_pgn_filters = pgn_filters if pgn_filters else [(0, 0)]
+        tmp_sa_filters = sa_filters if sa_filters else [(0, 0)]
+        tmp_da_filters = da_filters if da_filters else [(0, 0)]
+
+        def add_filter(pf, sf, df):
+            can_filters.append(
+                {
+                    "can_id": pf[0] | sf[0] | df[0],
+                    "can_mask": pf[1] | sf[1] | df[1],
+                    "extended": True,
+                }
+            )
+
+        if not self.ca_list:
+            for pf, sf, df in product(tmp_pgn_filters, tmp_sa_filters, tmp_da_filters):
+                add_filter(pf, sf, df)
+        else:
+            for controller_addr in self.ca_list:
+                sas_to_use = (
+                    [(controller_addr, 0x000000FF)]
+                    if any(
+                        s_mask == 0 or (controller_addr & s_mask) == (s_val & s_mask)
+                        for s_val, s_mask in tmp_sa_filters
+                    )
+                    else []
+                )
+                if sas_to_use:
+                    for pf, sf, df in product(
+                        tmp_pgn_filters, sas_to_use, tmp_da_filters
+                    ):
+                        add_filter(pf, sf, df)
+                das_to_use = (
+                    [((controller_addr << 8), 0x0000FF00)]
+                    if any(
+                        d_mask == 0
+                        or ((controller_addr << 8) & d_mask) == (d_val & d_mask)
+                        for d_val, d_mask in tmp_da_filters
+                    )
+                    else []
+                )
+                if das_to_use:
+                    for pf, sf, df in product(
+                        tmp_pgn_filters, tmp_sa_filters, das_to_use
+                    ):
+                        add_filter(pf, sf, df)
+
+        # Include transport PGNs if PGN filtering is active
+        if self.pgn_list:
+            for tp_pgn in [60416, 60160, 59392]:
+                tp_pf = (tp_pgn << 8, 0x03FF0000)
+                if not self.ca_list:
+                    for _, sf, df in product([(0, 0)], tmp_sa_filters, tmp_da_filters):
+                        add_filter(tp_pf, sf, df)
+                else:
+                    for c in self.ca_list:
+                        add_filter(tp_pf, (c, 0x000000FF), (0, 0))
+                        add_filter(tp_pf, (0, 0), ((c << 8), 0x0000FF00))
+
+        return can_filters
+
+
 class NameTracker:
     """Tracks J1939 ECU names dynamically from Address Claimed (PGN 60928) messages."""
 

@@ -89,6 +89,7 @@ def test_summary_merging_and_abbreviation():
     json_output = renderer.render_summary(summary_data, indent=True)
     # Parse the JSON since color_system=None now returns JSON
     import json
+
     summary_obj = json.loads(json_output)
     graph = summary_obj["Summary"]
 

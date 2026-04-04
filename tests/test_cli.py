@@ -189,21 +189,26 @@ def test_cli_filter_sa_string():
             os.remove(log_file)
 
 
-def test_cli_highlight_pgn():
-    """Verify CLI highlighting for PGNs."""
-    # Create a temp log with PGN 61444
-    log_file = "test_highlight_pgn_temp.log"
+def test_cli_highlight_multiple():
+    """Verify CLI highlighting for multiple criteria (OR-based matching)."""
+    # Create a log with two different messages
+    log_file = "test_highlight_multiple_temp.log"
     with open(log_file, "w") as f:
-        f.write("(1612543138.000000) vcan0 0CF00400#0041FF20481400F0\n")
+        # PGN 61444, SA 128
+        f.write("(1612543138.000000) vcan0 0CF00480#0041FF20481400F0\n")
+        # PGN 65259, SA 0
+        f.write("(1612543138.001000) vcan0 18FEEB00#0102030405060708\n")
 
-    # Explicitly use the project's database to avoid environment-specific failures
     db_path = os.path.join("pretty_j1939", "J1939db.json")
     try:
+        # Highlight PGN 61444 OR SA 0
         stdout, stderr, code = run_cli(
             [
                 log_file,
                 "--highlight-pgn",
                 "61444",
+                "--highlight-sa",
+                "0",
                 "--color",
                 "always",
                 "--da-json",
@@ -211,8 +216,9 @@ def test_cli_highlight_pgn():
             ]
         )
         assert code == 0
-        # Check for bright white highlight color (255;255;255)
-        assert "255;255;255" in stdout
+        # Both lines should contain the highlight color (255;255;255)
+        # Line 1 matches PGN 61444. Line 2 matches SA 0.
+        assert stdout.count("255;255;255") >= 2
     finally:
         if os.path.exists(log_file):
             os.remove(log_file)

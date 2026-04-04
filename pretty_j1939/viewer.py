@@ -22,7 +22,7 @@ except ImportError:
 if TYPE_CHECKING:
     import can
 
-from .describe import get_describer
+from .describe import get_describer, J1939Filter
 from .render import HighPerformanceRenderer, NUM_IN_PARENS_RE
 
 logger = logging.getLogger("pretty_j1939.viewer")
@@ -102,11 +102,17 @@ class UIState:
 
 class J1939Viewer:
     def __init__(
-        self, stdscr, bus: can.Bus, describer, theme_name: Optional[str] = None
+        self,
+        stdscr,
+        bus: can.Bus,
+        describer,
+        theme_name: Optional[str] = None,
+        j1939_filter: Optional[J1939Filter] = None,
     ):
         self.stdscr = stdscr
         self.bus = bus
         self.describer = describer
+        self.j1939_filter = j1939_filter
         self.ui = UIState()
 
         # Theme and Colors
@@ -370,9 +376,7 @@ class J1939Viewer:
                 room = self.screen_w - 1 - curr_x
                 if room <= 0:
                     break
-                self._safe_addstr(
-                    curr_y, curr_x, num_part[:room], curses.color_pair(2)
-                )
+                self._safe_addstr(curr_y, curr_x, num_part[:room], curses.color_pair(2))
                 curr_x += len(num_part[:room])
 
                 last_end = match.end(2)
@@ -649,6 +653,13 @@ class J1939Viewer:
 
     def _process_message(self, msg: can.Message):
         """Decodes message and updates internal state."""
+        new_desc = self.describer(msg.data, msg.arbitration_id)
+        if not new_desc:
+            return
+
+        if self.j1939_filter and not self.j1939_filter.matches(new_desc):
+            return
+
         key = msg.arbitration_id | (1 << 32 if msg.is_extended_id else 0)
 
         if key not in self.messages:
@@ -664,8 +675,6 @@ class J1939Viewer:
 
         state = self.messages[key]
         state.count += 1
-
-        new_desc = self.describer(msg.data, msg.arbitration_id)
 
         # Logging check
         if key in self.ui.active_logging_ids and self.ui.log_file_handle:
@@ -731,7 +740,7 @@ def main():
             "Error: 'python-can' is not installed. Curses viewer requires 'python-can'."
         )
 
-    from .__main__ import get_parser
+    from .__main__ import get_parser, _parse_list_args
 
     parser = get_parser()
     parser.description = "Pretty J1939 Curses Viewer"
@@ -765,17 +774,6 @@ def main():
                     }
                 )
 
-    bus_kwargs = {
-        "interface": args.interface,
-        "channel": args.channel,
-        "bitrate": args.bitrate,
-        **extra_kwargs,
-    }
-    # Filter out None values to let python-can use its defaults
-    bus_kwargs = {k: v for k, v in bus_kwargs.items() if v is not None}
-    if can_filters:
-        bus_kwargs["can_filters"] = can_filters
-
     describer = get_describer(
         da_json=args.da_json,
         describe_pgns=args.pgn,
@@ -789,6 +787,27 @@ def main():
         enable_isotp=args.enable_isotp,
     )
 
+    pgn_list = _parse_list_args(args.filter_pgn)
+    sa_list = _parse_list_args(args.filter_sa)
+    da_list = _parse_list_args(args.filter_da)
+    ca_list = _parse_list_args(args.filter_ca)
+
+    j1939_filter = J1939Filter(
+        describer.da_describer, pgn_list, sa_list, da_list, ca_list
+    )
+    can_filters = j1939_filter.generate_can_filters(can_filters)
+
+    bus_kwargs = {
+        "interface": args.interface,
+        "channel": args.channel,
+        "bitrate": args.bitrate,
+        **extra_kwargs,
+    }
+    # Filter out None values to let python-can use its defaults
+    bus_kwargs = {k: v for k, v in bus_kwargs.items() if v is not None}
+    if can_filters:
+        bus_kwargs["can_filters"] = can_filters
+
     try:
         bus = can.Bus(**bus_kwargs)
         curses.wrapper(
@@ -796,9 +815,10 @@ def main():
             bus,
             describer,
             theme_name=args.theme,
+            j1939_filter=j1939_filter,
         )
-    except can.CanError as e:
-        print(f"Error: Failed to open CAN bus: {e}", file=sys.stderr)
+    except (can.CanError, ValueError, RuntimeError) as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:
         logger.info("Viewer terminated by user")
