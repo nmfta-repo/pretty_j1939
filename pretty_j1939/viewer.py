@@ -130,17 +130,12 @@ class J1939Viewer:
         self.run()
 
     def _safe_addstr(self, *args, win=None):
-        """Wrapper for addstr that handles null characters."""
+        """Wrapper for addstr that handles exceptions."""
         if not args:
             return
         target = win if win else self.stdscr
-        # Support both (str), (str, attr), (y, x, str) and (y, x, str, attr)
-        new_args = list(args)
-        for i, arg in enumerate(new_args):
-            if isinstance(arg, str):
-                new_args[i] = arg.replace("\x00", ".")
         try:
-            target.addstr(*new_args)
+            target.addstr(*args)
         except Exception:
             pass
 
@@ -199,11 +194,7 @@ class J1939Viewer:
         ) in HighPerformanceRenderer.iterate_pretty_fields(
             state.description, state.previous_description, self.ui.highlight_changes
         ):
-            # Sanitize for curses (must match _draw_pretty_column)
-            k = str(k).replace("\x00", ".")
-            v_str = str(v_str).replace("\x00", ".")
-
-            kv_len = len(k) + len(v_str) + 2  # "key: value"
+            kv_len = len(str(k)) + len(str(v_str)) + 2  # "key: value"
             sep_len = 0 if is_first else 2  # ", "
 
             if not is_first and curr_x + sep_len + kv_len > max_x:
@@ -394,9 +385,6 @@ class J1939Viewer:
             self._safe_addstr(screen_row, curr_x, "..", attr_base)
 
     def _draw_pretty_value(self, curr_y, curr_x, v_str, val_attr):
-        # Sanitize string for curses
-        v_str = str(v_str).replace("\x00", ".")
-
         # Apply numeric colorization if using default color and parens are present
         if val_attr == curses.color_pair(3) and "(" in v_str:
             last_end = 0
@@ -452,11 +440,7 @@ class J1939Viewer:
         ) in HighPerformanceRenderer.iterate_pretty_fields(
             state.description, state.previous_description, self.ui.highlight_changes
         ):
-            # Sanitize for curses
-            k = str(k).replace("\x00", ".")
-            v_str = str(v_str).replace("\x00", ".")
-
-            kv_len = len(k) + len(v_str) + 2
+            kv_len = len(str(k)) + len(str(v_str)) + 2
             sep_len = 0 if is_first else 2
 
             if not is_first and curr_x + sep_len + kv_len > self.screen_w - 1:
@@ -476,8 +460,8 @@ class J1939Viewer:
             draw_x = curr_x - kv_len
 
             is_search_match = self.ui.search_term and (
-                self.ui.search_term.lower() in k.lower()
-                or self.ui.search_term.lower() in v_str.lower()
+                self.ui.search_term.lower() in str(k).lower()
+                or self.ui.search_term.lower() in str(v_str).lower()
             )
 
             # Draw separator
@@ -501,14 +485,18 @@ class J1939Viewer:
                 f"{k}: ",
                 key_attr,
             )
-            draw_x += len(k) + 2
+            draw_x += len(str(k)) + 2
 
             # Draw Value
-            if is_bytes and k in prev_desc and len(v_str) == len(str(prev_desc[k])):
+            if (
+                is_bytes
+                and k in prev_desc
+                and len(str(v_str)) == len(str(prev_desc[k]))
+            ):
                 # Special granular byte highlight
                 prev_v_str = str(prev_desc[k])
-                for i in range(0, len(v_str), 2):
-                    pair, p_pair = v_str[i : i + 2], prev_v_str[i : i + 2]
+                for i in range(0, len(str(v_str)), 2):
+                    pair, p_pair = str(v_str)[i : i + 2], prev_v_str[i : i + 2]
                     attr = (
                         curses.color_pair(5)
                         if is_search_match
@@ -579,10 +567,7 @@ class J1939Viewer:
         for k, v in state.description.items():
             if k.startswith("_"):
                 continue
-            # Match the sanitized versions that are actually displayed
-            k_disp = str(k).replace("\x00", ".")
-            v_disp = str(v).replace("\x00", ".")
-            if term in k_disp.lower() or term in v_disp.lower():
+            if term in str(k).lower() or term in str(v).lower():
                 return True
         return False
 
