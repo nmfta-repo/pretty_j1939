@@ -22,14 +22,14 @@ class HighPerformanceRenderer:
     BOUNCE_BUFFER_WIDTH = 25
 
     DEFAULT_THEME = {
-        "keys": "#3465a4",
-        "strings": "default",
-        "numbers": "#f57900",
+        "keys": "#FFCD00",
+        "strings": "#FFFFFF",
+        "numbers": "#007A33",
         "disabled_bytes": "#555753",
         "zero_bytes": "#babdb6",
-        "ascii_bytes": "#75507b",
-        "normal_bytes": "default",
-        "highlight": "#ffffff",
+        "ascii_bytes": "#007A33",
+        "normal_bytes": "#FFFFFF",
+        "highlight": "#FFCD00",
     }
 
     @staticmethod

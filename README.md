@@ -184,7 +184,7 @@ Key features of the viewer:
 - **Interactive Scrolling:** Use arrow keys or Page Up/Down to navigate the message history.
 - **Bytes Column:** Displays the raw hex data alongside the decoded PGN and SA/DA information.
 - **Real-time Decoding:** Messages are decoded instantly as they arrive, including transport reassembly.
-- **Theming:** Supports multiple color themes (e.g., `darcula`, `monokai`, `synthwave`) via the `--theme` flag.
+- **Theming:** Supports multiple color themes (e.g., `shipfreight` (default), `darcula`, `monokai`, `synthwave`) via the `--theme` flag.
 - **Search/Filter:** Press `/` to enter a search term (PGN label or address name) to filter the visible list in real-time.
 
 You can also use the viewer on log files:
