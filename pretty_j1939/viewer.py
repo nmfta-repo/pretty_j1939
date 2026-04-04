@@ -90,6 +90,8 @@ class UIState:
         self.scroll: int = 0
         self.paused: bool = False
         self.highlight_changes: bool = False
+        self.search_term: str = ""
+        self.search_direction: int = 1  # 1 for forward, -1 for backward
         self.selection_cursor: Optional[int] = None
         self.marked_ids: Set[int] = set()
         self.active_logging_ids: Set[int] = set()
@@ -294,10 +296,34 @@ class J1939Viewer:
                 if state.msg.is_extended_id
                 else f"0x{state.msg.arbitration_id:03X}"
             )
+            count_str = f"{state.count:<8}"
+            dt_str = f"{round(state.dt, 2):<8.3f}"
+            id_col_str = f"{marker}{id_hex:<11}"
 
-            self._safe_addstr(screen_row, 0, f"{state.count:<8}", attr_base)
-            self._safe_addstr(screen_row, 8, f"{round(state.dt, 2):<8.3f}", attr_base)
-            self._safe_addstr(screen_row, 16, f"{marker}{id_hex:<11}", attr_base)
+            search_highlight = curses.color_pair(5)
+
+            c_attr = (
+                search_highlight
+                if self.ui.search_term
+                and self.ui.search_term.lower() in count_str.lower()
+                else attr_base
+            )
+            self._safe_addstr(screen_row, 0, count_str, c_attr)
+
+            d_attr = (
+                search_highlight
+                if self.ui.search_term and self.ui.search_term.lower() in dt_str.lower()
+                else attr_base
+            )
+            self._safe_addstr(screen_row, 8, dt_str, d_attr)
+
+            i_attr = (
+                search_highlight
+                if self.ui.search_term
+                and self.ui.search_term.lower() in id_col_str.lower()
+                else attr_base
+            )
+            self._safe_addstr(screen_row, 16, id_col_str, i_attr)
 
     def _get_byte_attr(
         self,
@@ -306,7 +332,10 @@ class J1939Viewer:
         is_hover: bool,
         is_marked: bool,
         attr_base: int,
+        is_search_match: bool = False,
     ) -> int:
+        if is_search_match:
+            return curses.color_pair(5)
         if is_hover or is_marked:
             return attr_base
         if is_diff and self.ui.highlight_changes:
@@ -340,6 +369,10 @@ class J1939Viewer:
         data_hex = state.msg.data.hex().upper()
         prev_data_hex = getattr(state, "previous_data_hex", "")
 
+        is_search_match = (
+            self.ui.search_term and self.ui.search_term.upper() in data_hex
+        )
+
         for i in range(0, min(len(data_hex), 16), 2):
             byte_str = data_hex[i : i + 2]
             is_diff = False
@@ -347,7 +380,12 @@ class J1939Viewer:
                 is_diff = byte_str != prev_data_hex[i : i + 2]
 
             attr = self._get_byte_attr(
-                byte_str, is_diff, is_hover, is_marked, attr_base
+                byte_str,
+                is_diff,
+                is_hover,
+                is_marked,
+                attr_base,
+                is_search_match=is_search_match,
             )
             self._safe_addstr(screen_row, curr_x, byte_str, attr)
             curr_x += 2
@@ -437,6 +475,11 @@ class J1939Viewer:
             # Calculate where to start drawing this field
             draw_x = curr_x - kv_len
 
+            is_search_match = self.ui.search_term and (
+                self.ui.search_term.lower() in k.lower()
+                or self.ui.search_term.lower() in v_str.lower()
+            )
+
             # Draw separator
             if sep_len:
                 self._safe_addstr(
@@ -447,11 +490,16 @@ class J1939Viewer:
                 )
 
             # Draw Key
+            key_attr = (
+                curses.color_pair(5)
+                if is_search_match
+                else (attr_base if (is_hover or is_marked) else curses.color_pair(1))
+            )
             self._safe_addstr(
                 curr_y,
                 draw_x,
                 f"{k}: ",
-                attr_base if (is_hover or is_marked) else curses.color_pair(1),
+                key_attr,
             )
             draw_x += len(k) + 2
 
@@ -462,12 +510,16 @@ class J1939Viewer:
                 for i in range(0, len(v_str), 2):
                     pair, p_pair = v_str[i : i + 2], prev_v_str[i : i + 2]
                     attr = (
-                        attr_base
-                        if (is_hover or is_marked)
+                        curses.color_pair(5)
+                        if is_search_match
                         else (
-                            curses.color_pair(5)
-                            if (self.ui.highlight_changes and pair != p_pair)
-                            else curses.color_pair(3)
+                            attr_base
+                            if (is_hover or is_marked)
+                            else (
+                                curses.color_pair(5)
+                                if (self.ui.highlight_changes and pair != p_pair)
+                                else curses.color_pair(3)
+                            )
                         )
                     )
                     if draw_x + 2 < self.screen_w:
@@ -475,9 +527,15 @@ class J1939Viewer:
                         draw_x += 2
             else:
                 val_attr = (
-                    attr_base
-                    if (is_hover or is_marked)
-                    else (curses.color_pair(5) if is_changed else curses.color_pair(3))
+                    curses.color_pair(5)
+                    if is_search_match
+                    else (
+                        attr_base
+                        if (is_hover or is_marked)
+                        else (
+                            curses.color_pair(5) if is_changed else curses.color_pair(3)
+                        )
+                    )
                 )
                 self._draw_pretty_value(curr_y, draw_x, v_str, val_attr)
 
@@ -490,6 +548,86 @@ class J1939Viewer:
             curr_row += self.messages[key].num_rows
 
     # --- Interaction ---
+
+    def _message_matches(self, key: int, term: str) -> bool:
+        """Checks if a message's displayed text matches the search term."""
+        if not term:
+            return False
+        state = self.messages.get(key)
+        if not state:
+            return False
+        term = term.lower()
+
+        # Metadata
+        id_hex = (
+            f"0x{state.msg.arbitration_id:08X}"
+            if state.msg.is_extended_id
+            else f"0x{state.msg.arbitration_id:03X}"
+        )
+        if term in id_hex.lower():
+            return True
+        if term in str(state.count).lower():
+            return True
+        if term in f"{state.dt:.3f}".lower():
+            return True
+
+        # Bytes
+        if term in state.msg.data.hex().lower():
+            return True
+
+        # Pretty fields
+        for k, v in state.description.items():
+            if k.startswith("_"):
+                continue
+            # Match the sanitized versions that are actually displayed
+            k_disp = str(k).replace("\x00", ".")
+            v_disp = str(v).replace("\x00", ".")
+            if term in k_disp.lower() or term in v_disp.lower():
+                return True
+        return False
+
+    def _get_message_start_row(self, target_idx: int) -> int:
+        """Calculates the 1-based buffer row where a message starts."""
+        row = 1
+        for i in range(target_idx):
+            key = self.id_order[i]
+            row += self.messages[key].num_rows
+        return row
+
+    def _do_search(self, term: str, direction: int):
+        """Finds next match and scrolls to it."""
+        if not term or not self.id_order:
+            return
+
+        # Determine start index for search
+        start_idx = -1
+        if self.ui.selection_cursor is not None:
+            start_idx = self.ui.selection_cursor
+        else:
+            # Find which message is currently at the top
+            curr_row = 1
+            for i, key in enumerate(self.id_order):
+                msg_height = self.messages[key].num_rows
+                if curr_row >= self.ui.scroll + 1:
+                    start_idx = i
+                    break
+                curr_row += msg_height
+            if start_idx == -1:
+                start_idx = len(self.id_order) - 1
+
+        num_msgs = len(self.id_order)
+        for i in range(1, num_msgs + 1):
+            idx = (start_idx + i * direction) % num_msgs
+            if self._message_matches(self.id_order[idx], term):
+                target_row = self._get_message_start_row(idx)
+                # Scroll so the matched message is at the top
+                self.ui.scroll = max(0, target_row - 1)
+                # If in selection mode, update cursor
+                if self.ui.selection_cursor is not None:
+                    self.ui.selection_cursor = idx
+                self._redraw_all()
+                return True
+        return False
 
     def _get_user_input(self, prompt: str) -> Optional[str]:
         """Displays a prompt at the bottom and returns user text input."""
@@ -529,12 +667,15 @@ class J1939Viewer:
         lines = [
             "  pretty_j1939 Curses Viewer Help",
             "  -------------------------------",
-            "  q / ESC   : Quit viewer",
+            "  q / ESC   : Quit viewer / Clear search",
             "  Space     : Pause / Resume data receipt",
             "  c         : Clear all history and reset",
             "  s         : Sort rows by CAN ID",
             "  h         : Toggle highlighting for changed SPNs",
-            "  ?         : Show this help screen",
+            "  /         : Search forward (Enter for next)",
+            "  ?         : Search backward (Enter for next)",
+            "  n / N     : Next / Previous search match",
+            "  F1        : Show this help screen",
             "  UP / DOWN : Scroll display rows",
             "",
             "  Logging (Log Changes Mode):",
@@ -570,11 +711,32 @@ class J1939Viewer:
                 self.ui.selection_cursor = None
                 self.ui.marked_ids.clear()
                 self._redraw_all()
+            elif self.ui.search_term:
+                self.ui.search_term = ""
+                self._redraw_all()
             else:
                 return False
         elif key == ord("q"):
             return False
+        elif key == ord("/"):
+            term = self._get_user_input("/ ")
+            if term is not None:
+                if term:
+                    self.ui.search_term = term
+                self.ui.search_direction = 1
+                self._do_search(self.ui.search_term, 1)
         elif key == ord("?"):
+            term = self._get_user_input("? (press F1 for help) ")
+            if term is not None:
+                if term:
+                    self.ui.search_term = term
+                self.ui.search_direction = -1
+                self._do_search(self.ui.search_term, -1)
+        elif key == ord("n"):
+            self._do_search(self.ui.search_term, self.ui.search_direction)
+        elif key == ord("N"):
+            self._do_search(self.ui.search_term, -self.ui.search_direction)
+        elif key == curses.KEY_F1:
             self._show_help()
         elif key == ord("c"):
             self.messages.clear()

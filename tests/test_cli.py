@@ -216,9 +216,9 @@ def test_cli_highlight_multiple():
             ]
         )
         assert code == 0
-        # Both lines should contain the highlight color (255;255;255)
+        # Both lines should contain the highlight color (255;205;0)
         # Line 1 matches PGN 61444. Line 2 matches SA 0.
-        assert stdout.count("255;255;255") >= 2
+        assert stdout.count("255;205;0") >= 2
     finally:
         if os.path.exists(log_file):
             os.remove(log_file)
