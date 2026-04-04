@@ -22,7 +22,7 @@ except ImportError:
 if TYPE_CHECKING:
     import can
 
-from .describe import get_describer
+from .describe import get_describer, J1939Filter
 from .render import HighPerformanceRenderer, NUM_IN_PARENS_RE
 
 logger = logging.getLogger("pretty_j1939.viewer")
@@ -30,7 +30,7 @@ logger = logging.getLogger("pretty_j1939.viewer")
 # --- Constants ---
 PRETTY_COL_OFFSET = 50
 WRAP_INDENT = 4
-BOUNCE_BUFFER_WIDTH = 15
+BOUNCE_BUFFER_WIDTH = 25
 REFRESH_RATE_MS = 0.001
 
 # --- Utility Functions ---
@@ -90,6 +90,8 @@ class UIState:
         self.scroll: int = 0
         self.paused: bool = False
         self.highlight_changes: bool = False
+        self.search_term: str = ""
+        self.search_direction: int = 1  # 1 for forward, -1 for backward
         self.selection_cursor: Optional[int] = None
         self.marked_ids: Set[int] = set()
         self.active_logging_ids: Set[int] = set()
@@ -102,11 +104,17 @@ class UIState:
 
 class J1939Viewer:
     def __init__(
-        self, stdscr, bus: can.Bus, describer, theme_name: Optional[str] = None
+        self,
+        stdscr,
+        bus: can.Bus,
+        describer,
+        theme_name: Optional[str] = None,
+        j1939_filter: Optional[J1939Filter] = None,
     ):
         self.stdscr = stdscr
         self.bus = bus
         self.describer = describer
+        self.j1939_filter = j1939_filter
         self.ui = UIState()
 
         # Theme and Colors
@@ -120,6 +128,16 @@ class J1939Viewer:
         self.screen_h, self.screen_w = self.stdscr.getmaxyx()
 
         self.run()
+
+    def _safe_addstr(self, *args, win=None):
+        """Wrapper for addstr that handles exceptions."""
+        if not args:
+            return
+        target = win if win else self.stdscr
+        try:
+            target.addstr(*args)
+        except Exception:
+            pass
 
     def _init_curses(self):
         """Sets up curses modes and color pairs."""
@@ -167,10 +185,16 @@ class J1939Viewer:
         curr_x, num_rows = PRETTY_COL_OFFSET, 1
         max_x = self.screen_w - 1
 
-        for k, v_str, _, _, is_first in HighPerformanceRenderer.iterate_pretty_fields(
+        for (
+            k,
+            v_str,
+            _,
+            _,
+            is_first,
+        ) in HighPerformanceRenderer.iterate_pretty_fields(
             state.description, state.previous_description, self.ui.highlight_changes
         ):
-            kv_len = len(str(k)) + len(v_str) + 2  # "key: value"
+            kv_len = len(str(k)) + len(str(v_str)) + 2  # "key: value"
             sep_len = 0 if is_first else 2  # ", "
 
             if not is_first and curr_x + sep_len + kv_len > max_x:
@@ -195,7 +219,7 @@ class J1939Viewer:
         elif self.ui.selection_cursor is not None:
             text += f" [SELECT: {len(self.ui.marked_ids)} marked]"
 
-        self.stdscr.addstr(0, 0, text[: self.screen_w], curses.A_BOLD)
+        self._safe_addstr(0, 0, text[: self.screen_w], curses.A_BOLD)
 
     def _draw_message_row(self, key: int, start_row: int):
         """Draws a single ID's data across one or more rows."""
@@ -263,10 +287,34 @@ class J1939Viewer:
                 if state.msg.is_extended_id
                 else f"0x{state.msg.arbitration_id:03X}"
             )
+            count_str = f"{state.count:<8}"
+            dt_str = f"{round(state.dt, 2):<8.3f}"
+            id_col_str = f"{marker}{id_hex:<11}"
 
-            self.stdscr.addstr(screen_row, 0, f"{state.count:<8}", attr_base)
-            self.stdscr.addstr(screen_row, 8, f"{round(state.dt, 2):<8.3f}", attr_base)
-            self.stdscr.addstr(screen_row, 16, f"{marker}{id_hex:<11}", attr_base)
+            search_highlight = curses.color_pair(5)
+
+            c_attr = (
+                search_highlight
+                if self.ui.search_term
+                and self.ui.search_term.lower() in count_str.lower()
+                else attr_base
+            )
+            self._safe_addstr(screen_row, 0, count_str, c_attr)
+
+            d_attr = (
+                search_highlight
+                if self.ui.search_term and self.ui.search_term.lower() in dt_str.lower()
+                else attr_base
+            )
+            self._safe_addstr(screen_row, 8, dt_str, d_attr)
+
+            i_attr = (
+                search_highlight
+                if self.ui.search_term
+                and self.ui.search_term.lower() in id_col_str.lower()
+                else attr_base
+            )
+            self._safe_addstr(screen_row, 16, id_col_str, i_attr)
 
     def _get_byte_attr(
         self,
@@ -275,7 +323,10 @@ class J1939Viewer:
         is_hover: bool,
         is_marked: bool,
         attr_base: int,
+        is_search_match: bool = False,
     ) -> int:
+        if is_search_match:
+            return curses.color_pair(5)
         if is_hover or is_marked:
             return attr_base
         if is_diff and self.ui.highlight_changes:
@@ -309,6 +360,10 @@ class J1939Viewer:
         data_hex = state.msg.data.hex().upper()
         prev_data_hex = getattr(state, "previous_data_hex", "")
 
+        is_search_match = (
+            self.ui.search_term and self.ui.search_term.upper() in data_hex
+        )
+
         for i in range(0, min(len(data_hex), 16), 2):
             byte_str = data_hex[i : i + 2]
             is_diff = False
@@ -316,13 +371,18 @@ class J1939Viewer:
                 is_diff = byte_str != prev_data_hex[i : i + 2]
 
             attr = self._get_byte_attr(
-                byte_str, is_diff, is_hover, is_marked, attr_base
+                byte_str,
+                is_diff,
+                is_hover,
+                is_marked,
+                attr_base,
+                is_search_match=is_search_match,
             )
-            self.stdscr.addstr(screen_row, curr_x, byte_str, attr)
+            self._safe_addstr(screen_row, curr_x, byte_str, attr)
             curr_x += 2
 
         if len(data_hex) > 16:
-            self.stdscr.addstr(screen_row, curr_x, "..", attr_base)
+            self._safe_addstr(screen_row, curr_x, "..", attr_base)
 
     def _draw_pretty_value(self, curr_y, curr_x, v_str, val_attr):
         # Apply numeric colorization if using default color and parens are present
@@ -334,7 +394,7 @@ class J1939Viewer:
                 room = self.screen_w - 1 - curr_x
                 if room <= 0:
                     break
-                self.stdscr.addstr(curr_y, curr_x, pre[:room], val_attr)
+                self._safe_addstr(curr_y, curr_x, pre[:room], val_attr)
                 curr_x += len(pre[:room])
 
                 # Number itself
@@ -342,9 +402,7 @@ class J1939Viewer:
                 room = self.screen_w - 1 - curr_x
                 if room <= 0:
                     break
-                self.stdscr.addstr(
-                    curr_y, curr_x, num_part[:room], curses.color_pair(2)
-                )
+                self._safe_addstr(curr_y, curr_x, num_part[:room], curses.color_pair(2))
                 curr_x += len(num_part[:room])
 
                 last_end = match.end(2)
@@ -353,12 +411,12 @@ class J1939Viewer:
             post = v_str[last_end:]
             room = self.screen_w - 1 - curr_x
             if room > 0:
-                self.stdscr.addstr(curr_y, curr_x, post[:room], val_attr)
+                self._safe_addstr(curr_y, curr_x, post[:room], val_attr)
                 curr_x += len(post[:room])
         else:
             room = self.screen_w - 1 - curr_x
             if room > 0:
-                self.stdscr.addstr(curr_y, curr_x, v_str[:room], val_attr)
+                self._safe_addstr(curr_y, curr_x, v_str[:room], val_attr)
                 curr_x += len(v_str[:room])
         return curr_x
 
@@ -382,64 +440,92 @@ class J1939Viewer:
         ) in HighPerformanceRenderer.iterate_pretty_fields(
             state.description, state.previous_description, self.ui.highlight_changes
         ):
-            kv_len = len(str(k)) + len(v_str) + 2
+            kv_len = len(str(k)) + len(str(v_str)) + 2
             sep_len = 0 if is_first else 2
 
             if not is_first and curr_x + sep_len + kv_len > self.screen_w - 1:
                 curr_y += 1
-                curr_x = PRETTY_COL_OFFSET + WRAP_INDENT
+                curr_x = PRETTY_COL_OFFSET + WRAP_INDENT + kv_len
                 sep_len, is_first = 0, True
+            else:
+                curr_x += sep_len + kv_len
+                is_first = False
 
             if curr_y >= self.screen_h:
                 break
             if curr_y < 1:
-                curr_x += sep_len + kv_len
                 continue
+
+            # Calculate where to start drawing this field
+            draw_x = curr_x - kv_len
+
+            is_search_match = self.ui.search_term and (
+                self.ui.search_term.lower() in str(k).lower()
+                or self.ui.search_term.lower() in str(v_str).lower()
+            )
 
             # Draw separator
             if sep_len:
-                self.stdscr.addstr(
+                self._safe_addstr(
                     curr_y,
-                    curr_x,
+                    draw_x - 2,
                     ", ",
                     attr_base if (is_hover or is_marked) else curses.color_pair(3),
                 )
-                curr_x += 2
 
             # Draw Key
-            self.stdscr.addstr(
-                curr_y,
-                curr_x,
-                f"{k}: ",
-                attr_base if (is_hover or is_marked) else curses.color_pair(1),
+            key_attr = (
+                curses.color_pair(5)
+                if is_search_match
+                else (attr_base if (is_hover or is_marked) else curses.color_pair(1))
             )
-            curr_x += len(k) + 2
+            self._safe_addstr(
+                curr_y,
+                draw_x,
+                f"{k}: ",
+                key_attr,
+            )
+            draw_x += len(str(k)) + 2
 
             # Draw Value
-            if is_bytes and k in prev_desc and len(v_str) == len(str(prev_desc[k])):
+            if (
+                is_bytes
+                and k in prev_desc
+                and len(str(v_str)) == len(str(prev_desc[k]))
+            ):
                 # Special granular byte highlight
                 prev_v_str = str(prev_desc[k])
-                for i in range(0, len(v_str), 2):
-                    pair, p_pair = v_str[i : i + 2], prev_v_str[i : i + 2]
+                for i in range(0, len(str(v_str)), 2):
+                    pair, p_pair = str(v_str)[i : i + 2], prev_v_str[i : i + 2]
                     attr = (
+                        curses.color_pair(5)
+                        if is_search_match
+                        else (
+                            attr_base
+                            if (is_hover or is_marked)
+                            else (
+                                curses.color_pair(5)
+                                if (self.ui.highlight_changes and pair != p_pair)
+                                else curses.color_pair(3)
+                            )
+                        )
+                    )
+                    if draw_x + 2 < self.screen_w:
+                        self._safe_addstr(curr_y, draw_x, pair, attr)
+                        draw_x += 2
+            else:
+                val_attr = (
+                    curses.color_pair(5)
+                    if is_search_match
+                    else (
                         attr_base
                         if (is_hover or is_marked)
                         else (
-                            curses.color_pair(5)
-                            if (self.ui.highlight_changes and pair != p_pair)
-                            else curses.color_pair(3)
+                            curses.color_pair(5) if is_changed else curses.color_pair(3)
                         )
                     )
-                    if curr_x + 2 < self.screen_w:
-                        self.stdscr.addstr(curr_y, curr_x, pair, attr)
-                        curr_x += 2
-            else:
-                val_attr = (
-                    attr_base
-                    if (is_hover or is_marked)
-                    else (curses.color_pair(5) if is_changed else curses.color_pair(3))
                 )
-                curr_x = self._draw_pretty_value(curr_y, curr_x, v_str, val_attr)
+                self._draw_pretty_value(curr_y, draw_x, v_str, val_attr)
 
     def _redraw_all(self):
         """Full screen refresh."""
@@ -451,13 +537,90 @@ class J1939Viewer:
 
     # --- Interaction ---
 
+    def _message_matches(self, key: int, term: str) -> bool:
+        """Checks if a message's displayed text matches the search term."""
+        if not term:
+            return False
+        state = self.messages.get(key)
+        if not state:
+            return False
+        term = term.lower()
+
+        # Metadata
+        id_hex = (
+            f"0x{state.msg.arbitration_id:08X}"
+            if state.msg.is_extended_id
+            else f"0x{state.msg.arbitration_id:03X}"
+        )
+        if term in id_hex.lower():
+            return True
+        if term in str(state.count).lower():
+            return True
+        if term in f"{state.dt:.3f}".lower():
+            return True
+
+        # Bytes
+        if term in state.msg.data.hex().lower():
+            return True
+
+        # Pretty fields
+        for k, v in state.description.items():
+            if k.startswith("_"):
+                continue
+            if term in str(k).lower() or term in str(v).lower():
+                return True
+        return False
+
+    def _get_message_start_row(self, target_idx: int) -> int:
+        """Calculates the 1-based buffer row where a message starts."""
+        row = 1
+        for i in range(target_idx):
+            key = self.id_order[i]
+            row += self.messages[key].num_rows
+        return row
+
+    def _do_search(self, term: str, direction: int):
+        """Finds next match and scrolls to it."""
+        if not term or not self.id_order:
+            return
+
+        # Determine start index for search
+        start_idx = -1
+        if self.ui.selection_cursor is not None:
+            start_idx = self.ui.selection_cursor
+        else:
+            # Find which message is currently at the top
+            curr_row = 1
+            for i, key in enumerate(self.id_order):
+                msg_height = self.messages[key].num_rows
+                if curr_row >= self.ui.scroll + 1:
+                    start_idx = i
+                    break
+                curr_row += msg_height
+            if start_idx == -1:
+                start_idx = len(self.id_order) - 1
+
+        num_msgs = len(self.id_order)
+        for i in range(1, num_msgs + 1):
+            idx = (start_idx + i * direction) % num_msgs
+            if self._message_matches(self.id_order[idx], term):
+                target_row = self._get_message_start_row(idx)
+                # Scroll so the matched message is at the top
+                self.ui.scroll = max(0, target_row - 1)
+                # If in selection mode, update cursor
+                if self.ui.selection_cursor is not None:
+                    self.ui.selection_cursor = idx
+                self._redraw_all()
+                return True
+        return False
+
     def _get_user_input(self, prompt: str) -> Optional[str]:
         """Displays a prompt at the bottom and returns user text input."""
         curses.echo()
         curses.curs_set(1)
         self.stdscr.move(self.screen_h - 1, 0)
         self.stdscr.clrtoeol()
-        self.stdscr.addstr(self.screen_h - 1, 0, prompt)
+        self._safe_addstr(self.screen_h - 1, 0, prompt)
         self.stdscr.refresh()
 
         result = ""
@@ -473,7 +636,7 @@ class J1939Viewer:
                     result = result[:-1]
                     self.stdscr.move(self.screen_h - 1, len(prompt))
                     self.stdscr.clrtoeol()
-                    self.stdscr.addstr(result)
+                    self._safe_addstr(result)
             elif 32 <= ch <= 126:
                 result += chr(ch)
             time.sleep(0.01)
@@ -489,12 +652,15 @@ class J1939Viewer:
         lines = [
             "  pretty_j1939 Curses Viewer Help",
             "  -------------------------------",
-            "  q / ESC   : Quit viewer",
+            "  q / ESC   : Quit viewer / Clear search",
             "  Space     : Pause / Resume data receipt",
             "  c         : Clear all history and reset",
             "  s         : Sort rows by CAN ID",
             "  h         : Toggle highlighting for changed SPNs",
-            "  ?         : Show this help screen",
+            "  /         : Search forward (Enter for next)",
+            "  ?         : Search backward (Enter for next)",
+            "  n / N     : Next / Previous search match",
+            "  F1        : Show this help screen",
             "  UP / DOWN : Scroll display rows",
             "",
             "  Logging (Log Changes Mode):",
@@ -510,7 +676,7 @@ class J1939Viewer:
         win = curses.newwin(h, w, y, x)
         win.box()
         for i, line in enumerate(lines):
-            win.addstr(i + 2, 2, line[: w - 4])
+            self._safe_addstr(i + 2, 2, line[: w - 4], win=win)
         win.refresh()
         while self.stdscr.getch() == -1:
             time.sleep(0.01)
@@ -530,11 +696,32 @@ class J1939Viewer:
                 self.ui.selection_cursor = None
                 self.ui.marked_ids.clear()
                 self._redraw_all()
+            elif self.ui.search_term:
+                self.ui.search_term = ""
+                self._redraw_all()
             else:
                 return False
         elif key == ord("q"):
             return False
+        elif key == ord("/"):
+            term = self._get_user_input("/ ")
+            if term is not None:
+                if term:
+                    self.ui.search_term = term
+                self.ui.search_direction = 1
+                self._do_search(self.ui.search_term, 1)
         elif key == ord("?"):
+            term = self._get_user_input("? (press F1 for help) ")
+            if term is not None:
+                if term:
+                    self.ui.search_term = term
+                self.ui.search_direction = -1
+                self._do_search(self.ui.search_term, -1)
+        elif key == ord("n"):
+            self._do_search(self.ui.search_term, self.ui.search_direction)
+        elif key == ord("N"):
+            self._do_search(self.ui.search_term, -self.ui.search_direction)
+        elif key == curses.KEY_F1:
             self._show_help()
         elif key == ord("c"):
             self.messages.clear()
@@ -613,6 +800,13 @@ class J1939Viewer:
 
     def _process_message(self, msg: can.Message):
         """Decodes message and updates internal state."""
+        new_desc = self.describer(msg.data, msg.arbitration_id)
+        if not new_desc:
+            return
+
+        if self.j1939_filter and not self.j1939_filter.matches(new_desc):
+            return
+
         key = msg.arbitration_id | (1 << 32 if msg.is_extended_id else 0)
 
         if key not in self.messages:
@@ -628,8 +822,6 @@ class J1939Viewer:
 
         state = self.messages[key]
         state.count += 1
-
-        new_desc = self.describer(msg.data, msg.arbitration_id)
 
         # Logging check
         if key in self.ui.active_logging_ids and self.ui.log_file_handle:
@@ -652,7 +844,8 @@ class J1939Viewer:
         state.description = new_desc
         new_rows = self._calculate_required_rows(state)
 
-        if new_rows != state.num_rows:
+        # Allow growth, but never shrink - prevents UI 'bouncing'
+        if new_rows > state.num_rows:
             state.num_rows = new_rows
             self._redraw_all()
         else:
@@ -694,7 +887,7 @@ def main():
             "Error: 'python-can' is not installed. Curses viewer requires 'python-can'."
         )
 
-    from .__main__ import get_parser
+    from .__main__ import get_parser, _parse_list_args
 
     parser = get_parser()
     parser.description = "Pretty J1939 Curses Viewer"
@@ -728,17 +921,6 @@ def main():
                     }
                 )
 
-    bus_kwargs = {
-        "interface": args.interface,
-        "channel": args.channel,
-        "bitrate": args.bitrate,
-        **extra_kwargs,
-    }
-    # Filter out None values to let python-can use its defaults
-    bus_kwargs = {k: v for k, v in bus_kwargs.items() if v is not None}
-    if can_filters:
-        bus_kwargs["can_filters"] = can_filters
-
     describer = get_describer(
         da_json=args.da_json,
         describe_pgns=args.pgn,
@@ -752,6 +934,27 @@ def main():
         enable_isotp=args.enable_isotp,
     )
 
+    pgn_list = _parse_list_args(args.filter_pgn)
+    sa_list = _parse_list_args(args.filter_sa)
+    da_list = _parse_list_args(args.filter_da)
+    ca_list = _parse_list_args(args.filter_ca)
+
+    j1939_filter = J1939Filter(
+        describer.da_describer, pgn_list, sa_list, da_list, ca_list
+    )
+    can_filters = j1939_filter.generate_can_filters(can_filters)
+
+    bus_kwargs = {
+        "interface": args.interface,
+        "channel": args.channel,
+        "bitrate": args.bitrate,
+        **extra_kwargs,
+    }
+    # Filter out None values to let python-can use its defaults
+    bus_kwargs = {k: v for k, v in bus_kwargs.items() if v is not None}
+    if can_filters:
+        bus_kwargs["can_filters"] = can_filters
+
     try:
         bus = can.Bus(**bus_kwargs)
         curses.wrapper(
@@ -759,9 +962,10 @@ def main():
             bus,
             describer,
             theme_name=args.theme,
+            j1939_filter=j1939_filter,
         )
-    except can.CanError as e:
-        print(f"Error: Failed to open CAN bus: {e}", file=sys.stderr)
+    except (can.CanError, ValueError, RuntimeError) as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:
         logger.info("Viewer terminated by user")

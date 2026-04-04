@@ -166,3 +166,89 @@ def test_draw_message_row_highlights(mock_curses):
     assert (
         found_changed_pretty
     ), "Expected changed pretty description to use color_pair(5)"
+
+
+def test_draw_message_row_search(mock_curses):
+    win = MockWindow()
+
+    with patch.object(J1939Viewer, "run"):
+        viewer = J1939Viewer(win, MagicMock(), MagicMock(), theme_name="monokai")
+
+    viewer.ui.search_term = "RPM"
+
+    msg = can.Message(
+        arbitration_id=0x18FEEB00,
+        data=b"\x01\x02\x03\x04\x05\x06\x07\x08",
+        is_extended_id=True,
+    )
+    state = MessageState(msg=msg, count=5, dt=0.01)
+    state.description = {"PGN": "Engine RPM", "RPM": "1000", "Temp": "50"}
+
+    viewer.messages[0x18FEEB00] = state
+    viewer.id_order = [0x18FEEB00]
+
+    viewer._draw_message_row(0x18FEEB00, 2)
+
+    # color_pair(5) is mock-mapped to 5 * 256 = 1280
+    SEARCH_HIGHLIGHT_ATTR = 1280
+
+    # Check that "Engine RPM" and "RPM" were printed with the search highlight color
+    found_engine_rpm_highlight = False
+    found_rpm_highlight = False
+    found_temp_no_highlight = True  # Start true, prove false if highlighted
+
+    for args in win.addstr_calls:
+        if len(args) >= 4:
+            text, attr = args[2], args[3]
+            if "Engine RPM" in text and attr == SEARCH_HIGHLIGHT_ATTR:
+                found_engine_rpm_highlight = True
+            if "RPM" in text and attr == SEARCH_HIGHLIGHT_ATTR:
+                found_rpm_highlight = True
+            if "Temp" in text and attr == SEARCH_HIGHLIGHT_ATTR:
+                found_temp_no_highlight = False
+
+    assert (
+        found_engine_rpm_highlight
+    ), "Expected 'Engine RPM' (PGN label matching search) to use color_pair(5)"
+    assert (
+        found_rpm_highlight
+    ), "Expected 'RPM' (Field label matching search) to use color_pair(5)"
+    assert (
+        found_temp_no_highlight
+    ), "Expected 'Temp' (No search match) to NOT use color_pair(5)"
+
+
+def test_draw_message_row_search_static(mock_curses):
+    win = MockWindow()
+
+    with patch.object(J1939Viewer, "run"):
+        viewer = J1939Viewer(win, MagicMock(), MagicMock(), theme_name="monokai")
+
+    viewer.ui.search_term = "0x18FEEB00"
+
+    msg = can.Message(
+        arbitration_id=0x18FEEB00,
+        data=b"\x01\x02\x03\x04\x05\x06\x07\x08",
+        is_extended_id=True,
+    )
+    state = MessageState(msg=msg, count=5, dt=0.01)
+    state.description = {"PGN": "Engine RPM"}
+
+    viewer.messages[0x18FEEB00] = state
+    viewer.id_order = [0x18FEEB00]
+
+    viewer._draw_message_row(0x18FEEB00, 2)
+
+    # color_pair(5) is mock-mapped to 1280
+    SEARCH_HIGHLIGHT_ATTR = 1280
+
+    found_id_highlight = False
+    for args in win.addstr_calls:
+        if len(args) >= 4:
+            text, attr = args[2], args[3]
+            if "0x18FEEB00" in text and attr == SEARCH_HIGHLIGHT_ATTR:
+                found_id_highlight = True
+
+    assert (
+        found_id_highlight
+    ), "Expected ID column matching search term to use color_pair(5)"

@@ -19,30 +19,29 @@ NUM_IN_PARENS_RE = re.compile(r"(\()([^)]*[0-9/x][^)]*)(\))")
 
 
 class HighPerformanceRenderer:
-    BOUNCE_BUFFER_WIDTH = 15
+    BOUNCE_BUFFER_WIDTH = 25
 
     DEFAULT_THEME = {
-        "keys": "#3465a4",
-        "strings": "default",
-        "numbers": "#f57900",
+        "keys": "#FFCD00",
+        "strings": "#FFFFFF",
+        "numbers": "#007A33",
         "disabled_bytes": "#555753",
         "zero_bytes": "#babdb6",
-        "ascii_bytes": "#75507b",
-        "normal_bytes": "default",
-        "highlight": "#ffffff",
+        "ascii_bytes": "#007A33",
+        "normal_bytes": "#FFFFFF",
+        "highlight": "#FFCD00",
     }
 
     @staticmethod
     def format_value(key: str, val: Any) -> str:
-        """Applies fixed-width limits to floating point numbers ONLY, preserving units."""
+        """Applies fixed-width limits to numeric values, preserving units."""
         s = str(val)
         if key in ("Bytes", "Transport Data"):
             return s
 
-        # Detect floating point with optional units: e.g. "12.5 [deg]"
+        # Detect numeric part with optional units: e.g. "12.5 [deg]" or "0 [kpa]"
         t = s.strip()
-        if t and "." in t:
-            # Split into numeric part and everything else (like units)
+        if t:
             # Find first space or bracket to isolate the number
             split_idx = -1
             for i, char in enumerate(t):
@@ -53,14 +52,23 @@ class HighPerformanceRenderer:
             num_part = t[:split_idx] if split_idx != -1 else t
             rest_part = t[split_idx:] if split_idx != -1 else ""
 
-            # Verify num_part is actually numeric
+            # Verify num_part is actually numeric (integer or float)
+            is_numeric = False
             if num_part.replace(".", "", 1).isdigit() or (
                 num_part.startswith(("-", "+"))
                 and num_part[1:].replace(".", "", 1).isdigit()
             ):
+                is_numeric = True
+
+            if is_numeric:
                 # Pad/truncate ONLY the numeric part to prevent jitter
+                # We use a fixed width for the number to keep subsequent units and fields aligned.
                 formatted_num = f"{num_part[:HighPerformanceRenderer.BOUNCE_BUFFER_WIDTH]:<{HighPerformanceRenderer.BOUNCE_BUFFER_WIDTH}}"
                 return f"{formatted_num}{rest_part}"
+
+        # If not numeric, pad the whole string if it's shorter than buffer
+        if len(s) < HighPerformanceRenderer.BOUNCE_BUFFER_WIDTH:
+            return f"{s:<{HighPerformanceRenderer.BOUNCE_BUFFER_WIDTH}}"
 
         return s
 
