@@ -1468,7 +1468,10 @@ def decode_j1939_name(
     ig_name = lookup(industry_db, ig_val, f"Unknown Industry Group {ig_val}")
 
     # Vehicle System Lookup
-    vs_name = lookup(vehicle_db, vs_val, f"Unknown Vehicle System {vs_val}")
+    # First try dependent lookup (ig_vs), then fall back to independent lookup (vs)
+    vs_name = lookup(vehicle_db, f"{ig_val}_{vs_val}", None)
+    if vs_name is None:
+        vs_name = lookup(vehicle_db, vs_val, f"Unknown Vehicle System {vs_val}")
 
     # Function Lookup
     if func_val <= 127:

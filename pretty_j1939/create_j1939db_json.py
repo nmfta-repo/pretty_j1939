@@ -632,10 +632,17 @@ class J1939daConverter:
 
         header_row, header_row_num = self.get_header_row(sheet)
         id_col = self.get_any_header_column(
-            header_row, ["INDUSTRY_GROUP_CODE", "INDUSTRY_GROUP_ID", "ID"]
+            header_row,
+            ["INDUSTRY_GROUP_CODE", "INDUSTRY_GROUP_ID", "INDUSTRY_GROUP", "ID"],
         )
         name_col = self.get_any_header_column(
-            header_row, ["INDUSTRY_GROUP_NAME", "INDUSTRY_GROUP_DESCRIPTION", "NAME"]
+            header_row,
+            [
+                "INDUSTRY_GROUP_NAME",
+                "INDUSTRY_GROUP_DESCRIPTION",
+                "INDUSTRY_GROUP",
+                "NAME",
+            ],
         )
 
         for i in range(header_row_num + 1, sheet.nrows):
@@ -672,10 +679,17 @@ class J1939daConverter:
 
         header_row, header_row_num = self.get_header_row(sheet)
         id_col = self.get_any_header_column(
-            header_row, ["VEHICLE_SYSTEM_CODE", "VEHICLE_SYSTEM_ID", "ID"]
+            header_row,
+            ["VEHICLE_SYSTEM_CODE", "VEHICLE_SYSTEM_ID", "VEHICLE_SYSTEM", "ID"],
         )
         name_col = self.get_any_header_column(
-            header_row, ["VEHICLE_SYSTEM_NAME", "VEHICLE_SYSTEM_DESCRIPTION", "NAME"]
+            header_row,
+            [
+                "VEHICLE_SYSTEM_NAME",
+                "VEHICLE_SYSTEM_DESCRIPTION",
+                "VEHICLE_SYSTEM",
+                "NAME",
+            ],
         )
 
         for i in range(header_row_num + 1, sheet.nrows):
@@ -824,7 +838,12 @@ class J1939daConverter:
             self.process_industry_groups_sheet(ig_sheet)
 
         vs_sheet = self.find_first_sheet_by_name(
-            ["Global Vehicle Systems (B5)", "Global Vehicle Systems", "Vehicle Systems"]
+            [
+                "Global Vehicle Systems (B5)",
+                "Global Vehicle Systems",
+                "Vehicle Systems (B5)",
+                "Vehicle Systems",
+            ]
         )
         if vs_sheet:
             self.process_vehicle_systems_sheet(vs_sheet)
@@ -835,6 +854,8 @@ class J1939daConverter:
                 "Global Functions",
                 "Global NAME Functions (B11)",
                 "Global NAME Functions",
+                "NAME Functions - All Industry Inclusive (Table B11)",
+                "NAME Functions - All Industry Inclusive",
             ]
         )
         if func_sheet:
@@ -845,6 +866,7 @@ class J1939daConverter:
             vs_sheet_names = [
                 f"{ig_name} Vehicle Systems",
                 f" {ig_name} Vehicle Systems",
+                f"Industry Group {ig} Vehicle Systems",
             ]
             sheet = self.find_first_sheet_by_name(vs_sheet_names)
             if sheet:
@@ -853,7 +875,10 @@ class J1939daConverter:
             func_sheet_names = [
                 f"{ig_name} Functions",
                 f" {ig_name} Functions",
+                f"Industry Group {ig} Functions",
                 f"IG Specific NAME Function (B12)",
+                "NAME Functions - Industry Group And Vehicle System Dependent (Table B12)",
+                "NAME Functions - Industry Group And Vehicle System Dependent",
             ]
             sheet = self.find_first_sheet_by_name(func_sheet_names)
             if sheet:
