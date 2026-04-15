@@ -148,12 +148,22 @@ class J1939Filter:
         sa_list=None,
         da_list=None,
         ca_list=None,
+        priorities=None,
     ):
         self.da_describer = da_describer
         self.pgn_list = self._resolve_pgns(pgn_list)
         self.sa_list = self._resolve_addrs(sa_list, "Source Address")
         self.da_list = self._resolve_addrs(da_list, "Destination Address")
         self.ca_list = self._resolve_addrs(ca_list, "Controller Application")
+        # priorities: None means match any priority; a list/range restricts
+        # which CAN priority bits are included in generated hardware filters.
+        # Default (when explicitly building a scanner) is [6].
+        if priorities is None:
+            self.priorities = None
+        elif isinstance(priorities, int):
+            self.priorities = [priorities]
+        else:
+            self.priorities = list(priorities)
 
     def _resolve_pgns(self, raw_inputs):
         if not raw_inputs:
@@ -248,11 +258,30 @@ class J1939Filter:
             return True
 
     def generate_can_filters(self, initial_filters=None):
-        """Generate CAN-level filters from J1939 filter criteria."""
+        """Generate CAN-level filters from J1939 filter criteria.
+
+        When :attr:`priorities` is set, the generated filters include priority
+        bits so that the CAN controller (or software filter) only passes
+        messages whose priority bits match one of the configured values.  This
+        applies to both regular PGN filters and transport-protocol (RTS/BAM)
+        filters.  The default scanner priority is ``6``; the J1939 standard
+        transport priority of ``7`` is intentionally *not* hard-coded here so
+        that all scanner methods share the same configurable default.
+        """
         if not (self.pgn_list or self.sa_list or self.da_list or self.ca_list):
             return initial_filters
 
         can_filters = list(initial_filters) if initial_filters else []
+
+        # Build priority prefix tuples: (can_id_bits, can_mask_bits)
+        # When self.priorities is None we generate one "any-priority" entry.
+        PRIORITY_FIELD_MASK = 0x1C000000  # bits 28-26
+        if self.priorities is not None:
+            priority_prefixes = [
+                (p << 26, PRIORITY_FIELD_MASK) for p in self.priorities
+            ]
+        else:
+            priority_prefixes = [(0, 0)]
 
         pgn_filters = []
         for pgn_val in self.pgn_list:
@@ -271,18 +300,20 @@ class J1939Filter:
         tmp_sa_filters = sa_filters if sa_filters else [(0, 0)]
         tmp_da_filters = da_filters if da_filters else [(0, 0)]
 
-        def add_filter(pf, sf, df):
+        def add_filter(prio, pf, sf, df):
             can_filters.append(
                 {
-                    "can_id": pf[0] | sf[0] | df[0],
-                    "can_mask": pf[1] | sf[1] | df[1],
+                    "can_id": prio[0] | pf[0] | sf[0] | df[0],
+                    "can_mask": prio[1] | pf[1] | sf[1] | df[1],
                     "extended": True,
                 }
             )
 
         if not self.ca_list:
-            for pf, sf, df in product(tmp_pgn_filters, tmp_sa_filters, tmp_da_filters):
-                add_filter(pf, sf, df)
+            for prio, pf, sf, df in product(
+                priority_prefixes, tmp_pgn_filters, tmp_sa_filters, tmp_da_filters
+            ):
+                add_filter(prio, pf, sf, df)
         else:
             for controller_addr in self.ca_list:
                 sas_to_use = (
@@ -294,10 +325,10 @@ class J1939Filter:
                     else []
                 )
                 if sas_to_use:
-                    for pf, sf, df in product(
-                        tmp_pgn_filters, sas_to_use, tmp_da_filters
+                    for prio, pf, sf, df in product(
+                        priority_prefixes, tmp_pgn_filters, sas_to_use, tmp_da_filters
                     ):
-                        add_filter(pf, sf, df)
+                        add_filter(prio, pf, sf, df)
                 das_to_use = (
                     [((controller_addr << 8), 0x0000FF00)]
                     if any(
@@ -308,22 +339,28 @@ class J1939Filter:
                     else []
                 )
                 if das_to_use:
-                    for pf, sf, df in product(
-                        tmp_pgn_filters, tmp_sa_filters, das_to_use
+                    for prio, pf, sf, df in product(
+                        priority_prefixes, tmp_pgn_filters, tmp_sa_filters, das_to_use
                     ):
-                        add_filter(pf, sf, df)
+                        add_filter(prio, pf, sf, df)
 
-        # Include transport PGNs if PGN filtering is active
+        # Include transport PGNs if PGN filtering is active.
+        # Transport filters use the same priority configuration as regular
+        # filters – defaulting to priority 6 when priorities are set, not the
+        # J1939-standard transport priority of 7.
         if self.pgn_list:
             for tp_pgn in [60416, 60160, 59392]:
                 tp_pf = (tp_pgn << 8, 0x03FF0000)
                 if not self.ca_list:
-                    for _, sf, df in product([(0, 0)], tmp_sa_filters, tmp_da_filters):
-                        add_filter(tp_pf, sf, df)
+                    for prio, _, sf, df in product(
+                        priority_prefixes, [(0, 0)], tmp_sa_filters, tmp_da_filters
+                    ):
+                        add_filter(prio, tp_pf, sf, df)
                 else:
                     for c in self.ca_list:
-                        add_filter(tp_pf, (c, 0x000000FF), (0, 0))
-                        add_filter(tp_pf, (0, 0), ((c << 8), 0x0000FF00))
+                        for prio in priority_prefixes:
+                            add_filter(prio, tp_pf, (c, 0x000000FF), (0, 0))
+                            add_filter(prio, tp_pf, (0, 0), ((c << 8), 0x0000FF00))
 
         return can_filters
 
@@ -429,6 +466,7 @@ class DADescriber:
         include_transport_rawdata,
         include_na,
         include_raw_data,
+        default_priority=6,
     ):
         self.pgn_objects = {}
         self.spn_objects = {}
@@ -479,6 +517,15 @@ class DADescriber:
         self.include_transport_rawdata = include_transport_rawdata
         self.include_na = include_na
         self.include_raw_data = include_raw_data
+        # default_priority: priority value(s) treated as normal/expected for J1939
+        # messages.  The Priority field is omitted from description output when the
+        # message priority matches this default.  Accepts an int or a list/set of ints.
+        # The J1939 scanner uses 6 as the default for all methods (including RTS/TP
+        # messages which previously defaulted to priority 7 per the J1939 standard).
+        if isinstance(default_priority, int):
+            self.default_priorities = {default_priority}
+        else:
+            self.default_priorities = set(default_priority)
         # WARNING: PERFORMANCE OPTIMIZATION
         # Rationale: Caching SPN properties avoids redundant dictionary lookups and pre-calculates
         # fixed values like start bits and lengths. This significantly reduces CPU time during the
@@ -619,7 +666,7 @@ class DADescriber:
         da_formatted_address, da_address_name = self.get_formatted_address_and_name(da)
         sa_formatted_address, sa_address_name = self.get_formatted_address_and_name(sa)
 
-        if priority != 6:  # 6 is 0x18 shifted
+        if priority not in self.default_priorities:  # default priority is 6 (0x18 shifted)
             description["Priority"] = str(priority)
         description["PGN"] = self.get_pgn_description(pgn)
         description["SA"] = "%s%s" % (sa_address_name, sa_formatted_address)
@@ -1935,6 +1982,7 @@ DEFAULT_LINK = False
 DEFAULT_INCLUDE_NA = False
 DEFAULT_REAL_TIME = False
 DEFAULT_INCLUDE_RAW_DATA = False
+DEFAULT_PRIORITY = 6
 
 
 def get_describer(da_json=None, **kwargs):
@@ -1954,9 +2002,15 @@ def get_describer(da_json=None, **kwargs):
     # enable_isotp is only used by J1939Describer
     enable_isotp = kwargs.pop("enable_isotp", True)
 
+    # default_priority is only used by DADescriber; pop it before passing to
+    # J1939Describer so we don't get an unexpected-keyword-argument error.
+    default_priority = kwargs.pop("default_priority", DEFAULT_PRIORITY)
+
     describer = J1939Describer(enable_isotp=enable_isotp, **kwargs)
 
-    da_describer = DADescriber(da_json=da_json, **kwargs)
+    da_describer = DADescriber(
+        da_json=da_json, default_priority=default_priority, **kwargs
+    )
     describer.set_da_describer(da_describer)
 
     return describer

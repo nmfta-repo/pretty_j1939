@@ -16,6 +16,7 @@ __all__ = [
     "is_bam_rts_cts_message",
     "is_spn_bitencoded",
     "is_spn_numerical_values",
+    "J1939Scanner",
 ]
 
 DA_MASK = 0x0000FF00
@@ -205,3 +206,109 @@ def is_spn_numerical_values(spn_units):
         "request dependent",
         "ascii",
     )
+
+
+PRIORITY_MASK = 0x1C000000
+DEFAULT_PRIORITY = 6
+REQUEST_PGN = 0xEA00
+
+
+class J1939Scanner:
+    """Constructs J1939 CAN IDs for active bus scanning.
+
+    Supports a configurable range of priorities.  The default priority for all
+    scanner methods (including :meth:`rts`) is ``6``.  Prior implementations of
+    RTS-based transport scanning often hard-coded priority ``7`` (the J1939
+    standard transport priority); this class defaults to ``6`` for consistency.
+
+    Args:
+        sa (int): Source address of the scanner (0–254).
+        priority (int): Default priority for outgoing messages (0–7).
+            Defaults to ``6``.
+        priorities (list | range | None): Explicit list or range of priorities
+            to use when scanning across multiple priority levels.  When
+            provided, :attr:`priorities` takes precedence over *priority*.
+    """
+
+    def __init__(self, sa, priority=DEFAULT_PRIORITY, priorities=None):
+        self.sa = sa & 0xFF
+        if priorities is not None:
+            self.priorities = list(priorities)
+        else:
+            self.priorities = [priority]
+
+    @property
+    def priority(self):
+        """The default (first) priority used by this scanner."""
+        return self.priorities[0]
+
+    def build_can_id(self, pgn, da=0xFF, priority=None):
+        """Build a 29-bit J1939 CAN ID.
+
+        Args:
+            pgn (int): Parameter Group Number.
+            da (int): Destination address (0–255).  ``0xFF`` broadcasts.
+            priority (int | None): Override priority for this message.  Uses
+                :attr:`priority` when ``None``.
+
+        Returns:
+            int: 29-bit CAN ID.
+        """
+        p = priority if priority is not None else self.priority
+        pf = (pgn >> 8) & 0xFF
+        if pf < 240:
+            # PDU1 – destination-specific; DA goes in PS field
+            return (p << 26) | (pgn << 8) | (da << 8) | self.sa
+        else:
+            # PDU2 – broadcast; PS is part of the PGN
+            return (p << 26) | (pgn << 8) | self.sa
+
+    def request(self, requested_pgn, da=0xFF, priority=None):
+        """Build a CAN ID for a J1939 PGN Request (PGN 0xEA00).
+
+        Args:
+            requested_pgn (int): The PGN being requested.
+            da (int): Destination address.  ``0xFF`` broadcasts.
+            priority (int | None): Override priority.  Uses :attr:`priority`
+                when ``None``.
+
+        Returns:
+            int: CAN ID for the request message.
+        """
+        p = priority if priority is not None else self.priority
+        return (p << 26) | (REQUEST_PGN << 8) | (da << 8) | self.sa
+
+    def rts(self, pgn, da, priority=None):
+        """Build a CAN ID for a J1939 Transport Protocol RTS message.
+
+        The J1939 standard specifies priority ``7`` for transport protocol
+        messages; however, this scanner defaults to ``6`` (consistent with
+        all other scanner methods).  Pass *priority* explicitly to override.
+
+        Args:
+            pgn (int): PGN of the data to be transported (informational).
+            da (int): Destination address of the transport session.
+            priority (int | None): Override priority.  Uses :attr:`priority`
+                when ``None`` (default ``6``).
+
+        Returns:
+            int: CAN ID for the RTS Connection Management message.
+        """
+        p = priority if priority is not None else self.priority
+        # PGN 0xEC00 = Connection Management (CM); PDU1 → DA goes in PS field
+        return (p << 26) | (CM_MASK & 0x00FF0000) | (da << 8) | self.sa
+
+    def scan_can_ids(self, pgns, da=0xFF):
+        """Yield CAN IDs for request messages covering *pgns* across all
+        configured priorities.
+
+        Args:
+            pgns (iterable): Iterable of PGNs to request.
+            da (int): Destination address for each request.
+
+        Yields:
+            int: CAN ID for each (priority, pgn) combination.
+        """
+        for p in self.priorities:
+            for pgn in pgns:
+                yield self.request(pgn, da=da, priority=p)
