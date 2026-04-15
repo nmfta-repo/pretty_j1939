@@ -666,7 +666,7 @@ class DADescriber:
         da_formatted_address, da_address_name = self.get_formatted_address_and_name(da)
         sa_formatted_address, sa_address_name = self.get_formatted_address_and_name(sa)
 
-        if priority not in self.default_priorities:  # default priority is 6 (0x18 shifted)
+        if priority not in self.default_priorities:  # default priority value is 6
             description["Priority"] = str(priority)
         description["PGN"] = self.get_pgn_description(pgn)
         description["SA"] = "%s%s" % (sa_address_name, sa_formatted_address)

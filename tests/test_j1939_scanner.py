@@ -88,8 +88,10 @@ def test_request_method_default_priority_6():
     scanner = J1939Scanner(sa=0x0B)
     can_id = scanner.request(0xFECA, da=0xFF)
     assert (can_id >> 26) & 0x7 == 6
-    # PGN field: 0xEA00 << 8 → bits 23-8
-    assert (can_id >> 8) & 0xFFFF == (REQUEST_PGN | 0xFF)
+    # Verify PF byte (bits 23-16) encodes the Request PGN high byte (0xEA)
+    assert (can_id >> 16) & 0xFF == 0xEA
+    # Verify DA byte (bits 15-8) is 0xFF (broadcast)
+    assert (can_id >> 8) & 0xFF == 0xFF
 
 
 def test_request_method_priority_override():
