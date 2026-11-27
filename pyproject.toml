@@ -24,7 +24,7 @@ dependencies = [
     "xlrd",
     "openpyxl",
     "rich",
-    "bitstring>=4.0.1",
+    "bitstring>=4.0.1,<5",
     "python-can>=4.0.0"
 ]
 
