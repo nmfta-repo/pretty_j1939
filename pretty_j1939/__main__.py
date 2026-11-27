@@ -512,7 +512,7 @@ def _add_input_options(parser):
     input_group.add_argument(
         "-i",
         "--interface",
-        help="python-can backend interface to use (e.g. 'socketcan', 'cantact', 'vector'). "
+        help="python-can backend interface to use (e.g. 'socketcan', 'cantact', 'vector', 'cansub'). "
         "Enables live input instead of a log file.",
     )
     input_group.add_argument(

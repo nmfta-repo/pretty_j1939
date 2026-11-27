@@ -226,6 +226,12 @@ Additional driver-specific arguments can be passed using `--key=value` syntax:
 pretty_j1939 -i vector -c 1 --app-name=MyCanApp
 ```
 
+For a CSS Electronics CANsub (`pip install python-can-cansub`), the channel is the device and CAN channel:
+
+```bash
+pretty_j1939 -i cansub -c aabbccdd-usb.local@1 -b 250000 --candata
+```
+
 The script also supports multiple log formats when reading from files or pipes, including standard `candump` and `python-can` logger output. It also accepts stdin using `-`:
 
 ```bash
